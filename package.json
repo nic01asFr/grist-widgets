@@ -1,0 +1,20 @@
+{
+  "name": "grist-widgets",
+  "version": "1.0.0",
+  "description": "Collection de widgets custom pour Grist",
+  "scripts": {
+    "build:geo-map": "cd packages/geo-map && npm install && npm run build",
+    "build:all": "npm run build:geo-map && npm run prepare-dist",
+    "prepare-dist": "node scripts/prepare-dist.js",
+    "dev:geo-map": "cd packages/geo-map && npm start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nic01asFr/grist-widgets.git"
+  },
+  "author": "nic01asFr",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "fs-extra": "^11.1.1"
+  }
+}
