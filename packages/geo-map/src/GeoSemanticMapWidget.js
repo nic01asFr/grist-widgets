@@ -18,10 +18,13 @@ class WKTConverter {
   static parse(wkt) {
     if (!wkt || typeof wkt !== 'string') return null;
     
-    if (wkt.startsWith('POINT')) {
-      const match = wkt.match(/POINT\s*\(([^)]+)\)/i);
+    const trimmed = wkt.trim();
+    
+    if (trimmed.match(/^POINT/i)) {
+      const match = trimmed.match(/POINT\s*\(([^)]+)\)/i);
       if (!match) return null;
       const [lng, lat] = match[1].trim().split(/\s+/).map(Number);
+      if (isNaN(lng) || isNaN(lat)) return null;
       return {
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [lng, lat] },
@@ -29,8 +32,8 @@ class WKTConverter {
       };
     }
     
-    if (wkt.startsWith('LINESTRING')) {
-      const match = wkt.match(/LINESTRING\s*\(([^)]+)\)/i);
+    if (trimmed.match(/^LINESTRING/i)) {
+      const match = trimmed.match(/LINESTRING\s*\(([^)]+)\)/i);
       if (!match) return null;
       const coords = match[1].split(',').map(pair => {
         const [lng, lat] = pair.trim().split(/\s+/).map(Number);
@@ -43,8 +46,8 @@ class WKTConverter {
       };
     }
     
-    if (wkt.startsWith('POLYGON')) {
-      const match = wkt.match(/POLYGON\s*\(\((.+)\)\)/i);
+    if (trimmed.match(/^POLYGON/i)) {
+      const match = trimmed.match(/POLYGON\s*\(\((.+)\)\)/i);
       if (!match) return null;
       const coords = match[1].split(',').map(pair => {
         const [lng, lat] = pair.trim().split(/\s+/).map(Number);
@@ -59,53 +62,6 @@ class WKTConverter {
     
     return null;
   }
-  
-  static toWKT(layer) {
-    const geojson = layer.toGeoJSON();
-    const geom = geojson.geometry;
-    
-    if (geom.type === 'Point') {
-      return `POINT(${geom.coordinates[0]} ${geom.coordinates[1]})`;
-    }
-    if (geom.type === 'LineString') {
-      return `LINESTRING(${geom.coordinates.map(c => `${c[0]} ${c[1]}`).join(', ')})`;
-    }
-    if (geom.type === 'Polygon') {
-      return `POLYGON((${geom.coordinates[0].map(c => `${c[0]} ${c[1]}`).join(', ')}))`;
-    }
-    return null;
-  }
-}
-
-// Wait for Grist to be ready
-function getGrist() {
-  return new Promise((resolve) => {
-    if (window.grist && window.grist.ready) {
-      resolve(window.grist);
-    } else {
-      // Mock Grist for development
-      console.log('Grist API not found, using mock data');
-      const mockGrist = {
-        ready: () => Promise.resolve(),
-        onRecords: (callback) => {
-          const mockData = [
-            { id: 1, name: 'Paris', location: 'POINT(2.3522 48.8566)', description: 'Capitale' },
-            { id: 2, name: 'Lyon', location: 'POINT(4.8357 45.7640)', description: '2ème ville' }
-          ];
-          setTimeout(() => callback(mockData), 100);
-        },
-        onOptions: (callback) => {
-          setTimeout(() => callback({ geometry_column: 'location', name_column: 'name' }), 100);
-        },
-        setCursorPos: (pos) => console.log('Select:', pos.rowId),
-        updateRecord: (rowId, fields) => {
-          console.log('Update:', rowId, fields);
-          return Promise.resolve();
-        }
-      };
-      resolve(mockGrist);
-    }
-  });
 }
 
 // Map Controller
@@ -113,21 +69,27 @@ function MapController({ records, geometryColumn }) {
   const map = useMap();
   
   useEffect(() => {
-    if (records.length === 0) return;
+    if (!records || records.length === 0) return;
     
     const bounds = L.latLngBounds([]);
+    let hasValidBounds = false;
+    
     records.forEach(record => {
-      const feature = WKTConverter.parse(record[geometryColumn]);
+      const geomValue = record[geometryColumn];
+      if (!geomValue) return;
+      
+      const feature = WKTConverter.parse(geomValue);
       if (feature) {
         const geojson = L.geoJSON(feature);
         const featureBounds = geojson.getBounds();
         if (featureBounds.isValid()) {
           bounds.extend(featureBounds);
+          hasValidBounds = true;
         }
       }
     });
     
-    if (bounds.isValid()) {
+    if (hasValidBounds) {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
   }, [records, geometryColumn, map]);
@@ -138,46 +100,84 @@ function MapController({ records, geometryColumn }) {
 // Main Widget
 function GeoSemanticMapWidget() {
   const [records, setRecords] = useState([]);
+  const [mappedColumns, setMappedColumns] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [options, setOptions] = useState(null);
   const [error, setError] = useState(null);
-  
-  // Safe access to options with defaults
-  const geometryColumn = (options && options.geometry_column) || 'location';
-  const nameColumn = (options && options.name_column) || 'name';
   
   useEffect(() => {
     let mounted = true;
     
-    getGrist().then(grist => {
-      if (!mounted) return;
-      
-      return grist.ready();
+    // Check if Grist API is available
+    if (!window.grist) {
+      console.log('Grist API not found, using mock data');
+      // Use mock data for standalone testing
+      setRecords([
+        { id: 1, name: 'Paris', geometry: 'POINT(2.3522 48.8566)', description: 'Capitale' },
+        { id: 2, name: 'Lyon', geometry: 'POINT(4.8357 45.7640)', description: '2ème ville' }
+      ]);
+      setMappedColumns({ name: 'name', geometry: 'geometry', description: 'description' });
+      setLoading(false);
+      return;
+    }
+    
+    const grist = window.grist;
+    
+    // Declare widget requirements to Grist
+    grist.ready({
+      columns: [
+        { 
+          name: 'geometry', 
+          title: 'Géométrie',
+          description: 'Colonne contenant les géométries WKT (POINT, LINESTRING, POLYGON)',
+          type: 'Text',
+          optional: false
+        },
+        { 
+          name: 'name', 
+          title: 'Nom',
+          description: 'Colonne contenant les noms des entités',
+          type: 'Text',
+          optional: true
+        },
+        { 
+          name: 'description', 
+          title: 'Description',
+          description: 'Colonne contenant les descriptions',
+          type: 'Text',
+          optional: true
+        }
+      ],
+      requiredAccess: 'read table'
     }).then(() => {
-      if (!mounted) return;
+      console.log('Grist widget ready');
       
-      return getGrist();
-    }).then(grist => {
-      if (!mounted) return;
-      
-      grist.onRecords(data => {
-        if (mounted) {
-          console.log('Received records:', data);
-          setRecords(data || []);
-          setLoading(false);
-        }
+      // Listen for record changes
+      grist.onRecord((record, mappings) => {
+        if (!mounted) return;
+        console.log('Received single record:', record);
+        console.log('Column mappings:', mappings);
+        
+        // For single record mode, wrap in array
+        setRecords(record ? [record] : []);
+        setMappedColumns(mappings || {});
+        setLoading(false);
       });
       
-      grist.onOptions(opts => {
-        if (mounted) {
-          console.log('Received options:', opts);
-          setOptions(opts || {});
-        }
+      // Also listen for table data (when in table widget mode)
+      grist.onRecords((records, mappings) => {
+        if (!mounted) return;
+        console.log('Received records:', records);
+        console.log('Column mappings:', mappings);
+        
+        setRecords(records || []);
+        setMappedColumns(mappings || {});
+        setLoading(false);
       });
+      
     }).catch(err => {
       console.error('Error initializing Grist:', err);
       if (mounted) {
-        setError(err.message);
+        setError(err.message || 'Failed to initialize widget');
         setLoading(false);
       }
     });
@@ -202,10 +202,13 @@ function GeoSemanticMapWidget() {
         justifyContent: 'center', 
         height: '100vh',
         flexDirection: 'column',
-        gap: '16px'
+        gap: '16px',
+        padding: '20px'
       }}>
         <div style={{ fontSize: '48px' }}>⚠️</div>
-        <div style={{ color: '#e74c3c' }}>Error: {error}</div>
+        <div style={{ color: '#e74c3c', textAlign: 'center' }}>
+          <strong>Error:</strong> {error}
+        </div>
       </div>
     );
   }
@@ -221,10 +224,43 @@ function GeoSemanticMapWidget() {
         gap: '16px'
       }}>
         <div style={{ fontSize: '48px' }}>🗺️</div>
-        <div>Loading Geo-Semantic Map...</div>
+        <div>Chargement de la carte...</div>
       </div>
     );
   }
+  
+  if (!mappedColumns || !mappedColumns.geometry) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '16px',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '48px' }}>🗺️</div>
+        <div style={{ maxWidth: '400px' }}>
+          <strong>Configuration requise</strong>
+          <p>Veuillez mapper la colonne <strong>Géométrie</strong> dans les paramètres du widget.</p>
+          <p style={{ fontSize: '12px', color: '#666' }}>
+            Cette colonne doit contenir des géométries au format WKT (POINT, LINESTRING, POLYGON)
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
+  const geometryCol = mappedColumns.geometry;
+  const nameCol = mappedColumns.name || 'name';
+  const descCol = mappedColumns.description || 'description';
+  
+  const validRecords = records.filter(record => {
+    const geom = record[geometryCol];
+    return geom && WKTConverter.parse(geom);
+  });
   
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -233,50 +269,75 @@ function GeoSemanticMapWidget() {
         backgroundColor: '#2c3e50',
         color: 'white',
         display: 'flex',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
         <strong>🗺️ Carte Géospatiale</strong>
-        <span>{records.length} géométrie(s)</span>
+        <span style={{ fontSize: '14px' }}>
+          {validRecords.length} géométrie{validRecords.length > 1 ? 's' : ''}
+        </span>
       </div>
       
-      <MapContainer
-        center={[48.8566, 2.3522]}
-        zoom={6}
-        style={{ flex: 1 }}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution="&copy; OpenStreetMap"
-        />
-        
-        <MapController records={records} geometryColumn={geometryColumn} />
-        
-        {records.map(record => {
-          const feature = WKTConverter.parse(record[geometryColumn]);
-          if (!feature) return null;
+      {validRecords.length === 0 ? (
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '12px',
+          color: '#666'
+        }}>
+          <div style={{ fontSize: '48px' }}>📍</div>
+          <div>Aucune géométrie valide trouvée</div>
+          <div style={{ fontSize: '12px' }}>
+            Vérifiez que la colonne contient des géométries WKT valides
+          </div>
+        </div>
+      ) : (
+        <MapContainer
+          center={[46.603354, 1.888334]}
+          zoom={6}
+          style={{ flex: 1 }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; OpenStreetMap"
+          />
           
-          return (
-            <GeoJSON
-              key={record.id}
-              data={feature}
-              style={getStyle()}
-              onEachFeature={(feature, layer) => {
-                const name = record[nameColumn] || 'Sans nom';
-                const description = record.description || '';
-                layer.bindPopup(`
-                  <strong>${name}</strong><br/>
-                  ${description}
-                `);
-                layer.on('click', () => {
-                  getGrist().then(grist => {
-                    grist.setCursorPos({ rowId: record.id });
-                  });
-                });
-              }}
-            />
-          );
-        })}
-      </MapContainer>
+          <MapController records={validRecords} geometryColumn={geometryCol} />
+          
+          {validRecords.map((record, idx) => {
+            const feature = WKTConverter.parse(record[geometryCol]);
+            if (!feature) return null;
+            
+            const name = record[nameCol] || `Point ${idx + 1}`;
+            const description = record[descCol] || '';
+            
+            return (
+              <GeoJSON
+                key={record.id || idx}
+                data={feature}
+                style={getStyle()}
+                onEachFeature={(feature, layer) => {
+                  layer.bindPopup(`
+                    <div style="min-width: 150px;">
+                      <strong>${name}</strong>
+                      ${description ? `<br/><span style="color: #666;">${description}</span>` : ''}
+                    </div>
+                  `);
+                  
+                  if (window.grist && record.id) {
+                    layer.on('click', () => {
+                      window.grist.setCursorPos({ rowId: record.id });
+                    });
+                  }
+                }}
+              />
+            );
+          })}
+        </MapContainer>
+      )}
     </div>
   );
 }
