@@ -64,6 +64,17 @@ class WKTConverter {
   }
 }
 
+// Helper to normalize record format from Grist
+function normalizeRecord(record) {
+  // Grist can send records in different formats
+  if (record.fields) {
+    // Format: {id: 1, fields: {A: "value", B: "value"}}
+    return { id: record.id, ...record.fields };
+  }
+  // Format: {id: 1, A: "value", B: "value"}
+  return record;
+}
+
 // Map Controller
 function MapController({ records, geometryColumn }) {
   const map = useMap();
@@ -75,10 +86,16 @@ function MapController({ records, geometryColumn }) {
     let hasValidBounds = false;
     
     records.forEach(record => {
-      const geomValue = record[geometryColumn];
+      const normalized = normalizeRecord(record);
+      const geomValue = normalized[geometryColumn];
+      
+      console.log('Processing record:', normalized, 'geometry:', geomValue);
+      
       if (!geomValue) return;
       
       const feature = WKTConverter.parse(geomValue);
+      console.log('Parsed feature:', feature);
+      
       if (feature) {
         const geojson = L.geoJSON(feature);
         const featureBounds = geojson.getBounds();
@@ -90,7 +107,10 @@ function MapController({ records, geometryColumn }) {
     });
     
     if (hasValidBounds) {
+      console.log('Fitting bounds:', bounds);
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    } else {
+      console.warn('No valid bounds found');
     }
   }, [records, geometryColumn, map]);
   
@@ -168,6 +188,7 @@ function GeoSemanticMapWidget() {
         if (!mounted) return;
         console.log('Received records:', records);
         console.log('Column mappings:', mappings);
+        console.log('First record sample:', records && records[0]);
         
         setRecords(records || []);
         setMappedColumns(mappings || {});
@@ -257,10 +278,17 @@ function GeoSemanticMapWidget() {
   const nameCol = mappedColumns.name || 'name';
   const descCol = mappedColumns.description || 'description';
   
-  const validRecords = records.filter(record => {
+  // Normalize records and validate geometries
+  const validRecords = records.map(normalizeRecord).filter(record => {
     const geom = record[geometryCol];
-    return geom && WKTConverter.parse(geom);
+    const isValid = geom && WKTConverter.parse(geom);
+    if (!isValid && geom) {
+      console.warn('Invalid geometry for record:', record.id, geom);
+    }
+    return isValid;
   });
+  
+  console.log('Valid records:', validRecords.length, 'out of', records.length);
   
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -293,6 +321,11 @@ function GeoSemanticMapWidget() {
           <div style={{ fontSize: '12px' }}>
             Vérifiez que la colonne contient des géométries WKT valides
           </div>
+          <div style={{ fontSize: '10px', maxWidth: '300px', textAlign: 'center', marginTop: '10px' }}>
+            {records.length > 0 && (
+              <>Trouvé {records.length} enregistrement(s) mais aucune géométrie valide</>
+            )}
+          </div>
         </div>
       ) : (
         <MapContainer
@@ -313,6 +346,8 @@ function GeoSemanticMapWidget() {
             
             const name = record[nameCol] || `Point ${idx + 1}`;
             const description = record[descCol] || '';
+            
+            console.log('Rendering marker for:', name, feature);
             
             return (
               <GeoJSON
