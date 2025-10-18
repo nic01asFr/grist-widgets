@@ -77,23 +77,36 @@ class WKTConverter {
   }
 }
 
-// Grist API (mock for development, real API in production)
-const grist = window.grist || {
-  ready: () => Promise.resolve(),
-  onRecords: (callback) => {
-    const mockData = [
-      { id: 1, name: 'Paris', location: 'POINT(2.3522 48.8566)', description: 'Capitale' },
-      { id: 2, name: 'Lyon', location: 'POINT(4.8357 45.7640)', description: '2ème ville' }
-    ];
-    callback(mockData);
-  },
-  onOptions: (callback) => callback({ geometry_column: 'location', name_column: 'name' }),
-  setCursorPos: (pos) => console.log('Select:', pos.rowId),
-  updateRecord: (rowId, fields) => {
-    console.log('Update:', rowId, fields);
-    return Promise.resolve();
-  }
-};
+// Wait for Grist to be ready
+function getGrist() {
+  return new Promise((resolve) => {
+    if (window.grist && window.grist.ready) {
+      resolve(window.grist);
+    } else {
+      // Mock Grist for development
+      console.log('Grist API not found, using mock data');
+      const mockGrist = {
+        ready: () => Promise.resolve(),
+        onRecords: (callback) => {
+          const mockData = [
+            { id: 1, name: 'Paris', location: 'POINT(2.3522 48.8566)', description: 'Capitale' },
+            { id: 2, name: 'Lyon', location: 'POINT(4.8357 45.7640)', description: '2ème ville' }
+          ];
+          setTimeout(() => callback(mockData), 100);
+        },
+        onOptions: (callback) => {
+          setTimeout(() => callback({ geometry_column: 'location', name_column: 'name' }), 100);
+        },
+        setCursorPos: (pos) => console.log('Select:', pos.rowId),
+        updateRecord: (rowId, fields) => {
+          console.log('Update:', rowId, fields);
+          return Promise.resolve();
+        }
+      };
+      resolve(mockGrist);
+    }
+  });
+}
 
 // Map Controller
 function MapController({ records, geometryColumn }) {
@@ -127,21 +140,50 @@ function GeoSemanticMapWidget() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState({});
+  const [error, setError] = useState(null);
   
   const geometryColumn = options.geometry_column || 'location';
   const nameColumn = options.name_column || 'name';
   
   useEffect(() => {
-    grist.ready().then(() => {
+    let mounted = true;
+    
+    getGrist().then(grist => {
+      if (!mounted) return;
+      
+      return grist.ready();
+    }).then(() => {
+      if (!mounted) return;
+      
+      return getGrist();
+    }).then(grist => {
+      if (!mounted) return;
+      
       grist.onRecords(data => {
-        setRecords(data);
-        setLoading(false);
+        if (mounted) {
+          console.log('Received records:', data);
+          setRecords(data);
+          setLoading(false);
+        }
       });
       
       grist.onOptions(opts => {
-        setOptions(opts);
+        if (mounted) {
+          console.log('Received options:', opts);
+          setOptions(opts);
+        }
       });
+    }).catch(err => {
+      console.error('Error initializing Grist:', err);
+      if (mounted) {
+        setError(err.message);
+        setLoading(false);
+      }
     });
+    
+    return () => {
+      mounted = false;
+    };
   }, []);
   
   const getStyle = useCallback(() => ({
@@ -151,10 +193,34 @@ function GeoSemanticMapWidget() {
     weight: 2
   }), []);
   
+  if (error) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <div style={{ fontSize: '48px' }}>⚠️</div>
+        <div style={{ color: '#e74c3c' }}>Error: {error}</div>
+      </div>
+    );
+  }
+  
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        Loading...
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <div style={{ fontSize: '48px' }}>🗺️</div>
+        <div>Loading Geo-Semantic Map...</div>
       </div>
     );
   }
@@ -199,7 +265,9 @@ function GeoSemanticMapWidget() {
                   ${record.description || ''}
                 `);
                 layer.on('click', () => {
-                  grist.setCursorPos({ rowId: record.id });
+                  getGrist().then(grist => {
+                    grist.setCursorPos({ rowId: record.id });
+                  });
                 });
               }}
             />
