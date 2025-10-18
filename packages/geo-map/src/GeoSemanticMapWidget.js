@@ -230,21 +230,18 @@ function calculateLength(feature) {
   }
 }
 
-// Map Controller with auto-zoom
-function MapController({ records, geometryColumn, selectedIds }) {
+// Map Controller with auto-zoom (only on initial load)
+function MapController({ records, geometryColumn }) {
   const map = useMap();
+  const hasZoomedRef = useRef(false);
 
   useEffect(() => {
-    if (!records || records.length === 0) return;
+    if (!records || records.length === 0 || hasZoomedRef.current) return;
 
     const bounds = L.latLngBounds([]);
     let hasValidBounds = false;
 
-    const recordsToFit = selectedIds && selectedIds.length > 0
-      ? records.filter(r => selectedIds.includes(r.id))
-      : records;
-
-    recordsToFit.forEach(record => {
+    records.forEach(record => {
       const normalized = normalizeRecord(record);
       const geomValue = normalized[geometryColumn];
       if (!geomValue) return;
@@ -262,8 +259,9 @@ function MapController({ records, geometryColumn, selectedIds }) {
 
     if (hasValidBounds) {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      hasZoomedRef.current = true; // Mark as zoomed, never auto-zoom again
     }
-  }, [records, geometryColumn, selectedIds, map]);
+  }, [records, geometryColumn, map]);
 
   return null;
 }
@@ -890,7 +888,7 @@ function GeoSemanticMapWidget() {
             attribution="&copy; OpenStreetMap"
           />
 
-          <MapController records={validRecords} geometryColumn={geometryCol} selectedIds={selectedIds} />
+          <MapController records={validRecords} geometryColumn={geometryCol} />
           <GeomanController enabled={editMode} onGeometryCreated={handleGeometryCreated} />
 
           <MarkerClusterGroup>
