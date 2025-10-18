@@ -128,8 +128,8 @@ function GeoSemanticMapWidget() {
     let mounted = true;
     
     // Check if Grist API is available
-    if (!window.grist) {
-      console.log('Grist API not found, using mock data');
+    if (!window.grist || typeof window.grist.ready !== 'function') {
+      console.log('Grist API not found or not ready, using mock data');
       // Use mock data for standalone testing
       setRecords([
         { id: 1, name: 'Paris', geometry: 'POINT(2.3522 48.8566)', description: 'Capitale' },
@@ -149,21 +149,19 @@ function GeoSemanticMapWidget() {
           name: 'geometry', 
           title: 'Géométrie',
           description: 'Colonne contenant les géométries WKT (POINT, LINESTRING, POLYGON)',
-          type: 'Text',
           optional: false
+          // Ne pas spécifier de type pour accepter Text ET Geometry
         },
         { 
           name: 'name', 
           title: 'Nom',
           description: 'Colonne contenant les noms des entités',
-          type: 'Text',
           optional: true
         },
         { 
           name: 'description', 
           title: 'Description',
           description: 'Colonne contenant les descriptions',
-          type: 'Text',
           optional: true
         }
       ],
@@ -267,7 +265,9 @@ function GeoSemanticMapWidget() {
           <strong>Configuration requise</strong>
           <p>Veuillez mapper la colonne <strong>Géométrie</strong> dans les paramètres du widget.</p>
           <p style={{ fontSize: '12px', color: '#666' }}>
-            Cette colonne doit contenir des géométries au format WKT (POINT, LINESTRING, POLYGON)
+            Cette colonne doit contenir des géométries au format WKT (POINT, LINESTRING, POLYGON).
+            <br />
+            Types acceptés : Text ou Geometry
           </p>
         </div>
       </div>
@@ -314,16 +314,15 @@ function GeoSemanticMapWidget() {
           justifyContent: 'center',
           flexDirection: 'column',
           gap: '12px',
-          color: '#666'
+          color: '#666',
+          padding: '20px'
         }}>
           <div style={{ fontSize: '48px' }}>📍</div>
           <div>Aucune géométrie valide trouvée</div>
-          <div style={{ fontSize: '12px' }}>
+          <div style={{ fontSize: '12px', textAlign: 'center', maxWidth: '400px' }}>
             Vérifiez que la colonne contient des géométries WKT valides
-          </div>
-          <div style={{ fontSize: '10px', maxWidth: '300px', textAlign: 'center', marginTop: '10px' }}>
             {records.length > 0 && (
-              <>Trouvé {records.length} enregistrement(s) mais aucune géométrie valide</>
+              <><br/>{records.length} enregistrement(s) trouvé(s) mais aucune géométrie valide</>
             )}
           </div>
         </div>
