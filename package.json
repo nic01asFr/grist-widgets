@@ -6,7 +6,8 @@
     "build:geo-map": "cd packages/geo-map && npm install && npm run build",
     "build:all": "npm run build:geo-map && npm run prepare-dist",
     "prepare-dist": "node scripts/prepare-dist.js",
-    "dev:geo-map": "cd packages/geo-map && npm start"
+    "dev:geo-map": "cd packages/geo-map && npm start",
+    "verify": "node scripts/verify-config.js"
   },
   "repository": {
     "type": "git",
