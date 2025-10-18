@@ -2,7 +2,7 @@
   "name": "grist-geo-map-widget",
   "version": "1.0.0",
   "private": true,
-  "homepage": ".",
+  "homepage": "/grist-widgets/geo-map",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
