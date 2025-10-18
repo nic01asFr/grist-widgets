@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -18,7 +18,6 @@ L.Icon.Default.mergeOptions({
 class WKTConverter {
   static parse(wkt) {
     if (!wkt || typeof wkt !== 'string') return null;
-
     const trimmed = wkt.trim();
 
     // POINT
@@ -148,6 +147,25 @@ class WKTConverter {
       return `POLYGON((${coords}))`;
     }
 
+    if (type === 'MultiPoint') {
+      const coords = coordinates.map(c => `(${c[0]} ${c[1]})`).join(', ');
+      return `MULTIPOINT(${coords})`;
+    }
+
+    if (type === 'MultiLineString') {
+      const lines = coordinates.map(line =>
+        `(${line.map(c => `${c[0]} ${c[1]}`).join(', ')})`
+      ).join(', ');
+      return `MULTILINESTRING(${lines})`;
+    }
+
+    if (type === 'MultiPolygon') {
+      const polys = coordinates.map(poly =>
+        `((${poly[0].map(c => `${c[0]} ${c[1]}`).join(', ')}))`
+      ).join(', ');
+      return `MULTIPOLYGON(${polys})`;
+    }
+
     return null;
   }
 }
@@ -160,8 +178,60 @@ function normalizeRecord(record) {
   return record;
 }
 
+// Calculate geometry area in m²
+function calculateArea(feature) {
+  try {
+    const geojson = L.geoJSON(feature);
+    const latLngs = [];
+
+    geojson.eachLayer(layer => {
+      if (layer.getLatLngs) {
+        const latlngs = layer.getLatLngs();
+        if (Array.isArray(latlngs[0])) {
+          latLngs.push(...latlngs[0]);
+        } else {
+          latLngs.push(...latlngs);
+        }
+      }
+    });
+
+    if (latLngs.length < 3) return 0;
+
+    const polygon = L.polygon(latLngs);
+    const bounds = polygon.getBounds();
+    const area = (bounds.getNorth() - bounds.getSouth()) *
+                 (bounds.getEast() - bounds.getWest()) *
+                 111320 * 111320 * Math.cos(bounds.getCenter().lat * Math.PI / 180);
+
+    return Math.abs(area);
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Calculate line length in km
+function calculateLength(feature) {
+  try {
+    const geojson = L.geoJSON(feature);
+    let totalLength = 0;
+
+    geojson.eachLayer(layer => {
+      if (layer instanceof L.Polyline) {
+        const latLngs = layer.getLatLngs();
+        for (let i = 1; i < latLngs.length; i++) {
+          totalLength += latLngs[i-1].distanceTo(latLngs[i]);
+        }
+      }
+    });
+
+    return totalLength / 1000; // Convert to km
+  } catch (e) {
+    return 0;
+  }
+}
+
 // Map Controller with auto-zoom
-function MapController({ records, geometryColumn }) {
+function MapController({ records, geometryColumn, selectedIds }) {
   const map = useMap();
 
   useEffect(() => {
@@ -170,14 +240,16 @@ function MapController({ records, geometryColumn }) {
     const bounds = L.latLngBounds([]);
     let hasValidBounds = false;
 
-    records.forEach(record => {
+    const recordsToFit = selectedIds && selectedIds.length > 0
+      ? records.filter(r => selectedIds.includes(r.id))
+      : records;
+
+    recordsToFit.forEach(record => {
       const normalized = normalizeRecord(record);
       const geomValue = normalized[geometryColumn];
-
       if (!geomValue) return;
 
       const feature = WKTConverter.parse(geomValue);
-
       if (feature) {
         const geojson = L.geoJSON(feature);
         const featureBounds = geojson.getBounds();
@@ -189,9 +261,9 @@ function MapController({ records, geometryColumn }) {
     });
 
     if (hasValidBounds) {
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
     }
-  }, [records, geometryColumn, map]);
+  }, [records, geometryColumn, selectedIds, map]);
 
   return null;
 }
@@ -230,7 +302,6 @@ function GeomanController({ enabled, onGeometryCreated }) {
         onGeometryCreated(wkt);
       }
 
-      // Remove the drawn layer as it will be re-rendered from Grist data
       map.removeLayer(layer);
     };
 
@@ -252,15 +323,28 @@ function Sidebar({
   records,
   onSearch,
   stats,
-  searchResults
+  searchResults,
+  onRecordClick,
+  selectedIds,
+  onFilterChange,
+  activeFilters
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterText, setFilterText] = useState('');
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
       onSearch(searchQuery);
     }
   };
+
+  const filteredRecords = useMemo(() => {
+    if (!filterText) return records;
+    const lower = filterText.toLowerCase();
+    return records.filter(r =>
+      JSON.stringify(r).toLowerCase().includes(lower)
+    );
+  }, [records, filterText]);
 
   if (!show) return null;
 
@@ -270,9 +354,9 @@ function Sidebar({
       left: 0,
       top: 0,
       bottom: 0,
-      width: '300px',
+      width: '320px',
       backgroundColor: 'white',
-      boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+      boxShadow: '2px 0 12px rgba(0,0,0,0.15)',
       zIndex: 1000,
       display: 'flex',
       flexDirection: 'column',
@@ -287,22 +371,49 @@ function Sidebar({
         backgroundColor: '#2c3e50',
         color: 'white'
       }}>
-        <strong>🔍 Exploration</strong>
+        <strong style={{ fontSize: '16px' }}>🔍 Exploration</strong>
         <button onClick={onClose} style={{
           background: 'none',
           border: 'none',
           color: 'white',
-          fontSize: '20px',
+          fontSize: '24px',
           cursor: 'pointer',
-          padding: '0 8px'
+          padding: '0 8px',
+          lineHeight: '1'
         }}>×</button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        {/* Quick Filter */}
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '13px', marginBottom: '8px', color: '#555', fontWeight: '600' }}>
+            🔎 Filtrage Rapide
+          </h3>
+          <input
+            type="text"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            placeholder="Filtrer par texte..."
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '13px',
+              boxSizing: 'border-box'
+            }}
+          />
+          {filterText && (
+            <div style={{ marginTop: '6px', fontSize: '11px', color: '#666' }}>
+              {filteredRecords.length} / {records.length} entités affichées
+            </div>
+          )}
+        </div>
+
         {/* Semantic Search */}
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '14px', marginBottom: '8px', color: '#555' }}>
-            🔍 Recherche Sémantique
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '13px', marginBottom: '8px', color: '#555', fontWeight: '600' }}>
+            🤖 Recherche Sémantique (Albert)
           </h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
@@ -310,7 +421,7 @@ function Sidebar({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="ex: restaurants près de..."
+              placeholder="ex: restaurants proches..."
               style={{
                 flex: 1,
                 padding: '8px 12px',
@@ -326,50 +437,145 @@ function Sidebar({
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '13px'
+              fontSize: '13px',
+              fontWeight: '500'
             }}>
               Go
             </button>
           </div>
 
           {searchResults && searchResults.length > 0 && (
-            <div style={{ marginTop: '12px', fontSize: '12px', color: '#666' }}>
-              {searchResults.length} résultat(s) trouvé(s)
+            <div style={{ marginTop: '12px', fontSize: '12px', color: '#16B378', fontWeight: '500' }}>
+              ✓ {searchResults.length} résultat(s) trouvé(s)
             </div>
           )}
         </div>
 
         {/* Statistics */}
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '14px', marginBottom: '8px', color: '#555' }}>
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '13px', marginBottom: '10px', color: '#555', fontWeight: '600' }}>
             📊 Statistiques
           </h3>
-          <div style={{ fontSize: '13px', lineHeight: '1.8', color: '#333' }}>
-            <div>📍 Points: <strong>{stats.points}</strong></div>
-            <div>📏 Lignes: <strong>{stats.lines}</strong></div>
-            <div>🔷 Polygones: <strong>{stats.polygons}</strong></div>
-            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #eee' }}>
-              <strong>Total: {stats.total} entités</strong>
+          <div style={{
+            fontSize: '13px',
+            lineHeight: '2',
+            color: '#333',
+            backgroundColor: '#f8f9fa',
+            padding: '12px',
+            borderRadius: '6px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>📍 Points</span>
+              <strong>{stats.points}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>📏 Lignes</span>
+              <strong>{stats.lines}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>🔷 Polygones</span>
+              <strong>{stats.polygons}</strong>
+            </div>
+            <div style={{
+              marginTop: '10px',
+              paddingTop: '10px',
+              borderTop: '2px solid #dee2e6',
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: '14px'
+            }}>
+              <strong>Total</strong>
+              <strong style={{ color: '#16B378' }}>{stats.total}</strong>
             </div>
             {stats.totalArea > 0 && (
-              <div style={{ marginTop: '4px', color: '#666' }}>
-                Aire totale: {(stats.totalArea / 1000000).toFixed(2)} km²
+              <div style={{ marginTop: '6px', color: '#666', fontSize: '12px' }}>
+                Aire totale: <strong>{(stats.totalArea / 1000000).toFixed(2)} km²</strong>
+              </div>
+            )}
+            {stats.totalLength > 0 && (
+              <div style={{ marginTop: '4px', color: '#666', fontSize: '12px' }}>
+                Longueur totale: <strong>{stats.totalLength.toFixed(2)} km</strong>
               </div>
             )}
           </div>
         </div>
 
         {/* Legend */}
-        <div>
-          <h3 style={{ fontSize: '14px', marginBottom: '8px', color: '#555' }}>
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '13px', marginBottom: '10px', color: '#555', fontWeight: '600' }}>
             🎨 Légende
           </h3>
-          <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
-            <div><span style={{ color: '#3388ff' }}>●</span> Points</div>
-            <div><span style={{ color: '#16B378' }}>━</span> Lignes</div>
-            <div><span style={{ color: '#9b59b6' }}>▬</span> Polygones</div>
+          <div style={{ fontSize: '13px', lineHeight: '2' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#3388ff', fontSize: '18px' }}>●</span>
+              <span>Points / Multi-Points</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#16B378', fontSize: '18px', fontWeight: 'bold' }}>━</span>
+              <span>Lignes / Multi-Lignes</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#9b59b6', fontSize: '18px' }}>▬</span>
+              <span>Polygones / Multi-Polygones</span>
+            </div>
           </div>
         </div>
+
+        {/* Records List */}
+        {filteredRecords.length > 0 && (
+          <div>
+            <h3 style={{ fontSize: '13px', marginBottom: '10px', color: '#555', fontWeight: '600' }}>
+              📋 Entités ({filteredRecords.length})
+            </h3>
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {filteredRecords.slice(0, 50).map((record, idx) => {
+                const isSelected = selectedIds && selectedIds.includes(record.id);
+                return (
+                  <div
+                    key={record.id || idx}
+                    onClick={() => onRecordClick && onRecordClick(record.id)}
+                    style={{
+                      padding: '10px',
+                      marginBottom: '6px',
+                      backgroundColor: isSelected ? '#e3f2fd' : '#f8f9fa',
+                      border: isSelected ? '2px solid #2196f3' : '1px solid #e0e0e0',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = '#f0f0f0';
+                        e.currentTarget.style.borderColor = '#bbb';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = '#f8f9fa';
+                        e.currentTarget.style.borderColor = '#e0e0e0';
+                      }
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333' }}>
+                      {record.name || record.description || `Entité #${idx + 1}`}
+                    </div>
+                    {record.description && record.name && (
+                      <div style={{ color: '#666', fontSize: '11px' }}>
+                        {record.description.substring(0, 60)}{record.description.length > 60 ? '...' : ''}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {filteredRecords.length > 50 && (
+                <div style={{ padding: '10px', textAlign: 'center', color: '#999', fontSize: '11px' }}>
+                  ... et {filteredRecords.length - 50} autres
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -377,23 +583,28 @@ function Sidebar({
 
 // Main Widget
 function GeoSemanticMapWidget() {
-  const [records, setRecords] = useState([]);
+  const [allRecords, setAllRecords] = useState([]);
   const [mappedColumns, setMappedColumns] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [hoveredId, setHoveredId] = useState(null);
   const gristApiRef = useRef(null);
+  const allRecordsRef = useRef([]);
 
   // Calculate statistics
-  const stats = React.useMemo(() => {
-    if (!records || !mappedColumns?.geometry) return { points: 0, lines: 0, polygons: 0, total: 0, totalArea: 0 };
+  const stats = useMemo(() => {
+    if (!allRecords || !mappedColumns?.geometry) {
+      return { points: 0, lines: 0, polygons: 0, total: 0, totalArea: 0, totalLength: 0 };
+    }
 
     const geometryCol = mappedColumns.geometry;
-    let points = 0, lines = 0, polygons = 0, totalArea = 0;
+    let points = 0, lines = 0, polygons = 0, totalArea = 0, totalLength = 0;
 
-    records.forEach(record => {
+    allRecords.forEach(record => {
       const normalized = normalizeRecord(record);
       const geom = normalized[geometryCol];
       if (!geom) return;
@@ -403,24 +614,25 @@ function GeoSemanticMapWidget() {
 
       const type = feature.geometry.type;
       if (type.includes('Point')) points++;
-      if (type.includes('Line')) lines++;
-      if (type.includes('Polygon')) polygons++;
-
-      // Calculate area for polygons (approximate)
-      if (type.includes('Polygon') && normalized.area_m2) {
-        totalArea += parseFloat(normalized.area_m2) || 0;
+      if (type.includes('Line')) {
+        lines++;
+        totalLength += calculateLength(feature);
+      }
+      if (type.includes('Polygon')) {
+        polygons++;
+        totalArea += calculateArea(feature);
       }
     });
 
-    return { points, lines, polygons, total: points + lines + polygons, totalArea };
-  }, [records, mappedColumns]);
+    return { points, lines, polygons, total: points + lines + polygons, totalArea, totalLength };
+  }, [allRecords, mappedColumns]);
 
   useEffect(() => {
     let mounted = true;
 
     if (!window.grist || typeof window.grist.ready !== 'function') {
       console.log('Grist API not available, using mock data');
-      setRecords([
+      setAllRecords([
         { id: 1, name: 'Paris', geometry: 'POINT(2.3522 48.8566)', description: 'Capitale' },
         { id: 2, name: 'Lyon', geometry: 'POINT(4.8357 45.7640)', description: '2ème ville' }
       ]);
@@ -433,18 +645,22 @@ function GeoSemanticMapWidget() {
     gristApiRef.current = grist;
 
     const setupGristListeners = () => {
-      grist.onRecord((record, mappings) => {
-        if (!mounted) return;
-        setRecords(record ? [record] : []);
-        setMappedColumns(mappings || {});
-        setLoading(false);
-      });
-
+      // CRITICAL FIX: Only use onRecords to get ALL records, ignore onRecord
       grist.onRecords((recs, mappings) => {
         if (!mounted) return;
-        setRecords(recs || []);
+        const records = recs || [];
+        setAllRecords(records);
+        allRecordsRef.current = records;
         setMappedColumns(mappings || {});
         setLoading(false);
+        console.log('Received records:', records.length);
+      });
+
+      // Track selected row for highlighting, but don't filter the map
+      grist.onRecord((record) => {
+        if (!mounted || !record) return;
+        setSelectedIds([record.id]);
+        console.log('Selected record:', record.id);
       });
     };
 
@@ -489,52 +705,71 @@ function GeoSemanticMapWidget() {
   }, []);
 
   const handleGeometryCreated = useCallback(async (wkt) => {
-    if (!gristApiRef.current || !gristApiRef.current.docApi) return;
+    if (!gristApiRef.current || !gristApiRef.current.docApi) {
+      console.error('Grist API not available');
+      return;
+    }
 
     try {
-      const tableId = 'Table1'; // TODO: Get from Grist context
+      const tableId = await gristApiRef.current.getTableId();
       await gristApiRef.current.docApi.applyUserActions([
         ['AddRecord', tableId, null, {
           [mappedColumns.geometry]: wkt,
-          [mappedColumns.name]: 'New geometry',
-          [mappedColumns.description]: 'Created from map'
+          [mappedColumns.name || 'name']: 'Nouvelle géométrie',
+          [mappedColumns.description || 'description']: `Créée le ${new Date().toLocaleString()}`
         }]
       ]);
-
       console.log('Geometry created successfully');
     } catch (err) {
       console.error('Error creating geometry:', err);
     }
   }, [mappedColumns]);
 
-  const handleSearch = useCallback((query) => {
+  const handleSearch = useCallback(async (query) => {
     console.log('Searching for:', query);
     // TODO: Implement Albert API semantic search
+    // This would call your Albert API endpoint with the query and embeddings
     setSearchResults([]);
   }, []);
 
-  const getStyle = useCallback((feature) => {
-    const type = feature.geometry.type;
-
-    if (type.includes('Point')) {
-      return { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.6, weight: 2, radius: 8 };
+  const handleRecordClick = useCallback((recordId) => {
+    if (gristApiRef.current && gristApiRef.current.setCursorPos) {
+      gristApiRef.current.setCursorPos({ rowId: recordId });
+      setSelectedIds([recordId]);
     }
-    if (type.includes('Line')) {
-      return { color: '#16B378', weight: 3, opacity: 0.8 };
-    }
-    if (type.includes('Polygon')) {
-      return { color: '#9b59b6', fillColor: '#9b59b6', fillOpacity: 0.3, weight: 2 };
-    }
-
-    return { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.3, weight: 2 };
   }, []);
+
+  const getStyle = useCallback((feature, recordId) => {
+    const type = feature.geometry.type;
+    const isSelected = selectedIds.includes(recordId);
+    const isHovered = hoveredId === recordId;
+
+    const baseStyles = {
+      'Point': { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.6, weight: 2, radius: 8 },
+      'MultiPoint': { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.6, weight: 2, radius: 8 },
+      'LineString': { color: '#16B378', weight: 3, opacity: 0.8 },
+      'MultiLineString': { color: '#16B378', weight: 3, opacity: 0.8 },
+      'Polygon': { color: '#9b59b6', fillColor: '#9b59b6', fillOpacity: 0.3, weight: 2 },
+      'MultiPolygon': { color: '#9b59b6', fillColor: '#9b59b6', fillOpacity: 0.3, weight: 2 }
+    };
+
+    let style = baseStyles[type] || { color: '#3388ff', fillOpacity: 0.3, weight: 2 };
+
+    if (isSelected) {
+      style = { ...style, weight: style.weight * 2, fillOpacity: (style.fillOpacity || 0.3) * 1.5 };
+    } else if (isHovered) {
+      style = { ...style, weight: style.weight * 1.5, fillOpacity: (style.fillOpacity || 0.3) * 1.2 };
+    }
+
+    return style;
+  }, [selectedIds, hoveredId]);
 
   if (error) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: '16px', padding: '20px' }}>
         <div style={{ fontSize: '48px' }}>⚠️</div>
         <div style={{ color: '#e74c3c', textAlign: 'center' }}>
-          <strong>Error:</strong> {error}
+          <strong>Erreur:</strong> {error}
         </div>
       </div>
     );
@@ -565,7 +800,7 @@ function GeoSemanticMapWidget() {
   const nameCol = mappedColumns.name || 'name';
   const descCol = mappedColumns.description || 'description';
 
-  const validRecords = records.map(normalizeRecord).filter(record => {
+  const validRecords = allRecords.map(normalizeRecord).filter(record => {
     const geom = record[geometryCol];
     return geom && WKTConverter.parse(geom);
   });
@@ -580,20 +815,23 @@ function GeoSemanticMapWidget() {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        zIndex: 1001
+        zIndex: 1001,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <strong>🗺️ Carte Géo-Sémantique</strong>
+          <strong style={{ fontSize: '16px' }}>🗺️ Carte Géo-Sémantique</strong>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{
-              padding: '4px 12px',
+              padding: '6px 14px',
               backgroundColor: sidebarOpen ? '#16B378' : '#34495e',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: '13px',
+              fontWeight: '500',
+              transition: 'all 0.2s'
             }}
           >
             {sidebarOpen ? '◀ Fermer' : '▶ Explorer'}
@@ -601,19 +839,21 @@ function GeoSemanticMapWidget() {
           <button
             onClick={() => setEditMode(!editMode)}
             style={{
-              padding: '4px 12px',
+              padding: '6px 14px',
               backgroundColor: editMode ? '#e74c3c' : '#34495e',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: '13px',
+              fontWeight: '500',
+              transition: 'all 0.2s'
             }}
           >
-            {editMode ? '✓ Mode Édition' : '✏️ Éditer'}
+            {editMode ? '✓ Édition Active' : '✏️ Éditer'}
           </button>
         </div>
-        <span style={{ fontSize: '14px' }}>
+        <span style={{ fontSize: '14px', fontWeight: '500' }}>
           {validRecords.length} entité{validRecords.length > 1 ? 's' : ''}
         </span>
       </div>
@@ -626,13 +866,18 @@ function GeoSemanticMapWidget() {
         onSearch={handleSearch}
         stats={stats}
         searchResults={searchResults}
+        onRecordClick={handleRecordClick}
+        selectedIds={selectedIds}
       />
 
       {/* Map */}
       {validRecords.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', color: '#666', padding: '20px' }}>
-          <div style={{ fontSize: '48px' }}>📍</div>
-          <div>Aucune géométrie valide trouvée</div>
+          <div style={{ fontSize: '64px' }}>📍</div>
+          <div style={{ fontSize: '18px', fontWeight: '500' }}>Aucune géométrie valide trouvée</div>
+          <div style={{ fontSize: '14px', color: '#999' }}>
+            Ajoutez des données avec une colonne géométrie au format WKT
+          </div>
         </div>
       ) : (
         <MapContainer
@@ -645,7 +890,7 @@ function GeoSemanticMapWidget() {
             attribution="&copy; OpenStreetMap"
           />
 
-          <MapController records={validRecords} geometryColumn={geometryCol} />
+          <MapController records={validRecords} geometryColumn={geometryCol} selectedIds={selectedIds} />
           <GeomanController enabled={editMode} onGeometryCreated={handleGeometryCreated} />
 
           <MarkerClusterGroup>
@@ -655,26 +900,47 @@ function GeoSemanticMapWidget() {
 
               const name = record[nameCol] || `Entité ${idx + 1}`;
               const description = record[descCol] || '';
+              const geomType = feature.geometry.type;
 
               return (
                 <GeoJSON
-                  key={record.id || idx}
+                  key={`${record.id || idx}-${geomType}`}
                   data={feature}
-                  style={getStyle(feature)}
+                  style={() => getStyle(feature, record.id)}
                   onEachFeature={(feature, layer) => {
-                    layer.bindPopup(`
-                      <div style="min-width: 150px;">
-                        <strong>${name}</strong>
-                        ${description ? `<br/><span style="color: #666;">${description}</span>` : ''}
-                        <br/><small style="color: #999;">${feature.geometry.type}</small>
-                      </div>
-                    `);
+                    const area = calculateArea(feature);
+                    const length = calculateLength(feature);
 
-                    if (window.grist && record.id) {
-                      layer.on('click', () => {
-                        window.grist.setCursorPos({ rowId: record.id });
-                      });
-                    }
+                    let popupContent = `
+                      <div style="min-width: 200px; font-family: sans-serif;">
+                        <div style="font-weight: 600; font-size: 15px; margin-bottom: 8px; color: #2c3e50;">
+                          ${name}
+                        </div>
+                        ${description ? `<div style="color: #555; margin-bottom: 8px; font-size: 13px;">${description}</div>` : ''}
+                        <div style="font-size: 12px; color: #999; padding-top: 8px; border-top: 1px solid #eee;">
+                          <div style="margin-bottom: 4px;"><strong>Type:</strong> ${geomType}</div>
+                          ${area > 0 ? `<div style="margin-bottom: 4px;"><strong>Aire:</strong> ${(area / 1000000).toFixed(3)} km²</div>` : ''}
+                          ${length > 0 ? `<div><strong>Longueur:</strong> ${length.toFixed(2)} km</div>` : ''}
+                        </div>
+                      </div>
+                    `;
+
+                    layer.bindPopup(popupContent);
+
+                    layer.on('click', () => {
+                      if (gristApiRef.current && record.id) {
+                        gristApiRef.current.setCursorPos({ rowId: record.id });
+                        setSelectedIds([record.id]);
+                      }
+                    });
+
+                    layer.on('mouseover', () => {
+                      setHoveredId(record.id);
+                    });
+
+                    layer.on('mouseout', () => {
+                      setHoveredId(null);
+                    });
                   }}
                 />
               );
