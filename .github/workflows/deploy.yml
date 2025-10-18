@@ -26,8 +26,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'packages/geo-map/package-lock.json'
       
       - name: Install root dependencies
         run: npm install fs-extra
@@ -35,7 +33,7 @@ jobs:
       - name: Build Geo Map Widget
         working-directory: packages/geo-map
         run: |
-          npm ci
+          npm install
           npm run build
       
       - name: Prepare dist folder
