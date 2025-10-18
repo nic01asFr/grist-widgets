@@ -7,8 +7,7 @@
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
     "leaflet": "^1.9.4",
-    "@geoman-io/leaflet-geoman-free": "^2.15.0",
-    "grist-plugin-api": "^1.1.8"
+    "@geoman-io/leaflet-geoman-free": "^2.15.0"
   },
   "scripts": {
     "start": "react-scripts start",
