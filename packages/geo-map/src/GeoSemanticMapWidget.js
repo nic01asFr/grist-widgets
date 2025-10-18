@@ -139,11 +139,12 @@ function MapController({ records, geometryColumn }) {
 function GeoSemanticMapWidget() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [options, setOptions] = useState({});
+  const [options, setOptions] = useState(null);
   const [error, setError] = useState(null);
   
-  const geometryColumn = options.geometry_column || 'location';
-  const nameColumn = options.name_column || 'name';
+  // Safe access to options with defaults
+  const geometryColumn = (options && options.geometry_column) || 'location';
+  const nameColumn = (options && options.name_column) || 'name';
   
   useEffect(() => {
     let mounted = true;
@@ -162,7 +163,7 @@ function GeoSemanticMapWidget() {
       grist.onRecords(data => {
         if (mounted) {
           console.log('Received records:', data);
-          setRecords(data);
+          setRecords(data || []);
           setLoading(false);
         }
       });
@@ -170,7 +171,7 @@ function GeoSemanticMapWidget() {
       grist.onOptions(opts => {
         if (mounted) {
           console.log('Received options:', opts);
-          setOptions(opts);
+          setOptions(opts || {});
         }
       });
     }).catch(err => {
@@ -260,9 +261,11 @@ function GeoSemanticMapWidget() {
               data={feature}
               style={getStyle()}
               onEachFeature={(feature, layer) => {
+                const name = record[nameColumn] || 'Sans nom';
+                const description = record.description || '';
                 layer.bindPopup(`
-                  <strong>${record[nameColumn]}</strong><br/>
-                  ${record.description || ''}
+                  <strong>${name}</strong><br/>
+                  ${description}
                 `);
                 layer.on('click', () => {
                   getGrist().then(grist => {
