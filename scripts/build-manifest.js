@@ -6,10 +6,15 @@ const baseUrl = process.env.BASE_URL || 'https://nic01asfr.github.io/grist-widge
 const widgets = [
   {
     name: 'Geo-Semantic Map',
-    description: 'Carte géospatiale interactive avec support WKT complet (Point, LineString, Polygon, Multi*)',
+    description: 'Carte géospatiale interactive avec support WKT complet (Point, LineString, Polygon, Multi*). Édition interactive et recherche sémantique.',
     path: 'geo-map',
+    widgetId: '@nic01asFr/geo-semantic-map',
     accessLevel: 'full',
-    authors: [{ name: 'nic01asFr', url: 'https://github.com/nic01asFr' }]
+    renderAfterReady: true,
+    authors: [{ 
+      name: 'nic01asFr', 
+      url: 'https://github.com/nic01asFr' 
+    }]
   }
 ];
 
@@ -17,10 +22,12 @@ const manifest = widgets.map(widget => ({
   name: widget.name,
   description: widget.description,
   url: `${baseUrl}/${widget.path}/index.html`,
+  widgetId: widget.widgetId,
   published: true,
   authors: widget.authors,
   lastUpdatedAt: new Date().toISOString(),
   accessLevel: widget.accessLevel,
+  renderAfterReady: widget.renderAfterReady,
   isGristLabsMaintained: false
 }));
 
@@ -31,3 +38,9 @@ fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2));
 console.log('✅ Manifest généré:', manifest.length, 'widget(s)');
 console.log('📍 Location:', outputPath);
 console.log('🌐 Base URL:', baseUrl);
+console.log('\n📦 Widgets:');
+manifest.forEach(w => {
+  console.log(`  - ${w.name}`);
+  console.log(`    URL: ${w.url}`);
+  console.log(`    ID: ${w.widgetId}`);
+});
