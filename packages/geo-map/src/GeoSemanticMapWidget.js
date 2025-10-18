@@ -142,32 +142,9 @@ function GeoSemanticMapWidget() {
     
     const grist = window.grist;
     
-    // Declare widget requirements to Grist
-    grist.ready({
-      columns: [
-        { 
-          name: 'geometry', 
-          title: 'Géométrie',
-          description: 'Colonne contenant les géométries WKT (POINT, LINESTRING, POLYGON)',
-          optional: false
-          // Ne pas spécifier de type pour accepter Text ET Geometry
-        },
-        { 
-          name: 'name', 
-          title: 'Nom',
-          description: 'Colonne contenant les noms des entités',
-          optional: true
-        },
-        { 
-          name: 'description', 
-          title: 'Description',
-          description: 'Colonne contenant les descriptions',
-          optional: true
-        }
-      ],
-      requiredAccess: 'read table'
-    }).then(() => {
-      console.log('Grist widget ready');
+    // Helper function to setup Grist listeners
+    const setupGristListeners = () => {
+      console.log('Setting up Grist listeners');
       
       // Listen for record changes
       grist.onRecord((record, mappings) => {
@@ -192,14 +169,64 @@ function GeoSemanticMapWidget() {
         setMappedColumns(mappings || {});
         setLoading(false);
       });
+    };
+    
+    // Declare widget requirements to Grist
+    const readyOptions = {
+      columns: [
+        { 
+          name: 'geometry', 
+          title: 'Géométrie',
+          description: 'Colonne contenant les géométries WKT (POINT, LINESTRING, POLYGON)',
+          optional: false
+          // Ne pas spécifier de type pour accepter Text ET Geometry
+        },
+        { 
+          name: 'name', 
+          title: 'Nom',
+          description: 'Colonne contenant les noms des entités',
+          optional: true
+        },
+        { 
+          name: 'description', 
+          title: 'Description',
+          description: 'Colonne contenant les descriptions',
+          optional: true
+        }
+      ],
+      requiredAccess: 'read table'
+    };
+    
+    try {
+      const readyResult = grist.ready(readyOptions);
       
-    }).catch(err => {
-      console.error('Error initializing Grist:', err);
+      // Check if ready() returns a Promise
+      if (readyResult && typeof readyResult.then === 'function') {
+        // Promise-based API
+        readyResult
+          .then(() => {
+            console.log('Grist widget ready (Promise API)');
+            setupGristListeners();
+          })
+          .catch(err => {
+            console.error('Error initializing Grist (Promise API):', err);
+            if (mounted) {
+              setError(err.message || 'Failed to initialize widget');
+              setLoading(false);
+            }
+          });
+      } else {
+        // Synchronous API or no return value
+        console.log('Grist widget ready (Synchronous API)');
+        setupGristListeners();
+      }
+    } catch (err) {
+      console.error('Error calling grist.ready():', err);
       if (mounted) {
-        setError(err.message || 'Failed to initialize widget');
+        setError(err.message || 'Failed to call grist.ready()');
         setLoading(false);
       }
-    });
+    }
     
     return () => {
       mounted = false;
