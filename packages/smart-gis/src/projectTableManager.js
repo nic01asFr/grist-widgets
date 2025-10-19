@@ -35,7 +35,7 @@ export const PROJECT_TABLE_SCHEMA = {
   ],
   formulas: {
     // Auto-génération du vecteur sémantique si colonne properties existe
-    element_vector: '=CREATE_VECTOR($properties)'
+    element_vector: 'grist.CREATE_VECTOR($properties)'
   }
 };
 

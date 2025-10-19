@@ -816,7 +816,8 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableId = await gristApiRef.current.getTableId();
+      const tableInfo = await gristApiRef.current.getTable();
+      const tableId = tableInfo.tableId;
       await gristApiRef.current.docApi.applyUserActions([
         ['AddRecord', tableId, null, {
           [mappedColumns.geometry]: wkt,
@@ -869,7 +870,8 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableId = await gristApiRef.current.getTableId();
+      const tableInfo = await gristApiRef.current.getTable();
+      const tableId = tableInfo.tableId;
 
       await gristApiRef.current.docApi.applyUserActions([
         ['UpdateRecord', tableId, recordId, updates]
@@ -894,7 +896,8 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableId = await gristApiRef.current.getTableId();
+      const tableInfo = await gristApiRef.current.getTable();
+      const tableId = tableInfo.tableId;
 
       await gristApiRef.current.docApi.applyUserActions([
         ['RemoveRecord', tableId, deleteConfirm.id]
@@ -919,7 +922,8 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableId = await gristApiRef.current.getTableId();
+      const tableInfo = await gristApiRef.current.getTable();
+      const tableId = tableInfo.tableId;
 
       await gristApiRef.current.docApi.applyUserActions([
         ['UpdateRecord', tableId, recordId, updates]
@@ -942,7 +946,8 @@ function GeoSemanticMapWidget() {
 
     try {
       const docApi = gristApiRef.current.docApi;
-      const currentTable = await gristApiRef.current.getTableId();
+      const tableInfo = await gristApiRef.current.getTable();
+      const currentTable = tableInfo.tableId;
 
       console.log(`💾 Saving project: ${projectName}`);
       console.log(`  Current table: ${currentTable}`);
@@ -986,7 +991,8 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableId = await gristApiRef.current.getTableId();
+      const tableInfo = await gristApiRef.current.getTable();
+      const tableId = tableInfo.tableId;
 
       // Generate layer name from catalog
       const layerName = importData.catalog.title || 'Imported Layer';
@@ -1048,7 +1054,8 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableId = await gristApiRef.current.getTableId();
+      const tableInfo = await gristApiRef.current.getTable();
+      const tableId = tableInfo.tableId;
 
       // Find all records in this layer
       const layerRecords = allRecords.filter(r => r.layer_name === layerName);
