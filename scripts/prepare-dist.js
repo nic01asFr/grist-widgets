@@ -7,7 +7,7 @@ console.log('🚀 Préparation du dossier dist...');
 
 fs.ensureDirSync(distDir);
 
-const widgets = ['geo-map'];
+const widgets = ['geo-map', 'smart-gis'];
 
 let successCount = 0;
 let failCount = 0;
