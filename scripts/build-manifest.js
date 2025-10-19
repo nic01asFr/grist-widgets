@@ -11,9 +11,21 @@ const widgets = [
     widgetId: '@nic01asFr/geo-semantic-map',
     accessLevel: 'full',
     renderAfterReady: true,
-    authors: [{ 
-      name: 'nic01asFr', 
-      url: 'https://github.com/nic01asFr' 
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
+  },
+  {
+    name: 'Smart GIS',
+    description: 'Système cartographique intelligent avec gestion multi-sources (IGN, OSM), édition avancée, styles personnalisés, import wizard, layer management. Phases 1-7/10 (70%).',
+    path: 'smart-gis',
+    widgetId: '@nic01asFr/smart-gis',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
     }]
   }
 ];
