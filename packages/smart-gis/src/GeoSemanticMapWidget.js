@@ -818,18 +818,25 @@ function GeoSemanticMapWidget() {
     try {
       const tableInfo = await gristApiRef.current.getTable();
       const tableId = tableInfo.tableId;
+
+      // Smart GIS uses fixed column names from PROJECT_TABLE_SCHEMA
       await gristApiRef.current.docApi.applyUserActions([
         ['AddRecord', tableId, null, {
-          [mappedColumns.geometry]: wkt,
-          [mappedColumns.name || 'name']: 'Nouvelle géométrie',
-          [mappedColumns.description || 'description']: `Créée le ${new Date().toLocaleString()}`
+          geometry: wkt,
+          layer_name: 'Manuel',
+          layer_type: 'vector',
+          nom: 'Nouvelle géométrie',
+          type: 'Dessin manuel',
+          is_visible: true,
+          z_index: 50,
+          import_session: 0
         }]
       ]);
-      console.log('Geometry created successfully');
+      console.log('✓ Geometry created successfully');
     } catch (err) {
       console.error('Error creating geometry:', err);
     }
-  }, [mappedColumns]);
+  }, []);
 
   const handleSearch = useCallback(async (query) => {
     console.log('Searching for:', query);
