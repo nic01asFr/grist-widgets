@@ -7,12 +7,12 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import 'leaflet/dist/leaflet.css';
 import { setupSystemInfrastructure } from './systemInfrastructure';
 import {
-  initializeProjectSystem,
   groupByLayers,
   sortLayersByZIndex,
   createProjectTable,
   setCurrentProjectTable
 } from './projectTableManager';
+import { adaptCurrentTable } from './adaptCurrentTable';
 import LayerManager from './LayerManager';
 import ImportWizard from './ImportWizard';
 import SaveProjectDialog from './SaveProjectDialog';
@@ -746,15 +746,23 @@ function GeoSemanticMapWidget() {
         setInfrastructureReady(false);
       }
 
-      // Step 2: Initialize project table system
-      console.log('📋 Initializing project table system...');
-      const projectResult = await initializeProjectSystem(grist.docApi);
+      // Step 2: Adapt current table to project schema
+      console.log('📋 Adapting current table to Smart GIS schema...');
+      try {
+        const tableInfo = await grist.getTable();
+        const currentTableId = tableInfo.tableId;
 
-      if (projectResult.success) {
-        console.log('✅ Project system ready:', projectResult);
-        setProjectTableReady(true);
-      } else {
-        console.warn('⚠️ Project system setup failed:', projectResult.error);
+        const adaptResult = await adaptCurrentTable(grist, currentTableId);
+
+        if (adaptResult.success) {
+          console.log('✅ Current table adapted:', adaptResult);
+          setProjectTableReady(true);
+        } else {
+          console.warn('⚠️ Table adaptation failed:', adaptResult.error);
+          setProjectTableReady(false);
+        }
+      } catch (err) {
+        console.error('⚠️ Could not adapt table:', err);
         setProjectTableReady(false);
       }
 
