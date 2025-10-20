@@ -10,7 +10,16 @@ import {
   groupByLayers,
   sortLayersByZIndex
 } from './projectTableManager';
-import { adaptCurrentTable } from './adaptCurrentTable';
+import {
+  initializeWorkspace,
+  fetchWorkspaceData,
+  addToWorkspace,
+  bulkAddToWorkspace,
+  updateInWorkspace,
+  deleteFromWorkspace,
+  saveWorkspaceAs,
+  WORKSPACE_TABLE_NAME
+} from './workspaceManager';
 import LayerManager from './LayerManager';
 import ImportWizard from './ImportWizard';
 import SaveProjectDialog from './SaveProjectDialog';
@@ -698,24 +707,35 @@ function GeoSemanticMapWidget() {
     const grist = window.grist;
     gristApiRef.current = grist;
 
-    const setupGristListeners = () => {
-      // CRITICAL FIX: Only use onRecords to get ALL records, ignore onRecord
-      grist.onRecords((recs, mappings) => {
-        if (!mounted) return;
-        const records = recs || [];
-        setAllRecords(records);
-        allRecordsRef.current = records;
-        setMappedColumns(mappings || {});
-        setLoading(false);
-        console.log('Received records:', records.length);
-      });
+    const loadWorkspaceData = async () => {
+      if (!mounted || !grist.docApi) return;
 
-      // Track selected row for highlighting, but don't filter the map
-      grist.onRecord((record) => {
-        if (!mounted || !record) return;
-        setSelectedIds([record.id]);
-        console.log('Selected record:', record.id);
-      });
+      try {
+        const result = await fetchWorkspaceData(grist.docApi);
+
+        if (result.success && mounted) {
+          setAllRecords(result.records);
+          allRecordsRef.current = result.records;
+          setLoading(false);
+          console.log(`📊 Loaded ${result.records.length} records from workspace`);
+        }
+      } catch (err) {
+        console.error('Error loading workspace data:', err);
+      }
+    };
+
+    const setupWorkspacePolling = () => {
+      // Charger les données initiales
+      loadWorkspaceData();
+
+      // Polling toutes les 2 secondes pour détecter les changements
+      const intervalId = setInterval(() => {
+        if (mounted) {
+          loadWorkspaceData();
+        }
+      }, 2000);
+
+      return intervalId;
     };
 
     const readyOptions = {
@@ -744,23 +764,20 @@ function GeoSemanticMapWidget() {
         setInfrastructureReady(false);
       }
 
-      // Step 2: Adapt current table to project schema
-      console.log('📋 Adapting current table to Smart GIS schema...');
+      // Step 2: Initialize GIS_WorkSpace (table de travail dédiée)
+      console.log('📋 Initializing GIS workspace...');
       try {
-        const tableInfo = await grist.getTable();
-        const currentTableId = tableInfo.tableId;
+        const workspaceResult = await initializeWorkspace(grist.docApi);
 
-        const adaptResult = await adaptCurrentTable(grist, currentTableId);
-
-        if (adaptResult.success) {
-          console.log('✅ Current table adapted:', adaptResult);
+        if (workspaceResult.success) {
+          console.log('✅ Workspace ready:', workspaceResult.tableName);
           setProjectTableReady(true);
         } else {
-          console.warn('⚠️ Table adaptation failed:', adaptResult.error);
+          console.warn('⚠️ Workspace initialization failed:', workspaceResult.error);
           setProjectTableReady(false);
         }
       } catch (err) {
-        console.error('⚠️ Could not adapt table:', err);
+        console.error('⚠️ Could not initialize workspace:', err);
         setProjectTableReady(false);
       }
 
@@ -783,8 +800,13 @@ function GeoSemanticMapWidget() {
         console.warn('⚠️ Failed to load catalogs:', err);
       }
 
-      // Step 4: Setup Grist listeners (normal widget operation)
-      setupGristListeners();
+      // Step 4: Setup workspace polling
+      const pollingIntervalId = setupWorkspacePolling();
+
+      // Cleanup polling on unmount
+      return () => {
+        clearInterval(pollingIntervalId);
+      };
     };
 
     try {
@@ -822,23 +844,23 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableInfo = await gristApiRef.current.getTable();
-      const tableId = tableInfo.tableId;
+      // Add to workspace using workspace manager
+      const result = await addToWorkspace(gristApiRef.current.docApi, {
+        geometry: wkt,
+        layer_name: 'Manuel',
+        layer_type: 'vector',
+        nom: 'Nouvelle géométrie',
+        type: 'Dessin manuel',
+        is_visible: true,
+        z_index: 50,
+        import_session: 0
+      });
 
-      // Smart GIS uses fixed column names from PROJECT_TABLE_SCHEMA
-      await gristApiRef.current.docApi.applyUserActions([
-        ['AddRecord', tableId, null, {
-          geometry: wkt,
-          layer_name: 'Manuel',
-          layer_type: 'vector',
-          nom: 'Nouvelle géométrie',
-          type: 'Dessin manuel',
-          is_visible: true,
-          z_index: 50,
-          import_session: 0
-        }]
-      ]);
-      console.log('✓ Geometry created successfully');
+      if (result.success) {
+        console.log('✓ Geometry created successfully in workspace');
+      } else {
+        console.error('Failed to create geometry:', result.error);
+      }
     } catch (err) {
       console.error('Error creating geometry:', err);
     }
@@ -883,15 +905,15 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableInfo = await gristApiRef.current.getTable();
-      const tableId = tableInfo.tableId;
+      // Update in workspace using workspace manager
+      const result = await updateInWorkspace(gristApiRef.current.docApi, recordId, updates);
 
-      await gristApiRef.current.docApi.applyUserActions([
-        ['UpdateRecord', tableId, recordId, updates]
-      ]);
-
-      console.log(`✓ Attributes updated for record ${recordId}`);
-      setAttributeEditor(null);
+      if (result.success) {
+        console.log(`✓ Attributes updated for record ${recordId}`);
+        setAttributeEditor(null);
+      } else {
+        throw new Error(result.error || 'Failed to update attributes');
+      }
 
     } catch (error) {
       console.error('Error updating attributes:', error);
@@ -909,15 +931,15 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableInfo = await gristApiRef.current.getTable();
-      const tableId = tableInfo.tableId;
+      // Delete from workspace using workspace manager
+      const result = await deleteFromWorkspace(gristApiRef.current.docApi, deleteConfirm.id);
 
-      await gristApiRef.current.docApi.applyUserActions([
-        ['RemoveRecord', tableId, deleteConfirm.id]
-      ]);
-
-      console.log(`✓ Record ${deleteConfirm.id} deleted`);
-      setDeleteConfirm(null);
+      if (result.success) {
+        console.log(`✓ Record ${deleteConfirm.id} deleted from workspace`);
+        setDeleteConfirm(null);
+      } else {
+        throw new Error(result.error || 'Failed to delete record');
+      }
 
     } catch (error) {
       console.error('Error deleting record:', error);
@@ -935,15 +957,15 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableInfo = await gristApiRef.current.getTable();
-      const tableId = tableInfo.tableId;
+      // Update in workspace using workspace manager
+      const result = await updateInWorkspace(gristApiRef.current.docApi, recordId, updates);
 
-      await gristApiRef.current.docApi.applyUserActions([
-        ['UpdateRecord', tableId, recordId, updates]
-      ]);
-
-      console.log(`✓ Style updated for record ${recordId}`);
-      setStyleEditor(null);
+      if (result.success) {
+        console.log(`✓ Style updated for record ${recordId}`);
+        setStyleEditor(null);
+      } else {
+        throw new Error(result.error || 'Failed to update style');
+      }
 
     } catch (error) {
       console.error('Error updating style:', error);
@@ -959,26 +981,27 @@ function GeoSemanticMapWidget() {
 
     try {
       const docApi = gristApiRef.current.docApi;
-      const tableInfo = await gristApiRef.current.getTable();
-      const currentTable = tableInfo.tableId;
 
       console.log(`💾 Saving project: ${projectName}`);
-      console.log(`  Source table: ${currentTable}`);
+      console.log(`  Source: ${WORKSPACE_TABLE_NAME}`);
 
-      // Étape 1: Dupliquer la table courante avec le nom du projet
-      await docApi.applyUserActions([
-        ['DuplicateTable', currentTable, projectName, false]
-      ]);
-      console.log(`✓ Project saved as new table: ${projectName}`);
+      // Save workspace as new project using workspace manager
+      const result = await saveWorkspaceAs(docApi, projectName);
 
-      // Fermer le dialog
-      setShowSaveDialog(false);
+      if (result.success) {
+        console.log(`✓ Project saved as new table: ${projectName}`);
 
-      // Message de succès
-      alert(`✅ Projet "${projectName}" sauvegardé !\n\nLa table "${projectName}" a été créée.\nVous pouvez continuer à travailler sur "${currentTable}".`);
+        // Fermer le dialog
+        setShowSaveDialog(false);
 
-      console.log(`✅ Project saved successfully as "${projectName}"`);
-      console.log(`   User continues working on "${currentTable}"`);
+        // Message de succès
+        alert(`✅ Projet "${projectName}" sauvegardé !\n\nLa table "${projectName}" a été créée.\nVous continuez à travailler dans "${WORKSPACE_TABLE_NAME}".`);
+
+        console.log(`✅ Project saved successfully as "${projectName}"`);
+        console.log(`   User continues working in "${WORKSPACE_TABLE_NAME}"`);
+      } else {
+        throw new Error(result.error || 'Failed to save project');
+      }
 
     } catch (error) {
       console.error('Error saving project:', error);
@@ -994,8 +1017,7 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableInfo = await gristApiRef.current.getTable();
-      const tableId = tableInfo.tableId;
+      const docApi = gristApiRef.current.docApi;
 
       // Generate layer name from catalog
       const layerName = importData.catalog.title || 'Imported Layer';
@@ -1006,20 +1028,22 @@ function GeoSemanticMapWidget() {
 
       // Si c'est un raster, insérer une seule ligne avec l'URL
       if (importData.data.isRaster) {
-        await gristApiRef.current.docApi.applyUserActions([
-          ['AddRecord', tableId, null, {
-            layer_name: layerName,
-            layer_type: 'raster',
-            source_catalog: importData.catalog.id,
-            raster_url: importData.catalog.endpoint_url,
-            nom: layerName,
-            z_index: 0, // Raster en fond de carte
-            is_visible: true,
-            import_session: importSession
-          }]
-        ]);
+        const result = await addToWorkspace(docApi, {
+          layer_name: layerName,
+          layer_type: 'raster',
+          source_catalog: importData.catalog.id,
+          raster_url: importData.catalog.endpoint_url,
+          nom: layerName,
+          z_index: 0, // Raster en fond de carte
+          is_visible: true,
+          import_session: importSession
+        });
 
-        console.log(`✅ Added raster layer "${layerName}"`);
+        if (result.success) {
+          console.log(`✅ Added raster layer "${layerName}" to workspace`);
+        } else {
+          throw new Error(result.error || 'Failed to add raster layer');
+        }
         return;
       }
 
@@ -1037,12 +1061,15 @@ function GeoSemanticMapWidget() {
         import_session: importSession
       }));
 
-      // Bulk insert
-      await gristApiRef.current.docApi.applyUserActions([
-        ['BulkAddRecord', tableId, records.map(() => null), records]
-      ]);
+      // Bulk insert into workspace
+      const result = await bulkAddToWorkspace(docApi, records);
 
-      console.log(`✅ Imported ${records.length} records into layer "${layerName}"`);
+      if (result.success) {
+        console.log(`✅ Imported ${result.count} records into workspace layer "${layerName}"`);
+      } else {
+        throw new Error(result.error || 'Failed to import records');
+      }
+
     } catch (err) {
       console.error('Error importing data:', err);
       throw err;
@@ -1057,23 +1084,18 @@ function GeoSemanticMapWidget() {
     }
 
     try {
-      const tableInfo = await gristApiRef.current.getTable();
-      const tableId = tableInfo.tableId;
+      const docApi = gristApiRef.current.docApi;
 
       // Find all records in this layer
       const layerRecords = allRecords.filter(r => r.layer_name === layerName);
 
-      // Update z_index for all records in the layer
-      const actions = layerRecords.map(record => [
-        'UpdateRecord',
-        tableId,
-        record.id,
-        { z_index: newZIndex }
-      ]);
+      // Update z_index for all records in the layer using workspace manager
+      for (const record of layerRecords) {
+        await updateInWorkspace(docApi, record.id, { z_index: newZIndex });
+      }
 
-      if (actions.length > 0) {
-        await gristApiRef.current.docApi.applyUserActions(actions);
-        console.log(`Updated z-index for layer ${layerName} to ${newZIndex}`);
+      if (layerRecords.length > 0) {
+        console.log(`Updated z-index for layer ${layerName} to ${newZIndex} (${layerRecords.length} records)`);
       }
     } catch (err) {
       console.error('Error updating layer z-index:', err);

@@ -109,6 +109,15 @@ grist-widgets/
 
 ## 📚 Documentation
 
+### Documentation Widgets
+
+- **[Guide de Développement](./docs/WIDGET_DEVELOPMENT_GUIDE.md)** - Guide pratique pour créer des widgets production-ready
+- **[Architecture](./docs/ARCHITECTURE.md)** - Principes fondamentaux et séparation des responsabilités
+- **[Référence API](./docs/API_REFERENCE.md)** - Documentation complète des classes et utilitaires
+- **[Patterns VECTOR_SEARCH](./docs/VECTOR_SEARCH_PATTERNS.md)** - Détecter et exploiter les patterns de recherche vectorielle
+
+### Ressources Externes
+
 - [Grist Custom Widgets](https://support.getgrist.com/widget-custom/)
 - [Grist Plugin API](https://support.getgrist.com/code/modules/grist_plugin_api/)
 - [Leaflet Documentation](https://leafletjs.com/)

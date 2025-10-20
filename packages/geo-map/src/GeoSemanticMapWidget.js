@@ -5,6 +5,22 @@ import L from 'leaflet';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import 'leaflet/dist/leaflet.css';
+import { setupSystemInfrastructure } from './systemInfrastructure';
+import {
+  initializeProjectSystem,
+  groupByLayers,
+  sortLayersByZIndex,
+  createProjectTable,
+  setCurrentProjectTable
+} from './projectTableManager';
+import LayerManager from './LayerManager';
+import ImportWizard from './ImportWizard';
+import SaveProjectDialog from './SaveProjectDialog';
+import ContextMenu from './ContextMenu';
+import AttributeEditor from './AttributeEditor';
+import StyleEditor from './StyleEditor';
+import DeleteConfirmDialog from './DeleteConfirmDialog';
+import RasterLayers from './RasterLayers';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -176,6 +192,12 @@ function normalizeRecord(record) {
     return { id: record.id, ...record.fields };
   }
   return record;
+}
+
+// Helper to convert GeoJSON feature to WKT
+function featureToWKT(feature) {
+  if (!feature || !feature.geometry) return null;
+  return WKTConverter.toWKT(feature.geometry);
 }
 
 // Calculate geometry area in m²
@@ -590,6 +612,17 @@ function GeoSemanticMapWidget() {
   const [searchResults, setSearchResults] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [hoveredId, setHoveredId] = useState(null);
+  const [infrastructureReady, setInfrastructureReady] = useState(false);
+  const [projectTableReady, setProjectTableReady] = useState(false);
+  const [layers, setLayers] = useState([]);
+  const [layerVisibility, setLayerVisibility] = useState({});
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [attributeEditor, setAttributeEditor] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [styleEditor, setStyleEditor] = useState(null);
+  const [catalogs, setCatalogs] = useState([]);
   const gristApiRef = useRef(null);
   const allRecordsRef = useRef([]);
 
@@ -624,6 +657,31 @@ function GeoSemanticMapWidget() {
 
     return { points, lines, polygons, total: points + lines + polygons, totalArea, totalLength };
   }, [allRecords, mappedColumns]);
+
+  // Group records by layers (multi-layer support)
+  useEffect(() => {
+    if (!allRecords || allRecords.length === 0) {
+      setLayers([]);
+      return;
+    }
+
+    const layerGroups = groupByLayers(allRecords);
+    const sortedLayers = sortLayersByZIndex(layerGroups);
+
+    // Initialize layer visibility state
+    const visibility = {};
+    sortedLayers.forEach(layer => {
+      if (layerVisibility[layer.name] === undefined) {
+        visibility[layer.name] = layer.visible;
+      } else {
+        visibility[layer.name] = layerVisibility[layer.name];
+      }
+    });
+
+    setLayers(sortedLayers);
+    setLayerVisibility(visibility);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRecords]);
 
   useEffect(() => {
     let mounted = true;
@@ -674,13 +732,62 @@ function GeoSemanticMapWidget() {
       requiredAccess: 'full'
     };
 
+    const initializeWidget = async () => {
+      // Step 1: Setup system infrastructure (tables système)
+      console.log('🚀 Initializing Smart GIS Widget...');
+      const infraResult = await setupSystemInfrastructure(grist);
+
+      if (infraResult.success) {
+        console.log('✅ Infrastructure ready:', infraResult);
+        setInfrastructureReady(true);
+      } else {
+        console.warn('⚠️ Infrastructure setup failed:', infraResult.error);
+        // Continue anyway - non-blocking
+        setInfrastructureReady(false);
+      }
+
+      // Step 2: Initialize project table system
+      console.log('📋 Initializing project table system...');
+      const projectResult = await initializeProjectSystem(grist.docApi);
+
+      if (projectResult.success) {
+        console.log('✅ Project system ready:', projectResult);
+        setProjectTableReady(true);
+      } else {
+        console.warn('⚠️ Project system setup failed:', projectResult.error);
+        setProjectTableReady(false);
+      }
+
+      // Step 3: Load catalogs from GIS_Catalogs table
+      try {
+        const catalogsData = await grist.docApi.fetchTable('GIS_Catalogs');
+        const catalogsList = catalogsData.id.map((id, idx) => ({
+          id,
+          source_type: catalogsData.source_type[idx],
+          dataset_id: catalogsData.dataset_id[idx],
+          title: catalogsData.title[idx],
+          description: catalogsData.description[idx],
+          keywords: catalogsData.keywords[idx],
+          endpoint_url: catalogsData.endpoint_url[idx],
+          geometry_type: catalogsData.geometry_type[idx]
+        }));
+        setCatalogs(catalogsList);
+        console.log(`✅ Loaded ${catalogsList.length} catalogs`);
+      } catch (err) {
+        console.warn('⚠️ Failed to load catalogs:', err);
+      }
+
+      // Step 4: Setup Grist listeners (normal widget operation)
+      setupGristListeners();
+    };
+
     try {
       const readyResult = grist.ready(readyOptions);
 
       if (readyResult && typeof readyResult.then === 'function') {
         readyResult.then(() => {
           console.log('Grist widget ready');
-          setupGristListeners();
+          initializeWidget();
         }).catch(err => {
           console.error('Error initializing:', err);
           if (mounted) {
@@ -689,7 +796,7 @@ function GeoSemanticMapWidget() {
           }
         });
       } else {
-        setupGristListeners();
+        initializeWidget();
       }
     } catch (err) {
       console.error('Error calling ready():', err);
@@ -737,12 +844,239 @@ function GeoSemanticMapWidget() {
     }
   }, []);
 
-  const getStyle = useCallback((feature, recordId) => {
-    const type = feature.geometry.type;
-    const isSelected = selectedIds.includes(recordId);
-    const isHovered = hoveredId === recordId;
+  // Layer visibility toggle
+  const handleToggleLayerVisibility = useCallback((layerName, visible) => {
+    setLayerVisibility(prev => ({
+      ...prev,
+      [layerName]: visible
+    }));
+  }, []);
 
-    const baseStyles = {
+  // Handle context menu actions
+  const handleEditGeometry = useCallback((recordId) => {
+    console.log(`📝 Enable geometry editing for record ${recordId}`);
+    setEditMode(true);
+    // Note: L'utilisateur utilisera ensuite les contrôles Leaflet.pm pour éditer
+  }, []);
+
+  const handleEditAttributes = useCallback((record) => {
+    setAttributeEditor(record);
+  }, []);
+
+  const handleSaveAttributes = useCallback(async (recordId, updates) => {
+    if (!gristApiRef.current || !gristApiRef.current.docApi) {
+      throw new Error('Grist API not available');
+    }
+
+    try {
+      const tableId = await gristApiRef.current.getTableId();
+
+      await gristApiRef.current.docApi.applyUserActions([
+        ['UpdateRecord', tableId, recordId, updates]
+      ]);
+
+      console.log(`✓ Attributes updated for record ${recordId}`);
+      setAttributeEditor(null);
+
+    } catch (error) {
+      console.error('Error updating attributes:', error);
+      throw error;
+    }
+  }, []);
+
+  const handleDeleteRecord = useCallback((record) => {
+    setDeleteConfirm(record);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteConfirm || !gristApiRef.current || !gristApiRef.current.docApi) {
+      return;
+    }
+
+    try {
+      const tableId = await gristApiRef.current.getTableId();
+
+      await gristApiRef.current.docApi.applyUserActions([
+        ['RemoveRecord', tableId, deleteConfirm.id]
+      ]);
+
+      console.log(`✓ Record ${deleteConfirm.id} deleted`);
+      setDeleteConfirm(null);
+
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      alert(`Erreur lors de la suppression: ${error.message}`);
+    }
+  }, [deleteConfirm]);
+
+  const handleEditStyle = useCallback((record) => {
+    setStyleEditor(record);
+  }, []);
+
+  const handleSaveStyle = useCallback(async (recordId, updates) => {
+    if (!gristApiRef.current || !gristApiRef.current.docApi) {
+      throw new Error('Grist API not available');
+    }
+
+    try {
+      const tableId = await gristApiRef.current.getTableId();
+
+      await gristApiRef.current.docApi.applyUserActions([
+        ['UpdateRecord', tableId, recordId, updates]
+      ]);
+
+      console.log(`✓ Style updated for record ${recordId}`);
+      setStyleEditor(null);
+
+    } catch (error) {
+      console.error('Error updating style:', error);
+      throw error;
+    }
+  }, []);
+
+  // Handle save project
+  const handleSaveProject = useCallback(async (projectName) => {
+    if (!gristApiRef.current || !gristApiRef.current.docApi) {
+      throw new Error('Grist API not available');
+    }
+
+    try {
+      const docApi = gristApiRef.current.docApi;
+      const currentTable = await gristApiRef.current.getTableId();
+
+      console.log(`💾 Saving project: ${projectName}`);
+      console.log(`  Current table: ${currentTable}`);
+
+      // Étape 1: Renommer la table courante
+      await docApi.applyUserActions([
+        ['RenameTable', currentTable, projectName]
+      ]);
+      console.log(`✓ Table renamed to: ${projectName}`);
+
+      // Étape 2: Créer nouvelle table projet par défaut
+      const newTableResult = await createProjectTable(docApi, 'GeoMap_Project_Default');
+
+      if (!newTableResult.success) {
+        throw new Error(`Failed to create new project table: ${newTableResult.error}`);
+      }
+      console.log(`✓ New default table created: ${newTableResult.tableName}`);
+
+      // Étape 3: Configurer la nouvelle table comme courante
+      await setCurrentProjectTable(docApi, newTableResult.tableName);
+      console.log(`✓ Switched to new project table`);
+
+      // Fermer le dialog
+      setShowSaveDialog(false);
+
+      // Optionnel: Recharger le widget pour pointer sur la nouvelle table
+      // Note: L'utilisateur peut manuellement changer de table dans Grist
+      console.log(`✅ Project saved successfully as "${projectName}"`);
+
+    } catch (error) {
+      console.error('Error saving project:', error);
+      throw new Error(error.message || 'Failed to save project');
+    }
+  }, []);
+
+  // Handle import from wizard
+  const handleImport = useCallback(async (importData) => {
+    if (!gristApiRef.current || !gristApiRef.current.docApi) {
+      console.error('Grist API not available');
+      return;
+    }
+
+    try {
+      const tableId = await gristApiRef.current.getTableId();
+
+      // Generate layer name from catalog
+      const layerName = importData.catalog.title || 'Imported Layer';
+
+      // Get next import session number
+      const maxSession = Math.max(0, ...allRecords.map(r => r.import_session || 0));
+      const importSession = maxSession + 1;
+
+      // Si c'est un raster, insérer une seule ligne avec l'URL
+      if (importData.data.isRaster) {
+        await gristApiRef.current.docApi.applyUserActions([
+          ['AddRecord', tableId, null, {
+            layer_name: layerName,
+            layer_type: 'raster',
+            source_catalog: importData.catalog.id,
+            raster_url: importData.catalog.endpoint_url,
+            nom: layerName,
+            z_index: 0, // Raster en fond de carte
+            is_visible: true,
+            import_session: importSession
+          }]
+        ]);
+
+        console.log(`✅ Added raster layer "${layerName}"`);
+        return;
+      }
+
+      // Pour vecteur: préparer records pour bulk insert
+      const records = importData.data.features.map(feature => ({
+        layer_name: layerName,
+        layer_type: 'vector',
+        source_catalog: importData.catalog.id,
+        geometry: featureToWKT(feature),
+        properties: JSON.stringify(feature.properties),
+        nom: feature.properties.nom || feature.properties.name || '',
+        type: feature.properties.type || '',
+        z_index: 10,
+        is_visible: true,
+        import_session: importSession
+      }));
+
+      // Bulk insert
+      await gristApiRef.current.docApi.applyUserActions([
+        ['BulkAddRecord', tableId, records.map(() => null), records]
+      ]);
+
+      console.log(`✅ Imported ${records.length} records into layer "${layerName}"`);
+    } catch (err) {
+      console.error('Error importing data:', err);
+      throw err;
+    }
+  }, [allRecords]);
+
+  // Update layer z-index
+  const handleUpdateLayerZIndex = useCallback(async (layerName, newZIndex) => {
+    if (!gristApiRef.current || !gristApiRef.current.docApi) {
+      console.error('Grist API not available');
+      return;
+    }
+
+    try {
+      const tableId = await gristApiRef.current.getTableId();
+
+      // Find all records in this layer
+      const layerRecords = allRecords.filter(r => r.layer_name === layerName);
+
+      // Update z_index for all records in the layer
+      const actions = layerRecords.map(record => [
+        'UpdateRecord',
+        tableId,
+        record.id,
+        { z_index: newZIndex }
+      ]);
+
+      if (actions.length > 0) {
+        await gristApiRef.current.docApi.applyUserActions(actions);
+        console.log(`Updated z-index for layer ${layerName} to ${newZIndex}`);
+      }
+    } catch (err) {
+      console.error('Error updating layer z-index:', err);
+    }
+  }, [allRecords]);
+
+  const getStyle = useCallback((feature, record) => {
+    const type = feature.geometry.type;
+    const isSelected = selectedIds.includes(record.id);
+    const isHovered = hoveredId === record.id;
+
+    // Default base styles
+    const defaultBaseStyles = {
       'Point': { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.6, weight: 2, radius: 8 },
       'MultiPoint': { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.6, weight: 2, radius: 8 },
       'LineString': { color: '#16B378', weight: 3, opacity: 0.8 },
@@ -751,12 +1085,35 @@ function GeoSemanticMapWidget() {
       'MultiPolygon': { color: '#9b59b6', fillColor: '#9b59b6', fillOpacity: 0.3, weight: 2 }
     };
 
-    let style = baseStyles[type] || { color: '#3388ff', fillOpacity: 0.3, weight: 2 };
+    let style = defaultBaseStyles[type] || { color: '#3388ff', fillOpacity: 0.3, weight: 2 };
 
+    // Apply custom style_config if available
+    if (record.style_config) {
+      try {
+        const customStyle = typeof record.style_config === 'string'
+          ? JSON.parse(record.style_config)
+          : record.style_config;
+
+        // Merge custom style with base style
+        style = { ...style, ...customStyle };
+      } catch (err) {
+        console.warn(`Invalid style_config for record ${record.id}:`, err);
+      }
+    }
+
+    // Apply selection/hover effects
     if (isSelected) {
-      style = { ...style, weight: style.weight * 2, fillOpacity: (style.fillOpacity || 0.3) * 1.5 };
+      style = {
+        ...style,
+        weight: (style.weight || 2) * 2,
+        fillOpacity: Math.min((style.fillOpacity || 0.3) * 1.5, 1)
+      };
     } else if (isHovered) {
-      style = { ...style, weight: style.weight * 1.5, fillOpacity: (style.fillOpacity || 0.3) * 1.2 };
+      style = {
+        ...style,
+        weight: (style.weight || 2) * 1.5,
+        fillOpacity: Math.min((style.fillOpacity || 0.3) * 1.2, 1)
+      };
     }
 
     return style;
@@ -817,7 +1174,33 @@ function GeoSemanticMapWidget() {
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <strong style={{ fontSize: '16px' }}>🗺️ Carte Géo-Sémantique</strong>
+          <strong style={{ fontSize: '16px' }}>🗺️ Smart GIS</strong>
+          {infrastructureReady && (
+            <span style={{
+              fontSize: '11px',
+              padding: '2px 8px',
+              backgroundColor: '#16B378',
+              color: 'white',
+              borderRadius: '10px',
+              fontWeight: '500'
+            }}
+            title="Tables système prêtes">
+              ✓ System
+            </span>
+          )}
+          {projectTableReady && (
+            <span style={{
+              fontSize: '11px',
+              padding: '2px 8px',
+              backgroundColor: '#3498db',
+              color: 'white',
+              borderRadius: '10px',
+              fontWeight: '500'
+            }}
+            title="Table projet prête">
+              ✓ Project
+            </span>
+          )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{
@@ -850,6 +1233,38 @@ function GeoSemanticMapWidget() {
           >
             {editMode ? '✓ Édition Active' : '✏️ Éditer'}
           </button>
+          <button
+            onClick={() => setShowImportWizard(true)}
+            style={{
+              padding: '6px 14px',
+              backgroundColor: '#16B378',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600',
+              transition: 'all 0.2s'
+            }}
+          >
+            📥 Import
+          </button>
+          <button
+            onClick={() => setShowSaveDialog(true)}
+            style={{
+              padding: '6px 14px',
+              backgroundColor: '#3498db',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600',
+              transition: 'all 0.2s'
+            }}
+          >
+            💾 Sauvegarder
+          </button>
         </div>
         <span style={{ fontSize: '14px', fontWeight: '500' }}>
           {validRecords.length} entité{validRecords.length > 1 ? 's' : ''}
@@ -867,6 +1282,21 @@ function GeoSemanticMapWidget() {
         onRecordClick={handleRecordClick}
         selectedIds={selectedIds}
       />
+
+      {/* Layer Manager - Positioned over map */}
+      <div style={{
+        position: 'absolute',
+        top: '80px',
+        right: '16px',
+        zIndex: 1000,
+        maxWidth: '320px'
+      }}>
+        <LayerManager
+          layers={layers}
+          onToggleVisibility={handleToggleLayerVisibility}
+          onUpdateZIndex={handleUpdateLayerZIndex}
+        />
+      </div>
 
       {/* Map */}
       {validRecords.length === 0 ? (
@@ -888,11 +1318,21 @@ function GeoSemanticMapWidget() {
             attribution="&copy; OpenStreetMap"
           />
 
+          {/* Raster Layers (tile layers from records) */}
+          <RasterLayers records={allRecords} layerVisibility={layerVisibility} />
+
           <MapController records={validRecords} geometryColumn={geometryCol} />
           <GeomanController enabled={editMode} onGeometryCreated={handleGeometryCreated} />
 
           <MarkerClusterGroup>
             {validRecords.map((record, idx) => {
+              // Filter by layer visibility
+              const recordLayerName = record.layer_name || 'Default Layer';
+              const isLayerVisible = layerVisibility[recordLayerName] !== false;
+
+              if (!isLayerVisible) return null; // Skip invisible layers
+              if (record.is_visible === false) return null; // Skip invisible elements
+
               const feature = WKTConverter.parse(record[geometryCol]);
               if (!feature) return null;
 
@@ -904,7 +1344,7 @@ function GeoSemanticMapWidget() {
                 <GeoJSON
                   key={`${record.id || idx}-${geomType}`}
                   data={feature}
-                  style={() => getStyle(feature, record.id)}
+                  style={() => getStyle(feature, record)}
                   onEachFeature={(feature, layer) => {
                     const area = calculateArea(feature);
                     const length = calculateLength(feature);
@@ -932,6 +1372,17 @@ function GeoSemanticMapWidget() {
                       }
                     });
 
+                    layer.on('contextmenu', (e) => {
+                      L.DomEvent.stopPropagation(e);
+                      L.DomEvent.preventDefault(e);
+
+                      setContextMenu({
+                        x: e.originalEvent.pageX,
+                        y: e.originalEvent.pageY,
+                        record: record
+                      });
+                    });
+
                     layer.on('mouseover', () => {
                       setHoveredId(record.id);
                     });
@@ -945,6 +1396,65 @@ function GeoSemanticMapWidget() {
             })}
           </MarkerClusterGroup>
         </MapContainer>
+      )}
+
+      {/* Import Wizard */}
+      {showImportWizard && (
+        <ImportWizard
+          catalogs={catalogs}
+          onImport={handleImport}
+          onClose={() => setShowImportWizard(false)}
+          gristApi={gristApiRef.current}
+        />
+      )}
+
+      {/* Save Project Dialog */}
+      {showSaveDialog && (
+        <SaveProjectDialog
+          currentTableName="GeoMap_Project_Default"
+          onSave={handleSaveProject}
+          onClose={() => setShowSaveDialog(false)}
+        />
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onEditGeometry={() => handleEditGeometry(contextMenu.record.id)}
+          onEditAttributes={() => handleEditAttributes(contextMenu.record)}
+          onEditStyle={() => handleEditStyle(contextMenu.record)}
+          onDelete={() => handleDeleteRecord(contextMenu.record)}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Attribute Editor */}
+      {attributeEditor && (
+        <AttributeEditor
+          record={attributeEditor}
+          onSave={handleSaveAttributes}
+          onClose={() => setAttributeEditor(null)}
+        />
+      )}
+
+      {/* Style Editor */}
+      {styleEditor && (
+        <StyleEditor
+          record={styleEditor}
+          onSave={handleSaveStyle}
+          onClose={() => setStyleEditor(null)}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteConfirm && (
+        <DeleteConfirmDialog
+          record={deleteConfirm}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteConfirm(null)}
+        />
       )}
     </div>
   );
