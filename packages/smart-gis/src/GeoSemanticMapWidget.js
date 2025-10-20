@@ -8,9 +8,7 @@ import 'leaflet/dist/leaflet.css';
 import { setupSystemInfrastructure } from './systemInfrastructure';
 import {
   groupByLayers,
-  sortLayersByZIndex,
-  createProjectTable,
-  setCurrentProjectTable
+  sortLayersByZIndex
 } from './projectTableManager';
 import { adaptCurrentTable } from './adaptCurrentTable';
 import LayerManager from './LayerManager';
@@ -965,32 +963,22 @@ function GeoSemanticMapWidget() {
       const currentTable = tableInfo.tableId;
 
       console.log(`💾 Saving project: ${projectName}`);
-      console.log(`  Current table: ${currentTable}`);
+      console.log(`  Source table: ${currentTable}`);
 
-      // Étape 1: Renommer la table courante
+      // Étape 1: Dupliquer la table courante avec le nom du projet
       await docApi.applyUserActions([
-        ['RenameTable', currentTable, projectName]
+        ['DuplicateTable', currentTable, projectName, false]
       ]);
-      console.log(`✓ Table renamed to: ${projectName}`);
-
-      // Étape 2: Créer nouvelle table projet par défaut
-      const newTableResult = await createProjectTable(docApi, 'GeoMap_Project_Default');
-
-      if (!newTableResult.success) {
-        throw new Error(`Failed to create new project table: ${newTableResult.error}`);
-      }
-      console.log(`✓ New default table created: ${newTableResult.tableName}`);
-
-      // Étape 3: Configurer la nouvelle table comme courante
-      await setCurrentProjectTable(docApi, newTableResult.tableName);
-      console.log(`✓ Switched to new project table`);
+      console.log(`✓ Project saved as new table: ${projectName}`);
 
       // Fermer le dialog
       setShowSaveDialog(false);
 
-      // Optionnel: Recharger le widget pour pointer sur la nouvelle table
-      // Note: L'utilisateur peut manuellement changer de table dans Grist
+      // Message de succès
+      alert(`✅ Projet "${projectName}" sauvegardé !\n\nLa table "${projectName}" a été créée.\nVous pouvez continuer à travailler sur "${currentTable}".`);
+
       console.log(`✅ Project saved successfully as "${projectName}"`);
+      console.log(`   User continues working on "${currentTable}"`);
 
     } catch (error) {
       console.error('Error saving project:', error);
