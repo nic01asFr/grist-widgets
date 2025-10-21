@@ -1,0 +1,20 @@
+{
+  "name": "@grist-widgets/cluster-quest",
+  "version": "1.0.0",
+  "description": "Formation interactive Grist : Clusters et Vecteurs",
+  "main": "public/index.html",
+  "scripts": {
+    "dev": "echo 'Ouvrir public/index.html dans le navigateur'",
+    "build": "echo 'Widget standalone - aucun build nécessaire'"
+  },
+  "keywords": [
+    "grist",
+    "widget",
+    "training",
+    "clusters",
+    "vectors",
+    "interactive"
+  ],
+  "author": "nic01asFr",
+  "license": "Apache-2.0"
+}
