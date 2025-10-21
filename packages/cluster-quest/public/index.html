@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grist Cluster Quest</title>
+    
+    <!-- Grist Plugin API -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    
+    <!-- Reveal.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/theme/black.min.css">
+    
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <!-- Status Bar -->
+    <div id="status-bar">
+        <div class="status-item">
+            <div id="connection-status"></div>
+            <span id="connection-text">Connexion...</span>
+        </div>
+        <div class="status-item">
+            <span>👤 <span id="user-name">-</span></span>
+        </div>
+        <div class="status-item">
+            <span>🎯 <span id="user-score">0</span> pts</span>
+        </div>
+        <div class="status-item">
+            <span>📊 Chapitre <span id="current-chapter">1</span>/9</span>
+        </div>
+    </div>
+
+    <!-- User Login Modal -->
+    <div id="user-login">
+        <div class="login-card">
+            <h2 style="text-align: center; margin-top: 0;">🎮 Bienvenue !</h2>
+            <p style="font-size: 0.9em; text-align: center; opacity: 0.8;">
+                Connecté en tant que: <strong id="grist-user-display">Chargement...</strong>
+            </p>
+            <button id="start-button" onclick="startSession()">🚀 Démarrer la Formation</button>
+            <p style="font-size: 0.75em; margin-top: 1em; opacity: 0.6; text-align: center;">
+                Votre progression sera enregistrée automatiquement
+            </p>
+            <div id="login-error" class="message-box error" style="display: none; margin-top: 1em;"></div>
+        </div>
+    </div>
+
+    <div class="reveal">
+        <div class="slides">
+            <!-- SLIDE 0: ACCUEIL -->
+            <section data-chapter="0">
+                <h1>🎮 Grist Cluster Quest</h1>
+                <h3>Formation Interactive avec Grist</h3>
+                
+                <div class="card">
+                    <p><span class="emoji-large">🎯</span></p>
+                    <p>Apprenez à maîtriser les clusters et vecteurs<br>avec des exercices pratiques en temps réel</p>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card card-small">
+                        <strong>9 Chapitres</strong><br>
+                        <span style="font-size: 0.8em;">Progression guidée</span>
+                    </div>
+                    <div class="card card-small">
+                        <strong>Exercices Réels</strong><br>
+                        <span style="font-size: 0.8em;">Créez des données</span>
+                    </div>
+                    <div class="card card-small">
+                        <strong>Multi-joueurs</strong><br>
+                        <span style="font-size: 0.8em;">Comparez vos scores</span>
+                    </div>
+                    <div class="card card-small">
+                        <strong>Progression Sauvée</strong><br>
+                        <span style="font-size: 0.8em;">Dans Grist</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CHAPITRE 1: QUIZ SIMPLE -->
+            <section>
+                <section data-chapter="1">
+                    <h2>📚 Chapitre 1: Les Bases</h2>
+                    <span class="level-indicator level-1">Débutant</span>
+                    
+                    <div class="card">
+                        <h3>🤔 Qu'est-ce qu'un Cluster ?</h3>
+                        <p style="font-size: 0.9em;">Un cluster est un <strong>groupe d'éléments similaires</strong></p>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="card">
+                            <span class="emoji-large">🏖</span>
+                            <p style="font-size: 0.85em;">Photos de plage</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">🏔️</span>
+                            <p style="font-size: 0.85em;">Photos de montagne</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">🍕</span>
+                            <p style="font-size: 0.85em;">Photos de restaurants</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-chapter="1">
+                    <h2>📚 Exercice: Quiz</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Question</h3>
+                        <p>Un vecteur dans Grist capture...</p>
+
+                        <select id="ch1-quiz">
+                            <option value="">-- Choisissez --</option>
+                            <option value="mots">Les mots exacts du texte</option>
+                            <option value="sens">Le sens du texte</option>
+                            <option value="longueur">La longueur du texte</option>
+                        </select>
+
+                        <button onclick="submitChapter1()">✓ Valider</button>
+                        <div id="ch1-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 2: THÉORIE -->
+            <section data-chapter="2">
+                <h2>🧠 Chapitre 2: Comment ça marche ?</h2>
+                <span class="level-indicator level-1">Débutant</span>
+                
+                <div class="card">
+                    <h3>🔢 Les Vecteurs en Action</h3>
+                    <p style="font-size: 0.9em;">
+                        Dans Grist, <code>CREATE_VECTOR()</code> transforme vos textes<br>
+                        en représentations mathématiques pour la recherche
+                    </p>
+                </div>
+
+                <div class="card">
+                    <p style="font-size: 0.85em; text-align: left;">
+                        <strong>Exemple:</strong><br>
+                        • "T-shirt coton bio" → [0.23, 0.45, 0.12, ...]<br>
+                        • "Pull laine douce" → [0.19, 0.51, 0.08, ...]<br>
+                        • Proximité = Similarité sémantique
+                    </p>
+                </div>
+            </section>
+
+            <!-- CHAPITRE 3: EXERCICE PRATIQUE -->
+            <section>
+                <section data-chapter="3">
+                    <h2>🛠️ Chapitre 3: Créer un Produit</h2>
+                    <span class="level-indicator level-2">Intermédiaire</span>
+                    
+                    <div class="card">
+                        <h3>🎯 Exercice Pratique</h3>
+                        <p style="font-size: 0.9em;">
+                            Vous allez créer un <strong>vrai produit</strong><br>
+                            dans la table Grist avec son vecteur !
+                        </p>
+                    </div>
+
+                    <div class="card" style="background: rgba(255, 193, 7, 0.1);">
+                        <p style="font-size: 0.85em;">
+                            💡 <strong>Astuce:</strong> Les données seront visibles<br>
+                            dans la table "Exercices_Produits" du document
+                        </p>
+                    </div>
+                </section>
+
+                <section data-chapter="3">
+                    <h2>🛠️ Créer Votre Produit</h2>
+                    
+                    <div class="exercise">
+                        <h3>✏️ Formulaire de Création</h3>
+                        
+                        <input type="text" id="product-name" placeholder="Nom du produit (ex: T-shirt coton bio)">
+                        
+                        <textarea id="product-description" rows="3" placeholder="Description détaillée du produit"></textarea>
+                        
+                        <input type="number" id="product-price" placeholder="Prix (€)" step="0.01" min="0">
+                        
+                        <select id="product-category">
+                            <option value="">-- Catégorie --</option>
+                            <option value="Vêtements">Vêtements</option>
+                            <option value="Électronique">Électronique</option>
+                            <option value="Alimentation">Alimentation</option>
+                            <option value="Maison">Maison</option>
+                        </select>
+
+                        <button onclick="createProduct()">🚀 Créer dans Grist</button>
+                        <div id="ch3-feedback" class="feedback"></div>
+                    </div>
+
+                    <div id="created-products" class="data-preview" style="display: none;">
+                        <h4 style="margin-top: 0;">📦 Produits Créés</h4>
+                        <div id="products-list"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 4: RECHERCHE VECTORIELLE -->
+            <section data-chapter="4">
+                <h2>🔍 Chapitre 4: Recherche Sémantique</h2>
+                <span class="level-indicator level-2">Intermédiaire</span>
+                
+                <div class="card">
+                    <h3>🎯 VECTOR_SEARCH en Action</h3>
+                    <p style="font-size: 0.9em;">
+                        La fonction <code>VECTOR_SEARCH()</code> trouve<br>
+                        les produits similaires automatiquement
+                    </p>
+                </div>
+
+                <div class="card">
+                    <p style="font-size: 0.85em; text-align: left;">
+                        <strong>Paramètres clés:</strong><br>
+                        • <code>threshold</code>: Seuil de similarité (0-1)<br>
+                        • <code>limit</code>: Nombre de résultats<br>
+                        • <code>embedding_column</code>: Colonne vectorielle spécifique
+                    </p>
+                </div>
+            </section>
+
+            <!-- CHAPITRE 5: MULTI-VECTEURS -->
+            <section>
+                <section data-chapter="5">
+                    <h2>🌈 Chapitre 5: Multi-Vecteurs</h2>
+                    <span class="level-indicator level-3">Avancé</span>
+                    
+                    <div class="card">
+                        <h3>🎯 Exercice Avancé</h3>
+                        <p style="font-size: 0.9em;">
+                            Créez un produit avec <strong>plusieurs vecteurs</strong><br>
+                            pour différents types de recherche
+                        </p>
+                    </div>
+
+                    <div class="card">
+                        <p style="font-size: 0.85em;">
+                            🎨 <strong>Vecteur Marketing:</strong> Pour les clients<br>
+                            🔧 <strong>Vecteur Technique:</strong> Pour les specs
+                        </p>
+                    </div>
+                </section>
+
+                <section data-chapter="5">
+                    <h2>🌈 Produit Multi-Aspects</h2>
+                    
+                    <div class="exercise">
+                        <h3>✏️ Création Avancée</h3>
+                        
+                        <input type="text" id="adv-product-name" placeholder="Nom du produit">
+                        
+                        <textarea id="adv-product-marketing" rows="2" placeholder="Description marketing (pour clients)"></textarea>
+                        
+                        <textarea id="adv-product-technical" rows="2" placeholder="Caractéristiques techniques"></textarea>
+                        
+                        <input type="text" id="adv-product-tags" placeholder="Tags (séparés par des virgules)">
+
+                        <button onclick="createAdvancedProduct()">🚀 Créer avec Multi-Vecteurs</button>
+                        <div id="ch5-feedback" class="feedback"></div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1em; font-size: 0.85em;">
+                        <p><strong>Ce produit aura 2 vecteurs:</strong></p>
+                        <p>
+                            🎨 <code>vecteur_marketing</code> = nom + description marketing<br>
+                            🔧 <code>vecteur_technique</code> = caractéristiques techniques
+                        </p>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRES 6-8: THÉORIE SUPPLÉMENTAIRE -->
+            <section data-chapter="6">
+                <h2>📈 Chapitre 6: Optimisation</h2>
+                <span class="level-indicator level-2">Intermédiaire</span>
+                
+                <div class="card">
+                    <h3>⚙️ Ajuster les Paramètres</h3>
+                    <p style="font-size: 0.9em;">
+                        Le <code>threshold</code> détermine la qualité des résultats
+                    </p>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card">
+                        <strong>Threshold Bas (0.5)</strong><br>
+                        <span style="font-size: 0.8em;">Plus de résultats, moins précis</span>
+                    </div>
+                    <div class="card">
+                        <strong>Threshold Élevé (0.9)</strong><br>
+                        <span style="font-size: 0.8em;">Moins de résultats, très précis</span>
+                    </div>
+                </div>
+            </section>
+
+            <section data-chapter="7">
+                <h2>🎨 Chapitre 7: Cas d'Usage</h2>
+                <span class="level-indicator level-2">Intermédiaire</span>
+                
+                <div class="card-grid">
+                    <div class="card">
+                        <span class="emoji-large">🛍️</span>
+                        <strong>E-commerce</strong><br>
+                        <span style="font-size: 0.8em;">Recommandations produits</span>
+                    </div>
+                    <div class="card">
+                        <span class="emoji-large">❓</span>
+                        <strong>Support Client</strong><br>
+                        <span style="font-size: 0.8em;">FAQ intelligente</span>
+                    </div>
+                    <div class="card">
+                        <span class="emoji-large">📚</span>
+                        <strong>Documentation</strong><br>
+                        <span style="font-size: 0.8em;">Recherche sémantique</span>
+                    </div>
+                </div>
+            </section>
+
+            <section data-chapter="8">
+                <h2>🚀 Chapitre 8: Aller Plus Loin</h2>
+                <span class="level-indicator level-3">Avancé</span>
+                
+                <div class="card">
+                    <h3>💡 Prochaines Étapes</h3>
+                    <p style="font-size: 0.85em; text-align: left;">
+                        • Combiner avec des filtres traditionnels<br>
+                        • Utiliser plusieurs colonnes vectorielles<br>
+                        • Intégrer dans des workflows n8n<br>
+                        • Créer des dashboards interactifs
+                    </p>
+                </div>
+            </section>
+
+            <!-- CHAPITRE 9: LEADERBOARD -->
+            <section data-chapter="9">
+                <h2>🏆 Classement des Participants</h2>
+                
+                <div id="leaderboard" class="data-preview">
+                    <div class="spinner"></div>
+                    <p style="text-align: center; opacity: 0.7;">Chargement du classement...</p>
+                </div>
+
+                <div class="card" style="margin-top: 1em;">
+                    <h3>🎉 Félicitations !</h3>
+                    <p>Votre score: <strong><span id="final-score">0</span> points</strong></p>
+                    <p style="font-size: 0.85em; opacity: 0.8;">
+                        Temps total: <span id="final-time">-</span> minutes
+                    </p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>
