@@ -27,6 +27,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Cluster Quest',
+    description: 'Formation interactive pour apprendre à maîtriser les clusters et vecteurs dans Grist. 9 chapitres, exercices pratiques, leaderboard multi-joueurs.',
+    path: 'cluster-quest',
+    widgetId: '@nic01asFr/cluster-quest',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 
