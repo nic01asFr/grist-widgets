@@ -370,4 +370,460 @@ function updateConnectionStatus(status, text) {
     statusText.textContent = text;
 }
 
-// Suite du fichier dans le prochain commit...
+// ========================================
+// SESSION MANAGEMENT
+// ========================================
+async function startSession() {
+    const startButton = document.getElementById('start-button');
+    
+    if (!appState.gristReady) {
+        showLoginError('Connexion à Grist en cours, veuillez patienter...');
+        return;
+    }
+
+    if (appState.requireManualLogin) {
+        const nameInput = document.getElementById('manual-user-name');
+        const emailInput = document.getElementById('manual-user-email');
+        
+        if (!nameInput || !nameInput.value.trim()) {
+            showLoginError('Veuillez entrer votre nom');
+            return;
+        }
+        
+        const name = nameInput.value.trim();
+        const email = emailInput ? emailInput.value.trim() : '';
+        
+        let userId = localStorage.getItem('grist_widget_user_id');
+        if (!userId) {
+            userId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+            localStorage.setItem('grist_widget_user_id', userId);
+        }
+        
+        appState.gristUserId = userId;
+        appState.userName = name;
+        appState.userEmail = email || null;
+    }
+
+    if (!appState.gristUserId) {
+        showLoginError('Impossible de récupérer votre identifiant');
+        return;
+    }
+
+    startButton.disabled = true;
+    startButton.textContent = '⏳ Démarrage...';
+
+    try {
+        appState.startTime = new Date();
+
+        const userId = await createOrFindUser(appState.gristUserId, appState.userName, appState.userEmail);
+        appState.userId = userId;
+
+        const sessionId = await createSession(userId);
+        appState.sessionId = sessionId;
+
+        localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify({
+            gristUserId: appState.gristUserId,
+            userName: appState.userName,
+            userEmail: appState.userEmail,
+            userId: userId,
+            sessionId: sessionId,
+            startTime: appState.startTime.toISOString()
+        }));
+
+        document.getElementById('user-login').style.display = 'none';
+        document.getElementById('user-name').textContent = appState.userName;
+        
+        console.log('✅ Session démarrée:', { userId, sessionId });
+    } catch (error) {
+        console.error('❌ Erreur démarrage session:', error);
+        showLoginError('Erreur: ' + error.message);
+        startButton.disabled = false;
+        startButton.textContent = '🚀 Démarrer la Formation';
+    }
+}
+
+function showLoginError(message) {
+    const errorDiv = document.getElementById('login-error');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+async function createOrFindUser(gristUserId, name, email) {
+    try {
+        const users = await appState.gristApi.fetchTable(CONFIG.TABLES.USERS);
+        
+        if (users && users.id && users.grist_user_id) {
+            for (let i = 0; i < users.id.length; i++) {
+                if (users.grist_user_id[i] === gristUserId) {
+                    console.log('✓ Utilisateur existant trouvé:', users.id[i]);
+                    return users.id[i];
+                }
+            }
+        }
+
+        console.log('Creating new user:', name);
+        const result = await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.USERS, null, {
+                grist_user_id: gristUserId,
+                grist_email: email || '',
+                grist_name: name
+            }]
+        ]);
+
+        const newUserId = result[0];
+        console.log('✓ Nouvel utilisateur créé:', newUserId);
+        return newUserId;
+    } catch (error) {
+        console.error('Erreur createOrFindUser:', error);
+        throw new Error('Impossible de créer l\'utilisateur dans Grist');
+    }
+}
+
+async function createSession(userId) {
+    try {
+        const result = await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.SESSIONS, null, {
+                user_id: userId,
+                chapitre: 1,
+                score: 0,
+                temps_passe: 0
+            }]
+        ]);
+
+        const sessionId = result[0];
+        console.log('✓ Session créée:', sessionId);
+        return sessionId;
+    } catch (error) {
+        console.error('Erreur createSession:', error);
+        throw new Error('Impossible de créer la session');
+    }
+}
+
+async function updateSession(chapter, score) {
+    if (!appState.sessionId || !appState.startTime) return;
+
+    const timeSpent = Math.floor((new Date() - appState.startTime) / 1000);
+
+    try {
+        await appState.gristApi.applyUserActions([
+            ['UpdateRecord', CONFIG.TABLES.SESSIONS, appState.sessionId, {
+                chapitre: chapter,
+                score: score,
+                temps_passe: timeSpent
+            }]
+        ]);
+        console.log('✓ Session mise à jour:', { chapter, score, timeSpent });
+    } catch (error) {
+        console.error('Erreur updateSession:', error);
+    }
+}
+
+// ========================================
+// EXERCISE HANDLERS
+// ========================================
+window.submitChapter1 = async function() {
+    const answer = document.getElementById('ch1-quiz').value;
+    const feedback = document.getElementById('ch1-feedback');
+    
+    if (!answer) {
+        showFeedback(feedback, false, '❌ Veuillez sélectionner une réponse');
+        return;
+    }
+
+    const correct = answer === 'sens';
+    const points = correct ? CONFIG.POINTS.QUIZ : 0;
+
+    showFeedback(feedback, correct, 
+        correct ? '🎉 Exact ! Les vecteurs capturent le sens, pas juste les mots !' :
+                 '❌ Les vecteurs capturent le sens du texte, pas les mots exacts.'
+    );
+
+    if (correct) {
+        appState.currentScore += points;
+        updateScoreDisplay();
+        await saveExercise(1, 'quiz_bases', answer, correct);
+    }
+};
+
+window.createProduct = async function() {
+    const name = document.getElementById('product-name').value.trim();
+    const description = document.getElementById('product-description').value.trim();
+    const price = parseFloat(document.getElementById('product-price').value);
+    const category = document.getElementById('product-category').value;
+    const feedback = document.getElementById('ch3-feedback');
+
+    if (!name || !description || !price || !category) {
+        showFeedback(feedback, false, '❌ Veuillez remplir tous les champs');
+        return;
+    }
+
+    if (isNaN(price) || price <= 0) {
+        showFeedback(feedback, false, '❌ Prix invalide');
+        return;
+    }
+
+    try {
+        const result = await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.PRODUITS, null, {
+                user_id: appState.userId,
+                nom: name,
+                description: description,
+                prix: price,
+                categorie: category
+            }]
+        ]);
+
+        const productId = result[0];
+
+        showFeedback(feedback, true, 
+            `🎉 Produit créé avec succès ! (ID: ${productId})\n` +
+            `Le vecteur sera calculé automatiquement par Grist via CREATE_VECTOR().`
+        );
+
+        appState.currentScore += CONFIG.POINTS.PRODUIT;
+        updateScoreDisplay();
+        
+        await saveExercise(3, 'creer_produit', JSON.stringify({ name, category }), true);
+        await displayCreatedProducts();
+
+        document.getElementById('product-name').value = '';
+        document.getElementById('product-description').value = '';
+        document.getElementById('product-price').value = '';
+        document.getElementById('product-category').value = '';
+
+    } catch (error) {
+        console.error('Erreur création produit:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+    }
+};
+
+window.createAdvancedProduct = async function() {
+    const name = document.getElementById('adv-product-name').value.trim();
+    const marketing = document.getElementById('adv-product-marketing').value.trim();
+    const technical = document.getElementById('adv-product-technical').value.trim();
+    const tags = document.getElementById('adv-product-tags').value.trim();
+    const feedback = document.getElementById('ch5-feedback');
+
+    if (!name || !marketing || !technical) {
+        showFeedback(feedback, false, '❌ Veuillez remplir tous les champs obligatoires');
+        return;
+    }
+
+    try {
+        const result = await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.PRODUITS_AVANCES, null, {
+                user_id: appState.userId,
+                nom: name,
+                description_marketing: marketing,
+                caracteristiques_techniques: technical,
+                tags: tags
+            }]
+        ]);
+
+        const productId = result[0];
+
+        showFeedback(feedback, true, 
+            `🎉 Produit créé avec 2 vecteurs ! (ID: ${productId})\n` +
+            `• vecteur_marketing pour recherche client\n` +
+            `• vecteur_technique pour recherche par specs`
+        );
+
+        appState.currentScore += CONFIG.POINTS.PRODUIT_AVANCE;
+        updateScoreDisplay();
+        
+        await saveExercise(5, 'multi_vecteurs', JSON.stringify({ name }), true);
+
+        document.getElementById('adv-product-name').value = '';
+        document.getElementById('adv-product-marketing').value = '';
+        document.getElementById('adv-product-technical').value = '';
+        document.getElementById('adv-product-tags').value = '';
+
+    } catch (error) {
+        console.error('Erreur création produit avancé:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+    }
+};
+
+async function displayCreatedProducts() {
+    try {
+        const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        
+        if (!products || !products.id) {
+            console.log('Aucun produit trouvé');
+            return;
+        }
+
+        const userProducts = [];
+        for (let i = 0; i < products.id.length; i++) {
+            if (products.user_id && products.user_id[i] === appState.userId) {
+                userProducts.push({
+                    id: products.id[i],
+                    nom: products.nom ? products.nom[i] : 'Sans nom',
+                    categorie: products.categorie ? products.categorie[i] : '',
+                    prix: products.prix ? products.prix[i] : 0,
+                    description: products.description ? products.description[i] : ''
+                });
+            }
+        }
+
+        if (userProducts.length === 0) return;
+
+        const container = document.getElementById('created-products');
+        const list = document.getElementById('products-list');
+        
+        list.innerHTML = userProducts.map(p => `
+            <div class="record-item">
+                <strong>${p.nom}</strong> - ${p.categorie}<br>
+                <span style="font-size: 0.9em; opacity: 0.8;">${p.prix}€ - ${p.description.substring(0, 50)}${p.description.length > 50 ? '...' : ''}</span>
+            </div>
+        `).join('');
+
+        container.style.display = 'block';
+    } catch (error) {
+        console.error('Erreur displayCreatedProducts:', error);
+    }
+}
+
+async function saveExercise(chapter, exerciseId, answer, correct) {
+    if (!appState.userId) return;
+
+    try {
+        await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.EXERCICES, null, {
+                user_id: appState.userId,
+                chapitre: chapter,
+                exercice_id: exerciseId,
+                reponse: answer,
+                correct: correct
+            }]
+        ]);
+        console.log('✓ Exercice sauvegardé:', { chapter, exerciseId, correct });
+    } catch (error) {
+        console.error('Erreur saveExercise:', error);
+    }
+}
+
+// ========================================
+// LEADERBOARD
+// ========================================
+async function loadLeaderboard() {
+    try {
+        const sessions = await appState.gristApi.fetchTable(CONFIG.TABLES.SESSIONS);
+        const users = await appState.gristApi.fetchTable(CONFIG.TABLES.USERS);
+
+        if (!sessions || !sessions.id || !users || !users.id) {
+            document.getElementById('leaderboard').innerHTML = 
+                '<p style="text-align: center;">Aucune donnée disponible</p>';
+            return;
+        }
+
+        const userScores = {};
+        for (let i = 0; i < sessions.id.length; i++) {
+            const userId = sessions.user_id ? sessions.user_id[i] : null;
+            const score = sessions.score ? sessions.score[i] : 0;
+            
+            if (!userId) continue;
+            
+            if (!userScores[userId] || score > userScores[userId].score) {
+                userScores[userId] = {
+                    userId: userId,
+                    score: score,
+                    chapitre: sessions.chapitre ? sessions.chapitre[i] : 0
+                };
+            }
+        }
+
+        const leaderboard = Object.values(userScores)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
+
+        const container = document.getElementById('leaderboard');
+        
+        if (leaderboard.length === 0) {
+            container.innerHTML = '<p style="text-align: center;">Aucun participant pour le moment</p>';
+            return;
+        }
+
+        container.innerHTML = leaderboard.map((s, index) => {
+            let userName = 'Utilisateur #' + s.userId;
+            for (let i = 0; i < users.id.length; i++) {
+                if (users.id[i] === s.userId) {
+                    userName = users.grist_name ? users.grist_name[i] : (users.grist_email ? users.grist_email[i] : userName);
+                    break;
+                }
+            }
+            
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            const isCurrentUser = s.userId === appState.userId;
+            
+            return `
+                <div class="record-item" style="${isCurrentUser ? 'border-left-color: gold; background: rgba(255, 215, 0, 0.1);' : ''}">
+                    ${medal} <strong>${userName}</strong> - ${s.score} points
+                    <span style="opacity: 0.7; font-size: 0.9em;">(Chapitre ${s.chapitre})</span>
+                    ${isCurrentUser ? ' 👈 Vous' : ''}
+                </div>
+            `;
+        }).join('');
+
+        document.getElementById('final-score').textContent = appState.currentScore;
+        if (appState.startTime) {
+            const minutes = Math.round((new Date() - appState.startTime) / 60000);
+            document.getElementById('final-time').textContent = minutes;
+        }
+        
+    } catch (error) {
+        console.error('Erreur loadLeaderboard:', error);
+        document.getElementById('leaderboard').innerHTML = 
+            '<p style="text-align: center; color: var(--color-error);">Erreur de chargement</p>';
+    }
+}
+
+// ========================================
+// UI HELPERS
+// ========================================
+function showFeedback(element, success, message) {
+    element.className = 'feedback ' + (success ? 'success' : 'error');
+    element.textContent = message;
+    element.style.display = 'block';
+}
+
+function updateScoreDisplay() {
+    document.getElementById('user-score').textContent = appState.currentScore;
+}
+
+// ========================================
+// REVEAL.JS INITIALIZATION
+// ========================================
+Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    transition: 'slide',
+    embedded: true,
+    keyboard: true,
+    overview: true,
+    center: true,
+    touch: true
+});
+
+Reveal.on('slidechanged', async (event) => {
+    const chapter = event.currentSlide.dataset.chapter;
+    if (chapter) {
+        const chapterNum = parseInt(chapter);
+        document.getElementById('current-chapter').textContent = chapterNum;
+        
+        if (appState.sessionId && chapterNum > 0) {
+            await updateSession(chapterNum, appState.currentScore);
+        }
+
+        if (chapterNum === 9) {
+            await loadLeaderboard();
+        }
+        
+        if (chapterNum === 3 && event.indexv === 1) {
+            await displayCreatedProducts();
+        }
+    }
+});
+
+console.log('🎮 Grist Cluster Quest Widget initialized');
+console.log('📝 Version: 1.0.0');
