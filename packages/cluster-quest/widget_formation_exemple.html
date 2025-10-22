@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 Grist Cluster Quest</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/theme/black.min.css">
+    <style>
+        :root {
+            --color-primary: #4CAF50;
+            --color-secondary: #2196F3;
+            --color-success: #8BC34A;
+            --color-warning: #FF9800;
+            --color-error: #F44336;
+        }
+
+        .reveal {
+            font-size: 1.2em;
+        }
+
+        .reveal h1, .reveal h2, .reveal h3 {
+            text-transform: none;
+            margin-bottom: 0.5em;
+        }
+
+        .reveal h1 { font-size: 2em; }
+        .reveal h2 { font-size: 1.6em; }
+        .reveal h3 { font-size: 1.3em; }
+
+        /* Cards Design */
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.2em;
+            margin: 0.8em 0;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1em;
+            margin: 1em 0;
+        }
+
+        .card-small {
+            padding: 0.8em;
+            font-size: 0.85em;
+        }
+
+        /* Progress Bar */
+        #progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        #progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Score Display */
+        #score-display {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 0.8em 1.2em;
+            border-radius: 8px;
+            z-index: 1000;
+            font-size: 0.8em;
+            min-width: 150px;
+        }
+
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.3em 0;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.3em 0.8em;
+            border-radius: 20px;
+            font-size: 0.7em;
+            margin: 0.2em;
+            background: var(--color-primary);
+        }
+
+        .badge.locked {
+            background: rgba(255, 255, 255, 0.2);
+            opacity: 0.5;
+        }
+
+        /* Exercise Container */
+        .exercise {
+            background: rgba(33, 150, 243, 0.1);
+            border-left: 4px solid var(--color-secondary);
+            padding: 1em;
+            margin: 1em 0;
+            border-radius: 4px;
+        }
+
+        .exercise input, .exercise select, .exercise textarea {
+            width: 100%;
+            padding: 0.6em;
+            margin: 0.5em 0;
+            border-radius: 4px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 0.9em;
+        }
+
+        .exercise button {
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            padding: 0.7em 1.5em;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 0.5em;
+            transition: all 0.3s;
+        }
+
+        .exercise button:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+
+        .exercise button:disabled {
+            background: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+        }
+
+        .feedback {
+            margin-top: 0.8em;
+            padding: 0.8em;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .feedback.success {
+            background: rgba(139, 195, 74, 0.2);
+            border: 2px solid var(--color-success);
+            color: var(--color-success);
+        }
+
+        .feedback.error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 2px solid var(--color-error);
+            color: var(--color-error);
+        }
+
+        /* Code Display */
+        code {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+
+        pre code {
+            display: block;
+            padding: 1em;
+            overflow-x: auto;
+            max-height: 300px;
+        }
+
+        /* Level Indicator */
+        .level-indicator {
+            display: inline-block;
+            padding: 0.3em 0.8em;
+            border-radius: 4px;
+            font-size: 0.7em;
+            margin-left: 0.5em;
+        }
+
+        .level-1 { background: var(--color-success); }
+        .level-2 { background: var(--color-secondary); }
+        .level-3 { background: var(--color-warning); }
+
+        /* Comparison Table */
+        .comparison-table {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1em;
+            margin: 1em 0;
+        }
+
+        /* Threshold Slider */
+        .threshold-demo {
+            margin: 1em 0;
+        }
+
+        .slider-container {
+            margin: 1em 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 0.5em 0;
+        }
+
+        .slider-value {
+            text-align: center;
+            font-size: 1.2em;
+            color: var(--color-primary);
+            margin: 0.5em 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .reveal { font-size: 1em; }
+            .card-grid { grid-template-columns: 1fr; }
+            #score-display { top: 10px; right: 10px; font-size: 0.7em; }
+        }
+
+        /* Emoji Large */
+        .emoji-large {
+            font-size: 2em;
+            margin: 0.2em;
+        }
+
+        /* Navigation Hint */
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 0.5em 1em;
+            border-radius: 20px;
+            font-size: 0.7em;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <!-- Progress Bar -->
+    <div id="progress-bar">
+        <div id="progress-fill"></div>
+    </div>
+
+    <!-- Score Display -->
+    <div id="score-display">
+        <div class="score-item">
+            <span>🎯 Points:</span>
+            <span id="points">0</span>
+        </div>
+        <div class="score-item">
+            <span>⭐ Niveau:</span>
+            <span id="level">1</span>
+        </div>
+        <div class="score-item">
+            <span>🏆 Badges:</span>
+            <span id="badges-count">0/9</span>
+        </div>
+    </div>
+
+    <!-- Navigation Hint -->
+    <div class="nav-hint">
+        ← → Chapitres | ↑ ↓ Détails | ESC Vue d'ensemble
+    </div>
+
+    <div class="reveal">
+        <div class="slides">
+            <!-- SLIDE 0: ACCUEIL -->
+            <section data-auto-animate>
+                <h1>🎮 Grist Cluster Quest</h1>
+                <h3>Maîtrisez l'Art des Clusters Intelligents</h3>
+                
+                <div class="card" style="margin-top: 2em;">
+                    <p><span class="emoji-large">🎯</span></p>
+                    <p>Un parcours interactif pour comprendre et utiliser<br>les vecteurs et clusters dans Grist</p>
+                </div>
+
+                <div class="card-grid" style="margin-top: 2em;">
+                    <div class="card card-small">
+                        <strong>9 Chapitres</strong><br>
+                        Progression guidée
+                    </div>
+                    <div class="card card-small">
+                        <strong>Exercices Pratiques</strong><br>
+                        Validez vos acquis
+                    </div>
+                    <div class="card card-small">
+                        <strong>3 Niveaux</strong><br>
+                        Du débutant à l'expert
+                    </div>
+                    <div class="card card-small">
+                        <strong>9 Badges</strong><br>
+                        À débloquer
+                    </div>
+                </div>
+
+                <p style="margin-top: 2em; font-size: 0.8em; opacity: 0.7;">
+                    Appuyez sur → pour commencer votre quête !
+                </p>
+            </section>
+
+            <!-- CHAPITRE 1: LES BASES -->
+            <section>
+                <section data-auto-animate>
+                    <h2>📚 Chapitre 1: Les Bases</h2>
+                    <span class="level-indicator level-1">Niveau Débutant</span>
+                    
+                    <div class="card">
+                        <h3>🤔 Qu'est-ce qu'un Cluster ?</h3>
+                        <p>Imaginez que vous triez vos photos de vacances...</p>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="card">
+                            <span class="emoji-large">📸</span>
+                            <p>Photos de plage<br>→ <strong>Un tas</strong></p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">🏔️</span>
+                            <p>Photos de montagne<br>→ <strong>Un autre tas</strong></p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">🍕</span>
+                            <p>Photos de restaurants<br>→ <strong>Encore un tas</strong></p>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1em;">
+                        <p><strong>Un cluster = un "tas" de choses qui se ressemblent</strong></p>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>📚 Chapitre 1: Les Bases</h2>
+                    
+                    <div class="card">
+                        <h3>🔢 Qu'est-ce qu'un Vecteur ?</h3>
+                        <p style="font-size: 0.9em;">Une "fiche signalétique" numérique pour chaque élément</p>
+                    </div>
+
+                    <div class="comparison-table">
+                        <div class="card">
+                            <h4>Exemple Simple</h4>
+                            <p style="font-size: 0.85em;">
+                                👤 Taille: 175cm<br>
+                                ⚖️ Poids: 70kg<br>
+                                👶 Âge: 35 ans<br>
+                                <br>
+                                <code>[175, 70, 35]</code>
+                            </p>
+                        </div>
+                        <div class="card">
+                            <h4>Dans Grist</h4>
+                            <p style="font-size: 0.85em;">
+                                ✨ 1024 dimensions<br>
+                                🧠 Capture le <strong>sens</strong><br>
+                                🤖 Calculé automatiquement<br>
+                                <br>
+                                <code>[0.23, -0.45, ...]</code>
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>📚 Chapitre 1: Exercice</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Quiz de Compréhension</h3>
+                        <p>Ces deux phrases veulent-elles dire la même chose ?</p>
+                        
+                        <div class="card" style="margin: 1em 0;">
+                            <p><strong>Phrase 1:</strong> "J'ai acheté une voiture rouge"</p>
+                            <p><strong>Phrase 2:</strong> "J'ai acquis un véhicule écarlate"</p>
+                        </div>
+
+                        <select id="ch1-quiz">
+                            <option value="">-- Choisissez --</option>
+                            <option value="oui">Oui, elles sont similaires</option>
+                            <option value="non">Non, elles sont différentes</option>
+                        </select>
+
+                        <button onclick="checkChapter1()">Valider</button>
+
+                        <div id="ch1-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 2: À QUOI ÇA SERT -->
+            <section>
+                <section data-auto-animate>
+                    <h2>🎯 Chapitre 2: À Quoi Ça Sert ?</h2>
+                    <span class="level-indicator level-1">Niveau Débutant</span>
+                    
+                    <div class="card-grid">
+                        <div class="card">
+                            <span class="emoji-large">🔍</span>
+                            <h4>Détecter Doublons</h4>
+                            <p style="font-size: 0.85em;">Trouver les entrées similaires automatiquement</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">💡</span>
+                            <h4>Recommandations</h4>
+                            <p style="font-size: 0.85em;">Suggérer des produits similaires</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">📂</span>
+                            <h4>Organiser Documents</h4>
+                            <p style="font-size: 0.85em;">Classer automatiquement par thème</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🎯 Exemple: Doublons</h2>
+                    
+                    <div class="card">
+                        <h4>Sans Vecteurs ⛔</h4>
+                        <p style="font-size: 0.85em;">
+                            • Comparer manuellement = heures de travail<br>
+                            • "Dupont" ≠ "Dupond" ≠ "Du Pont"
+                        </p>
+                    </div>
+
+                    <div class="card" style="margin-top: 1em;">
+                        <h4>Avec Vecteurs ✅</h4>
+                        <pre><code>Client 1: "Jean Dupont, 15 rue de la Paix, Paris"
+Client 2: "J. Dupond, 15 Rue Paix, 75001 Paris"
+
+→ Grist détecte: 92% de similarité 
+→ Probable doublon !</code></pre>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🎯 Chapitre 2: Exercice</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Cas Pratique</h3>
+                        <p>Vous vendez le livre "Harry Potter à l'école des sorciers".<br>
+                        Quel livre Grist suggèrera-t-il avec les vecteurs ?</p>
+
+                        <select id="ch2-quiz">
+                            <option value="">-- Choisissez --</option>
+                            <option value="percy">Percy Jackson (jeunesse, aventure, fantastique)</option>
+                            <option value="cuisine">Livre de cuisine (le mot "feu" apparaît dans les deux)</option>
+                            <option value="science">Livre de sciences physiques</option>
+                        </select>
+
+                        <button onclick="checkChapter2()">Valider</button>
+
+                        <div id="ch2-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 3: PREMIER CLUSTER -->
+            <section>
+                <section data-auto-animate>
+                    <h2>🛠️ Chapitre 3: Votre Premier Cluster</h2>
+                    <span class="level-indicator level-2">Niveau Intermédiaire</span>
+                    
+                    <div class="card">
+                        <h3>📋 Étape 1: Préparer la Table</h3>
+                        <p style="font-size: 0.85em;">Créons une table "Produits"</p>
+                    </div>
+
+                    <div class="card">
+                        <table style="width: 100%; font-size: 0.75em; border-collapse: collapse;">
+                            <tr style="background: rgba(255,255,255,0.1);">
+                                <th style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">Colonne</th>
+                                <th style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">Type</th>
+                                <th style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">Exemple</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">nom</td>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">Texte</td>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">T-shirt coton bio bleu</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">description</td>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">Texte</td>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">Fabriqué en coton bio...</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">prix</td>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">Nombre</td>
+                                <td style="padding: 0.5em; border: 1px solid rgba(255,255,255,0.2);">29.99</td>
+                            </tr>
+                        </table>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🛠️ Chapitre 3: Votre Premier Cluster</h2>
+                    
+                    <div class="card">
+                        <h3>✨ Étape 2: Créer un Vecteur</h3>
+                        <p style="font-size: 0.85em;">Ajoutez une colonne <code>vecteur_produit</code></p>
+                    </div>
+
+                    <div class="card">
+                        <p><strong>Type:</strong> Vector</p>
+                        <p><strong>Formule:</strong></p>
+                        <pre><code>CREATE_VECTOR($nom, $description, $categorie)</code></pre>
+                        <p style="font-size: 0.85em; margin-top: 1em;">
+                            ✅ Grist crée une "signature unique" de 1024 nombres<br>
+                            ✅ Vous ne la voyez pas, mais elle est stockée !
+                        </p>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🛠️ Chapitre 3: Votre Premier Cluster</h2>
+                    
+                    <div class="card">
+                        <h3>🔍 Étape 3: Trouver les Similaires</h3>
+                        <p style="font-size: 0.85em;">Ajoutez une colonne <code>produits_similaires</code></p>
+                    </div>
+
+                    <div class="card">
+                        <p><strong>Type:</strong> Reference List</p>
+                        <p><strong>Formule:</strong></p>
+                        <pre><code>VECTOR_SEARCH(
+    Produits,        # Table source
+    $description,    # Texte à comparer
+    threshold=0.75,  # Minimum 75% similaire
+    limit=5          # Maximum 5 résultats
+)</code></pre>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🛠️ Chapitre 3: Exercice</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Créez Votre Formule</h3>
+                        <p>Complétez la formule pour chercher des produits similaires<br>
+                        avec un seuil de 80% et max 3 résultats:</p>
+
+                        <textarea id="ch3-formula" rows="4" placeholder="VECTOR_SEARCH(...)"></textarea>
+
+                        <button onclick="checkChapter3()">Valider</button>
+
+                        <div id="ch3-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 4: AJUSTER LE CLUSTERING -->
+            <section>
+                <section data-auto-animate>
+                    <h2>🎓 Chapitre 4: Ajuster le Clustering</h2>
+                    <span class="level-indicator level-2">Niveau Intermédiaire</span>
+                    
+                    <div class="card">
+                        <h3>🎚️ Le Paramètre Magique: threshold</h3>
+                        <p style="font-size: 0.85em;">Le seuil détermine le niveau de similarité requis</p>
+                    </div>
+
+                    <div class="threshold-demo">
+                        <div class="slider-container">
+                            <input type="range" id="threshold-slider" min="0" max="100" value="75" oninput="updateThreshold(this.value)">
+                            <div class="slider-value">Seuil: <span id="threshold-value">0.75</span></div>
+                        </div>
+                        
+                        <div class="card" id="threshold-explanation">
+                            <p style="font-size: 0.9em;">🎯 Assez similaires - Bon pour recommandations</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🎓 Guide des Seuils</h2>
+                    
+                    <div class="card-grid">
+                        <div class="card">
+                            <h4 style="color: #f44336;">0.90 - 1.00</h4>
+                            <p style="font-size: 0.8em;">Quasi identiques<br>→ Détecter doublons</p>
+                        </div>
+                        <div class="card">
+                            <h4 style="color: #ff9800;">0.80 - 0.89</h4>
+                            <p style="font-size: 0.8em;">Très similaires<br>→ Substituts produits</p>
+                        </div>
+                        <div class="card">
+                            <h4 style="color: #4caf50;">0.70 - 0.79</h4>
+                            <p style="font-size: 0.8em;">Assez similaires<br>→ Recommandations</p>
+                        </div>
+                        <div class="card">
+                            <h4 style="color: #2196f3;">0.60 - 0.69</h4>
+                            <p style="font-size: 0.8em;">Un peu similaires<br>→ Exploration</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🎓 Chapitre 4: Exercice</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Choisir le Bon Seuil</h3>
+                        <p>Quel seuil utiliseriez-vous pour détecter des fiches clients en double ?</p>
+
+                        <select id="ch4-quiz">
+                            <option value="">-- Choisissez --</option>
+                            <option value="60">0.60 - Pour explorer largement</option>
+                            <option value="75">0.75 - Pour recommandations</option>
+                            <option value="90">0.90 - Pour détecter les quasi-identiques</option>
+                        </select>
+
+                        <button onclick="checkChapter4()">Valider</button>
+
+                        <div id="ch4-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 5: PLUSIEURS VECTEURS -->
+            <section>
+                <section data-auto-animate>
+                    <h2>🌈 Chapitre 5: Vecteurs Multiples</h2>
+                    <span class="level-indicator level-3">Niveau Avancé</span>
+                    
+                    <div class="card">
+                        <h3>💡 Principe</h3>
+                        <p>Au lieu d'un seul vecteur qui mélange tout,<br>
+                        créez des vecteurs <strong>spécialisés</strong></p>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="card">
+                            <span class="emoji-large">🥗</span>
+                            <p style="font-size: 0.85em;"><code>vecteur_ingredients</code><br>Ingrédients uniquement</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">👨‍🍳</span>
+                            <p style="font-size: 0.85em;"><code>vecteur_technique</code><br>Méthode de cuisson</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">🎉</span>
+                            <p style="font-size: 0.85em;"><code>vecteur_contexte</code><br>Occasion, saison</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🌈 Exemple Complet: Recettes</h2>
+                    
+                    <div class="card">
+                        <pre style="font-size: 0.65em;"><code># Vecteur 1: Ingrédients
+vecteur_ingredients = CREATE_VECTOR($liste_ingredients)
+
+# Vecteur 2: Technique
+vecteur_technique = CREATE_VECTOR(
+    $methode_cuisson, 
+    $temps_preparation
+)
+
+# Vecteur 3: Contexte
+vecteur_contexte = CREATE_VECTOR(
+    $occasion, 
+    $saison, 
+    $difficulte
+)</code></pre>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🌈 Trois Clusters Différents</h2>
+                    
+                    <div class="card">
+                        <pre style="font-size: 0.6em;"><code># Cluster 1: Ingrédients similaires
+recettes_ingredients_proches = VECTOR_SEARCH(
+    Recettes, 
+    $liste_ingredients,
+    embedding_column="vecteur_ingredients",
+    threshold=0.75
+)
+
+# Cluster 2: Même technique
+recettes_technique_proche = VECTOR_SEARCH(
+    Recettes,
+    $methode_cuisson,
+    embedding_column="vecteur_technique",
+    threshold=0.75
+)
+
+# Cluster 3: Même occasion
+recettes_contexte_proche = VECTOR_SEARCH(
+    Recettes,
+    $occasion,
+    embedding_column="vecteur_contexte",
+    threshold=0.75
+)</code></pre>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🌈 Chapitre 5: Exercice</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Cas Pratique E-commerce</h3>
+                        <p>Vous vendez des produits tech. Combien de vecteurs créeriez-vous ?</p>
+
+                        <label><input type="checkbox" id="ch5-specs"> Caractéristiques techniques</label><br>
+                        <label><input type="checkbox" id="ch5-marketing"> Description marketing</label><br>
+                        <label><input type="checkbox" id="ch5-reviews"> Avis clients</label><br>
+                        <label><input type="checkbox" id="ch5-price"> Prix uniquement</label><br>
+
+                        <button onclick="checkChapter5()">Valider</button>
+
+                        <div id="ch5-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 6: VISUALISER -->
+            <section>
+                <section data-auto-animate>
+                    <h2>🎨 Chapitre 6: Visualiser les Clusters</h2>
+                    <span class="level-indicator level-2">Niveau Intermédiaire</span>
+                    
+                    <div class="card">
+                        <h3>📊 Colonnes de Contrôle</h3>
+                        <p>Créez des colonnes pour analyser vos clusters</p>
+                    </div>
+
+                    <div class="card">
+                        <pre style="font-size: 0.7em;"><code># Compter les éléments du cluster
+taille_cluster = LEN($produits_similaires)
+
+# Donner un label
+type_cluster = IF(
+    $taille_cluster > 10, 
+    "🔥 Cluster large",
+    IF($taille_cluster > 3, 
+        "📊 Cluster moyen", 
+        "🔍 Cluster petit"
+    )
+)
+
+# Détecter doublons
+alerte_doublon = IF(
+    LEN(VECTOR_SEARCH(
+        Produits, 
+        $description, 
+        threshold=0.95, 
+        limit=2
+    )) > 1,
+    "⚠️ DOUBLON POSSIBLE",
+    "✅ Unique"
+)</code></pre>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🎨 Tableau de Bord</h2>
+                    
+                    <div class="card-grid">
+                        <div class="card">
+                            <h4>🚨 Alertes Doublons</h4>
+                            <p style="font-size: 0.8em;">Filtre:<br><code>alerte_doublon = "⚠️"</code></p>
+                        </div>
+                        <div class="card">
+                            <h4>🔥 Clusters Larges</h4>
+                            <p style="font-size: 0.8em;">Filtre:<br><code>taille_cluster > 10</code></p>
+                        </div>
+                        <div class="card">
+                            <h4>🔍 Éléments Isolés</h4>
+                            <p style="font-size: 0.8em;">Filtre:<br><code>taille_cluster = 1</code></p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🎨 Chapitre 6: Exercice</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Créer une Alerte</h3>
+                        <p>Écrivez une formule qui affiche "🎯 HOT PRODUCT" si le cluster contient plus de 15 produits similaires:</p>
+
+                        <textarea id="ch6-formula" rows="4" placeholder="IF(...)"></textarea>
+
+                        <button onclick="checkChapter6()">Valider</button>
+
+                        <div id="ch6-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 7: CAS D'USAGE -->
+            <section>
+                <section data-auto-animate>
+                    <h2>📖 Chapitre 7: Cas d'Usage Réels</h2>
+                    <span class="level-indicator level-3">Niveau Avancé</span>
+                    
+                    <div class="card-grid">
+                        <div class="card">
+                            <span class="emoji-large">📚</span>
+                            <h4>Wiki Entreprise</h4>
+                            <p style="font-size: 0.8em;">Articles connexes automatiques</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">🛒</span>
+                            <h4>E-commerce</h4>
+                            <p style="font-size: 0.8em;">Recommandations produits</p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">💬</span>
+                            <h4>Support Client</h4>
+                            <p style="font-size: 0.8em;">Solutions suggérées</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>📖 Cas 1: Wiki d'Entreprise</h2>
+                    
+                    <div class="card">
+                        <h4>Table "Articles"</h4>
+                        <pre style="font-size: 0.65em;"><code># Vecteur de l'article
+vecteur_article = CREATE_VECTOR($titre, $contenu)
+
+# Articles connexes (lecture suggérée)
+articles_connexes = VECTOR_SEARCH(
+    Articles, 
+    $contenu, 
+    threshold=0.70, 
+    limit=5
+)
+
+# Vérifier doublons
+articles_identiques = VECTOR_SEARCH(
+    Articles, 
+    $contenu, 
+    threshold=0.95, 
+    limit=3
+)</code></pre>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>📖 Cas 2: E-commerce</h2>
+                    
+                    <div class="card">
+                        <pre style="font-size: 0.6em;"><code># Vecteurs spécialisés
+vecteur_technique = CREATE_VECTOR(
+    $caracteristiques, 
+    $specifications
+)
+vecteur_marketing = CREATE_VECTOR(
+    $titre, 
+    $description_vente
+)
+
+# Recommandations
+produits_complementaires = VECTOR_SEARCH(
+    Produits,
+    $description_vente,
+    embedding_column="vecteur_marketing",
+    threshold=0.70,
+    limit=6
+)
+
+# Substituts (alternatives)
+produits_substituts = VECTOR_SEARCH(
+    Produits,
+    $caracteristiques,
+    embedding_column="vecteur_technique",
+    threshold=0.80,
+    limit=4
+)</code></pre>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>📖 Chapitre 7: Exercice</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Support Client Intelligent</h3>
+                        <p>Un client ouvre un ticket: "Mon produit ne s'allume plus".<br>
+                        Quelle formule utiliseriez-vous pour trouver des solutions dans la base de connaissances ?</p>
+
+                        <select id="ch7-quiz">
+                            <option value="">-- Choisissez --</option>
+                            <option value="high">VECTOR_SEARCH avec threshold=0.95 (très strict)</option>
+                            <option value="medium">VECTOR_SEARCH avec threshold=0.65 (large)</option>
+                            <option value="exact">Recherche exacte du mot "allume"</option>
+                        </select>
+
+                        <button onclick="checkChapter7()">Valider</button>
+
+                        <div id="ch7-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 8: CONSEILS -->
+            <section>
+                <section data-auto-animate>
+                    <h2>⚡ Chapitre 8: Conseils Pratiques</h2>
+                    <span class="level-indicator level-1">Niveau Débutant</span>
+                    
+                    <div class="comparison-table">
+                        <div>
+                            <div class="card" style="background: rgba(76, 175, 80, 0.2); border-color: var(--color-success);">
+                                <h4>✅ À Faire</h4>
+                                <ul style="text-align: left; font-size: 0.8em;">
+                                    <li>Commencez simple</li>
+                                    <li>Testez les seuils</li>
+                                    <li>Noms clairs</li>
+                                    <li>Colonnes de contrôle</li>
+                                    <li>Plusieurs vecteurs</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card" style="background: rgba(244, 67, 54, 0.2); border-color: var(--color-error);">
+                                <h4>❌ À Éviter</h4>
+                                <ul style="text-align: left; font-size: 0.8em;">
+                                    <li>Threshold trop bas (&lt;0.60)</li>
+                                    <li>Threshold trop haut (&gt;0.95)</li>
+                                    <li>Oublier le limit</li>
+                                    <li>Vecteurs sur champs vides</li>
+                                    <li>Comparer incomparables</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>⚡ Règles d'Or</h2>
+                    
+                    <div class="card-grid">
+                        <div class="card">
+                            <span class="emoji-large">🔍</span>
+                            <h4>Doublons</h4>
+                            <p style="font-size: 0.85em;"><code>threshold=0.90-0.95</code></p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">💡</span>
+                            <h4>Recommandations</h4>
+                            <p style="font-size: 0.85em;"><code>threshold=0.70-0.80</code></p>
+                        </div>
+                        <div class="card">
+                            <span class="emoji-large">🔭</span>
+                            <h4>Exploration</h4>
+                            <p style="font-size: 0.85em;"><code>threshold=0.60-0.70</code></p>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1em;">
+                        <p><strong>Taille du limit:</strong></p>
+                        <p style="font-size: 0.85em;">
+                            Petit (3-5) = Précis et pertinent<br>
+                            Grand (15-20) = Vue d'ensemble
+                        </p>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>⚡ Chapitre 8: Exercice Final</h2>
+                    
+                    <div class="exercise">
+                        <h3>🎯 Quiz Récapitulatif</h3>
+                        <p>Vous voulez créer un système de recommandation de produits.<br>
+                        Quelle configuration est idéale ?</p>
+
+                        <select id="ch8-quiz">
+                            <option value="">-- Choisissez --</option>
+                            <option value="a">threshold=0.95, limit=3</option>
+                            <option value="b">threshold=0.75, limit=6</option>
+                            <option value="c">threshold=0.60, limit=20</option>
+                        </select>
+
+                        <button onclick="checkChapter8()">Valider</button>
+
+                        <div id="ch8-feedback" class="feedback"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- CHAPITRE 9: RÉCAPITULATIF & FÉLICITATIONS -->
+            <section>
+                <section data-auto-animate>
+                    <h2>🎓 Chapitre 9: Récapitulatif</h2>
+                    
+                    <div class="card">
+                        <h3>🎉 Ce Que Vous Avez Appris</h3>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="card card-small">✅ Concept de cluster</div>
+                        <div class="card card-small">✅ Vecteurs et signatures</div>
+                        <div class="card card-small">✅ VECTOR_SEARCH</div>
+                        <div class="card card-small">✅ CREATE_VECTOR</div>
+                        <div class="card card-small">✅ Paramètre threshold</div>
+                        <div class="card card-small">✅ Paramètre limit</div>
+                        <div class="card card-small">✅ Vecteurs multiples</div>
+                        <div class="card card-small">✅ Cas d'usage réels</div>
+                        <div class="card card-small">✅ Bonnes pratiques</div>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h2>🏆 Vos Badges</h2>
+                    
+                    <div id="badges-display" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5em; margin: 2em 0;">
+                        <span class="badge" id="badge-1">🎯 Bases Maîtrisées</span>
+                        <span class="badge" id="badge-2">🔍 Détecteur de Doublons</span>
+                        <span class="badge" id="badge-3">🛠️ Premier Cluster</span>
+                        <span class="badge" id="badge-4">🎚️ Ajusteur de Seuils</span>
+                        <span class="badge" id="badge-5">🌈 Multi-Vecteurs</span>
+                        <span class="badge" id="badge-6">🎨 Visualisateur</span>
+                        <span class="badge" id="badge-7">📖 Expert Cas d'Usage</span>
+                        <span class="badge" id="badge-8">⚡ Maître des Bonnes Pratiques</span>
+                        <span class="badge" id="badge-9">🎓 Grist Cluster Master</span>
+                    </div>
+                </section>
+
+                <section data-auto-animate>
+                    <h1>🎉 Félicitations !</h1>
+                    
+                    <div class="card">
+                        <h2 id="final-score">Score Final: <span id="final-points">0</span> points</h2>
+                        <h3 id="final-level">Niveau: <span id="final-level-value">1</span></h3>
+                    </div>
+
+                    <div class="card" style="margin-top: 2em;">
+                        <h3>🚀 Prochaines Étapes</h3>
+                        <p style="font-size: 0.9em;">
+                            1. Créez une table test avec 10-20 éléments<br>
+                            2. Testez vos premières formules<br>
+                            3. Explorez les différents seuils<br>
+                            4. Construisez votre premier cas d'usage réel
+                        </p>
+                    </div>
+
+                    <div class="card" style="margin-top: 1em;">
+                        <p style="font-size: 0.85em;">
+                            📚 Documentation Grist:<br>
+                            <a href="https://support.getgrist.com/" target="_blank">support.getgrist.com</a>
+                        </p>
+                    </div>
+                </section>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.js"></script>
+    <script>
+        // Game State
+        let gameState = {
+            points: 0,
+            level: 1,
+            completedChapters: [],
+            badges: []
+        };
+
+        // Initialize Reveal.js
+        Reveal.initialize({
+            hash: true,
+            controlsLayout: 'bottom-right',
+            progress: false,
+            slideNumber: 'c/t',
+            showSlideNumber: 'all',
+            transition: 'slide',
+            backgroundTransition: 'fade'
+        });
+
+        // Update progress bar
+        Reveal.on('slidechanged', event => {
+            const total = Reveal.getTotalSlides();
+            const current = event.indexh * 10 + (event.indexv || 0);
+            const progress = (current / (total * 3)) * 100;
+            document.getElementById('progress-fill').style.width = progress + '%';
+        });
+
+        // Update Score Display
+        function updateScore() {
+            document.getElementById('points').textContent = gameState.points;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('badges-count').textContent = gameState.badges.length + '/9';
+            
+            // Update level
+            if (gameState.points >= 800) gameState.level = 3;
+            else if (gameState.points >= 400) gameState.level = 2;
+        }
+
+        // Add Points
+        function addPoints(points) {
+            gameState.points += points;
+            updateScore();
+        }
+
+        // Unlock Badge
+        function unlockBadge(badgeId, badgeName) {
+            if (!gameState.badges.includes(badgeId)) {
+                gameState.badges.push(badgeId);
+                const badge = document.getElementById('badge-' + badgeId);
+                if (badge) {
+                    badge.classList.remove('locked');
+                }
+                updateScore();
+            }
+        }
+
+        // Show Feedback
+        function showFeedback(elementId, success, message) {
+            const feedback = document.getElementById(elementId);
+            feedback.className = 'feedback ' + (success ? 'success' : 'error');
+            feedback.textContent = message;
+            feedback.style.display = 'block';
+        }
+
+        // Chapter 1
+        function checkChapter1() {
+            const answer = document.getElementById('ch1-quiz').value;
+            if (answer === 'oui') {
+                showFeedback('ch1-feedback', true, '🎉 Exact ! Les vecteurs comprennent que ces phrases ont le même sens, même avec des mots différents !');
+                addPoints(100);
+                unlockBadge(1, 'Bases Maîtrisées');
+            } else {
+                showFeedback('ch1-feedback', false, '❌ Pas tout à fait. Bien que les mots soient différents, le sens est identique. Les vecteurs détectent cela !');
+            }
+        }
+
+        // Chapter 2
+        function checkChapter2() {
+            const answer = document.getElementById('ch2-quiz').value;
+            if (answer === 'percy') {
+                showFeedback('ch2-feedback', true, '🎉 Parfait ! Les vecteurs comprennent les thèmes (fantastique, jeunesse, aventure) pas juste les mots !');
+                addPoints(100);
+                unlockBadge(2, 'Détecteur de Doublons');
+            } else {
+                showFeedback('ch2-feedback', false, '❌ Non. Les vecteurs analysent le sens et le contexte, pas juste la présence d\'un mot commun.');
+            }
+        }
+
+        // Chapter 3
+        function checkChapter3() {
+            const formula = document.getElementById('ch3-formula').value.toLowerCase();
+            const hasSearch = formula.includes('vector_search');
+            const hasThreshold = formula.includes('0.80') || formula.includes('0.8');
+            const hasLimit = formula.includes('limit') && (formula.includes('3') || formula.includes('limit=3'));
+            
+            if (hasSearch && hasThreshold && hasLimit) {
+                showFeedback('ch3-feedback', true, '🎉 Excellent ! Votre formule est correcte : VECTOR_SEARCH avec threshold=0.80 et limit=3 !');
+                addPoints(150);
+                unlockBadge(3, 'Premier Cluster');
+            } else {
+                let hint = '';
+                if (!hasSearch) hint = 'Utilisez VECTOR_SEARCH(...)';
+                else if (!hasThreshold) hint = 'N\'oubliez pas threshold=0.80';
+                else if (!hasLimit) hint = 'N\'oubliez pas limit=3';
+                showFeedback('ch3-feedback', false, '❌ ' + hint);
+            }
+        }
+
+        // Chapter 4
+        function checkChapter4() {
+            const answer = document.getElementById('ch4-quiz').value;
+            if (answer === '90') {
+                showFeedback('ch4-feedback', true, '🎉 Parfait ! 0.90+ est idéal pour détecter les quasi-identiques (doublons) !');
+                addPoints(100);
+                unlockBadge(4, 'Ajusteur de Seuils');
+            } else {
+                showFeedback('ch4-feedback', false, '❌ Pour détecter des doublons, il faut un seuil très élevé (0.90+) pour ne trouver que les quasi-identiques.');
+            }
+        }
+
+        // Threshold Slider
+        function updateThreshold(value) {
+            const threshold = (value / 100).toFixed(2);
+            document.getElementById('threshold-value').textContent = threshold;
+            
+            const explanation = document.getElementById('threshold-explanation');
+            let text = '';
+            if (threshold >= 0.90) text = '🔥 Quasi identiques - Parfait pour détecter les doublons';
+            else if (threshold >= 0.80) text = '⭐ Très similaires - Idéal pour trouver des substituts';
+            else if (threshold >= 0.70) text = '🎯 Assez similaires - Bon pour recommandations';
+            else if (threshold >= 0.60) text = '🔍 Un peu similaires - Utile pour exploration';
+            else text = '⚠️ Trop bas - Risque de résultats non pertinents';
+            
+            explanation.innerHTML = '<p style="font-size: 0.9em;">' + text + '</p>';
+        }
+
+        // Chapter 5
+        function checkChapter5() {
+            const specs = document.getElementById('ch5-specs').checked;
+            const marketing = document.getElementById('ch5-marketing').checked;
+            const reviews = document.getElementById('ch5-reviews').checked;
+            const price = document.getElementById('ch5-price').checked;
+            
+            if (specs && marketing && reviews && !price) {
+                showFeedback('ch5-feedback', true, '🎉 Excellent ! Specs, marketing et reviews sont pertinents. Le prix seul n\'est pas un bon critère de similarité sémantique.');
+                addPoints(150);
+                unlockBadge(5, 'Multi-Vecteurs');
+            } else if (price) {
+                showFeedback('ch5-feedback', false, '❌ Le prix seul n\'est pas pertinent pour des vecteurs sémantiques. Concentrez-vous sur le contenu textuel !');
+            } else {
+                showFeedback('ch5-feedback', false, '❌ Vous devriez cocher caractéristiques techniques, description marketing ET avis clients pour avoir plusieurs angles de recommandation.');
+            }
+        }
+
+        // Chapter 6
+        function checkChapter6() {
+            const formula = document.getElementById('ch6-formula').value.toLowerCase();
+            const hasIf = formula.includes('if');
+            const hasLen = formula.includes('len');
+            const has15 = formula.includes('15');
+            const hasHot = formula.includes('hot');
+            
+            if (hasIf && hasLen && has15) {
+                showFeedback('ch6-feedback', true, '🎉 Parfait ! Votre formule utilise bien IF et LEN pour créer une alerte conditionnelle !');
+                addPoints(100);
+                unlockBadge(6, 'Visualisateur');
+            } else {
+                showFeedback('ch6-feedback', false, '❌ Utilisez: IF(LEN($produits_similaires) > 15, "🎯 HOT PRODUCT", "")');
+            }
+        }
+
+        // Chapter 7
+        function checkChapter7() {
+            const answer = document.getElementById('ch7-quiz').value;
+            if (answer === 'medium') {
+                showFeedback('ch7-feedback', true, '🎉 Exact ! Un seuil de 0.65 permet de trouver des solutions pertinentes même si les mots exacts diffèrent.');
+                addPoints(150);
+                unlockBadge(7, 'Expert Cas d\'Usage');
+            } else {
+                showFeedback('ch7-feedback', false, '❌ 0.95 serait trop strict (on raterait des solutions), et la recherche exacte ne trouve que les mots identiques.');
+            }
+        }
+
+        // Chapter 8
+        function checkChapter8() {
+            const answer = document.getElementById('ch8-quiz').value;
+            if (answer === 'b') {
+                showFeedback('ch8-feedback', true, '🎉 Parfait ! threshold=0.75 et limit=6 est l\'équilibre idéal pour des recommandations pertinentes !');
+                addPoints(100);
+                unlockBadge(8, 'Maître des Bonnes Pratiques');
+                
+                // Final badge
+                if (gameState.badges.length >= 8) {
+                    unlockBadge(9, 'Grist Cluster Master');
+                }
+            } else {
+                showFeedback('ch8-feedback', false, '❌ Pour des recommandations: threshold=0.75 (ni trop strict ni trop large) et limit=6 (assez de choix sans surcharge).');
+            }
+        }
+
+        // Update final score
+        Reveal.on('slidechanged', event => {
+            if (event.indexh === 8 && event.indexv === 2) {
+                document.getElementById('final-points').textContent = gameState.points;
+                document.getElementById('final-level-value').textContent = gameState.level;
+            }
+        });
+
+        // Initialize
+        updateScore();
+        updateThreshold(75);
+    </script>
+</body>
+</html>
