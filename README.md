@@ -5,6 +5,8 @@
 ## 📦 Widgets Disponibles
 
 ### Geo-Semantic Map
+![d4cdb104-9cd2-4c7d-9dec-8e2b83672f69.png](https://docs.numerique.gouv.fr/media/b494ac93-5286-4d16-909f-9c73eaeec82d/attachments/d4cdb104-9cd2-4c7d-9dec-8e2b83672f69.png)
+
 Carte géospatiale interactive avec support WKT complet :
 - ✅ Affichage : Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
 - ✅ Édition interactive via Leaflet.pm
