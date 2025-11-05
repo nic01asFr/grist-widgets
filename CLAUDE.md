@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This repository hosts custom widgets for Grist (spreadsheet application) on GitHub Pages. It contains multiple widgets:
 - **geo-map** (React): Geo-semantic map with WKT support, interactive editing via Leaflet.pm
 - **smart-gis** (React): Smart GIS system with multi-source support (IGN, OSM), advanced editing, custom styles
-- **cluster-quest** (Static HTML/JS): Interactive training for learning Grist clusters and vectors
+- **cluster-quest** (Static HTML/JS): Interactive training for learning Grist clusters and vectors with Reveal.js
+- **reveal-minimal-example** (Static HTML/JS): Minimal working example template for Reveal.js widgets
 
 ## Development Commands
 
@@ -186,7 +187,9 @@ URLs after deployment:
 - `/docs/WIDGET_DEVELOPMENT_GUIDE.md` - Practical development guide
 - `/docs/API_REFERENCE.md` - Complete API documentation
 - `/docs/VECTOR_SEARCH_PATTERNS.md` - Vector search patterns in Grist
+- `/docs/REVEAL_WIDGET_GUIDE.md` - **Complete guide for creating Reveal.js widgets** (for presentation-style interfaces)
 - `/packages/cluster-quest/README.md` - Cluster Quest widget specifics
+- `/packages/reveal-minimal-example/README.md` - Minimal Reveal.js widget template
 
 ## Common Patterns
 
@@ -223,6 +226,96 @@ await this.docApi.applyUserActions([
 ]);
 ```
 
+## Reveal.js Widgets (Presentation-Style Interfaces)
+
+### When to Use Reveal.js Widgets
+
+Use Reveal.js for presentation-style interfaces within Grist:
+- Interactive training/tutorials (like cluster-quest)
+- Step-by-step data visualizations
+- Slide-based reports or dashboards
+- Educational content with progression tracking
+
+### Critical Requirements for Reveal.js in Grist Iframes
+
+**⚠️ MUST-FOLLOW Rules** (based on production debugging):
+
+1. **Configuration:**
+   ```javascript
+   Reveal.initialize({
+     hash: false,        // CRITICAL: Must be false in iframe
+     embedded: true,     // CRITICAL: For iframe mode
+     // NEVER use: width: '100%', height: '100%'
+   });
+   ```
+
+2. **Initialization:**
+   ```javascript
+   // Use polling to wait for Reveal.js CDN load
+   function waitForReveal() {
+     if (typeof Reveal !== 'undefined') {
+       initializeRevealJS();
+     } else {
+       setTimeout(waitForReveal, 100);
+     }
+   }
+   ```
+
+3. **Layout Updates:**
+   ```javascript
+   // After modal close or DOM changes
+   requestAnimationFrame(() => {
+     Reveal.layout();  // Use this, NOT Reveal.sync()
+   });
+   ```
+
+4. **CSS Requirements:**
+   ```css
+   .reveal {
+     width: 100%;
+     height: 100vh;
+     position: relative;
+     z-index: 1;
+   }
+   ```
+
+### Quick Start: Create a New Reveal.js Widget
+
+1. **Copy the template:**
+   ```bash
+   cp -r packages/reveal-minimal-example packages/my-new-widget
+   ```
+
+2. **Read the comprehensive guide:**
+   - `/docs/REVEAL_WIDGET_GUIDE.md` - Complete documentation with all patterns and pitfalls
+
+3. **Customize slides:**
+   - Edit `public/index.html` to add your slides
+   - Modify `public/app.js` for Grist integration
+   - Adjust `public/styles.css` for custom styling
+
+4. **Test locally:**
+   ```bash
+   cd packages/my-new-widget/public
+   python -m http.server 8000
+   ```
+
+### Common Reveal.js Pitfalls
+
+❌ **Stack Overflow Error** (`Maximum call stack size exceeded`):
+- Caused by: `width: '100%'`, `height: '100%'`, `hash: true`, or calling `Reveal.sync()`
+- Solution: Remove percentage dimensions, set `hash: false`, use `Reveal.layout()` instead
+
+❌ **Blank Screen** (slides don't appear):
+- Caused by: Missing `.reveal` dimensions, no `Reveal.layout()` after modal close
+- Solution: Add CSS dimensions, call `Reveal.layout()` in `requestAnimationFrame()`
+
+❌ **Reveal is Undefined**:
+- Caused by: app.js executes before Reveal.js CDN loads
+- Solution: Use polling mechanism `waitForReveal()`
+
+**See `/docs/REVEAL_WIDGET_GUIDE.md` for complete troubleshooting.**
+
 ## Known Issues & Solutions
 
 ### Widget doesn't display:
@@ -234,10 +327,11 @@ await this.docApi.applyUserActions([
 - Run `npm install` in both root and widget package directory
 - Check GitHub Actions logs in Actions tab
 
-### Cluster Quest blank page:
-- Requires Reveal.js which only works on hosted pages
-- Must use hosted URL: `https://nic01asfr.github.io/grist-widgets/cluster-quest/`
-- Cannot use direct local HTML file
+### Reveal.js widgets blank page or stack overflow:
+- See "Reveal.js Widgets" section above for critical requirements
+- Most common: percentage width/height or hash:true causing infinite loop
+- Solution: Follow patterns in `/docs/REVEAL_WIDGET_GUIDE.md`
+- For local testing: Use `python -m http.server` (Reveal.js needs HTTP server, not file://)
 
 ## Git Branch Strategy
 

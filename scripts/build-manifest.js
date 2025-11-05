@@ -39,6 +39,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Reveal.js Minimal Example',
+    description: 'Modèle minimal pour créer des widgets Grist avec présentation Reveal.js. Démontre la configuration sécurisée pour iframes et l\'intégration Grist API.',
+    path: 'reveal-minimal-example',
+    widgetId: '@nic01asFr/reveal-minimal-example',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 

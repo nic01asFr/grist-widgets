@@ -12,7 +12,8 @@ const builtWidgets = ['geo-map', 'smart-gis'];
 
 // Widgets statiques (HTML/CSS/JS direct)
 const staticWidgets = [
-  { name: 'cluster-quest', source: 'public' }
+  { name: 'cluster-quest', source: 'public' },
+  { name: 'reveal-minimal-example', source: 'public' }
 ];
 
 let successCount = 0;

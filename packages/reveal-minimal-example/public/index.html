@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Reveal.js Widget</title>
+
+    <!-- Grist Plugin API -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <!-- Reveal.js CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/theme/black.css">
+
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <!-- Optional: Loading screen -->
+    <div id="loading-screen">
+        <div class="loading-card">
+            <h2>📊 Minimal Reveal Widget</h2>
+            <p>Connected to Grist</p>
+            <button id="start-btn">Start Presentation</button>
+        </div>
+    </div>
+
+    <!-- Reveal.js container -->
+    <div class="reveal">
+        <div class="slides">
+            <!-- Slide 1: Welcome -->
+            <section data-slide-id="welcome">
+                <h1>🎉 Welcome</h1>
+                <h3>Minimal Reveal.js Widget for Grist</h3>
+                <p>This is a minimal working example</p>
+            </section>
+
+            <!-- Slide 2: Grist Data -->
+            <section data-slide-id="data">
+                <h2>📊 Data from Grist</h2>
+                <div id="grist-data-container">
+                    <p>Loading data...</p>
+                </div>
+            </section>
+
+            <!-- Slide 3: Interactive -->
+            <section data-slide-id="interactive">
+                <h2>✍️ Interactive Example</h2>
+                <input type="text" id="user-input" placeholder="Enter something...">
+                <button id="save-btn">Save to Grist</button>
+                <div id="feedback"></div>
+            </section>
+
+            <!-- Slide 4: Conclusion -->
+            <section data-slide-id="conclusion">
+                <h2>✅ That's It!</h2>
+                <p>This minimal widget demonstrates:</p>
+                <ul>
+                    <li class="fragment">Proper Reveal.js initialization</li>
+                    <li class="fragment">Grist API integration</li>
+                    <li class="fragment">Safe configuration for iframes</li>
+                    <li class="fragment">Data display and interaction</li>
+                </ul>
+            </section>
+        </div>
+    </div>
+
+    <!-- Load Reveal.js BEFORE app.js -->
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>
