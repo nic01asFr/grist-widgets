@@ -435,8 +435,15 @@ async function startSession() {
         document.getElementById('user-login').style.display = 'none';
         document.getElementById('user-name').textContent = appState.userName;
 
-        // NOTE: Ne PAS appeler Reveal.sync() ou Reveal.layout() ici
-        // Ces méthodes causent une boucle infinie avec les URLs complexes de Grist
+        // Forcer Reveal.js à se redimensionner après fermeture du modal
+        // Utilise requestAnimationFrame pour éviter la boucle infinie
+        requestAnimationFrame(() => {
+            if (typeof Reveal !== 'undefined') {
+                Reveal.layout();
+                console.log('🎬 Reveal.js layout mis à jour');
+            }
+        });
+
         console.log('🎬 Modal fermé, slides Reveal.js devraient être visibles');
 
         console.log('✅ Session démarrée:', { userId, sessionId });
