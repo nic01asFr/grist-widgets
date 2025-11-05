@@ -811,13 +811,14 @@ function initializeRevealJS() {
             hash: false,  // CRITICAL: Must be false in iframe to avoid infinite loop
             slideNumber: 'c/t',
             transition: 'slide',
-            embedded: true,
+            embedded: true,  // Run in iframe mode
             keyboard: true,
             overview: true,
             center: true,
             touch: true,
-            width: '100%',
-            height: '100%',
+            // REMOVED: width: '100%', height: '100%'
+            // Percentage values cause infinite recursion (see GitHub issue #2514)
+            // Reveal.js uses default 960x700 and auto-scales to fit container
             margin: 0.04,
             minScale: 0.2,
             maxScale: 2.0
