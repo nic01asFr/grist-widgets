@@ -879,3 +879,6 @@ function waitForReveal() {
 
 // Démarrer l'attente
 waitForReveal();
+
+console.log('🎮 Grist Cluster Quest Widget initialized');
+console.log('📝 Version: 1.0.0');

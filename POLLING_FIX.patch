@@ -1,0 +1,36 @@
+Fix: Wait for Reveal.js to load with polling
+
+This patch fixes the Reveal.js initialization by using a polling mechanism instead of window.load event.
+
+Apply this change to: packages/cluster-quest/public/app.js
+
+Around line 869-874, replace:
+
+```javascript
+// Attendre que Reveal.js soit chargé
+if (typeof Reveal !== 'undefined') {
+    initializeRevealJS();
+} else {
+    window.addEventListener('load', initializeRevealJS);
+}
+```
+
+With:
+
+```javascript
+// Attendre que Reveal.js soit chargé
+function waitForReveal() {
+    if (typeof Reveal !== 'undefined') {
+        console.log('✅ Reveal.js détecté, initialisation...');
+        initializeRevealJS();
+    } else {
+        console.log('⏳ Attente de Reveal.js...');
+        setTimeout(waitForReveal, 100);
+    }
+}
+
+// Démarrer l'attente
+waitForReveal();
+```
+
+This ensures Reveal.js is properly detected and initialized even in iframe contexts where load events may not fire reliably.
