@@ -437,12 +437,22 @@ async function startSession() {
 
         // Force Reveal.js à se synchroniser après la fermeture du modal
         setTimeout(() => {
-            if (typeof Reveal !== 'undefined') {
+            if (typeof Reveal !== 'undefined' && Reveal.isReady && Reveal.isReady()) {
                 Reveal.sync();
                 Reveal.layout();
-                console.log('🎬 Reveal.js synchronisé');
+                console.log('🎬 Reveal.js synchronisé et affiché');
+            } else {
+                console.warn('⚠️ Reveal.js not ready, reinitializing...');
+                initializeRevealJS();
+                setTimeout(() => {
+                    if (typeof Reveal !== 'undefined') {
+                        Reveal.sync();
+                        Reveal.layout();
+                        console.log('🎬 Reveal.js synchronisé (2ème tentative)');
+                    }
+                }, 300);
             }
-        }, 100);
+        }, 150);
 
         console.log('✅ Session démarrée:', { userId, sessionId });
     } catch (error) {
@@ -805,36 +815,63 @@ function updateScoreDisplay() {
 // ========================================
 // REVEAL.JS INITIALIZATION
 // ========================================
-Reveal.initialize({
-    hash: true,
-    slideNumber: 'c/t',
-    transition: 'slide',
-    embedded: true,
-    keyboard: true,
-    overview: true,
-    center: true,
-    touch: true
-});
-
-Reveal.on('slidechanged', async (event) => {
-    const chapter = event.currentSlide.dataset.chapter;
-    if (chapter) {
-        const chapterNum = parseInt(chapter);
-        document.getElementById('current-chapter').textContent = chapterNum;
-        
-        if (appState.sessionId && chapterNum > 0) {
-            await updateSession(chapterNum, appState.currentScore);
-        }
-
-        if (chapterNum === 9) {
-            await loadLeaderboard();
-        }
-        
-        if (chapterNum === 3 && event.indexv === 1) {
-            await displayCreatedProducts();
-        }
+function initializeRevealJS() {
+    if (typeof Reveal === 'undefined') {
+        console.error('❌ Reveal.js not loaded yet');
+        return false;
     }
-});
+
+    try {
+        Reveal.initialize({
+            hash: true,
+            slideNumber: 'c/t',
+            transition: 'slide',
+            embedded: true,
+            keyboard: true,
+            overview: true,
+            center: true,
+            touch: true,
+            width: '100%',
+            height: '100%',
+            margin: 0.04,
+            minScale: 0.2,
+            maxScale: 2.0
+        });
+
+        Reveal.on('slidechanged', async (event) => {
+            const chapter = event.currentSlide.dataset.chapter;
+            if (chapter) {
+                const chapterNum = parseInt(chapter);
+                document.getElementById('current-chapter').textContent = chapterNum;
+
+                if (appState.sessionId && chapterNum > 0) {
+                    await updateSession(chapterNum, appState.currentScore);
+                }
+
+                if (chapterNum === 9) {
+                    await loadLeaderboard();
+                }
+
+                if (chapterNum === 3 && event.indexv === 1) {
+                    await displayCreatedProducts();
+                }
+            }
+        });
+
+        console.log('🎬 Reveal.js initialized successfully');
+        return true;
+    } catch (error) {
+        console.error('❌ Error initializing Reveal.js:', error);
+        return false;
+    }
+}
+
+// Attendre que Reveal.js soit chargé
+if (typeof Reveal !== 'undefined') {
+    initializeRevealJS();
+} else {
+    window.addEventListener('load', initializeRevealJS);
+}
 
 console.log('🎮 Grist Cluster Quest Widget initialized');
 console.log('📝 Version: 1.0.0');
