@@ -45,68 +45,141 @@ const appState = {
 // GRIST INITIALIZATION
 // ========================================
 
+async function identifyUser() {
+    // Strategy: Create stable user ID with multiple fallback layers
+    let userId = null;
+    let userName = null;
+    let userEmail = null;
+    let identificationMethod = null;
+
+    // Method 1: Stable ID from access token + baseUrl
+    try {
+        const access = await grist.getAccessToken({ readOnly: false });
+        console.log('✅ Access token obtenu');
+
+        // Create stable hash from baseUrl + token
+        const stableString = `${access.baseUrl}_${access.token}`;
+        const stableHash = btoa(stableString).substring(0, 24).replace(/[+/=]/g, '_');
+        userId = `grist_${stableHash}`;
+        identificationMethod = 'token';
+
+        // Try to get user info from _grist_ACLPrincipals (if accessible)
+        try {
+            const principals = await appState.gristApi.fetchTable('_grist_ACLPrincipals');
+            if (principals && principals.id) {
+                // Filter non-anonymous users
+                const realUsers = [];
+                for (let i = 0; i < principals.id.length; i++) {
+                    const email = principals.userEmail ? principals.userEmail[i] : null;
+                    const name = principals.name ? principals.name[i] : null;
+                    if (email && email !== 'anon@getgrist.com' && !email.startsWith('anon-')) {
+                        realUsers.push({ email, name });
+                    }
+                }
+
+                // If single user, use their info
+                if (realUsers.length === 1) {
+                    userEmail = realUsers[0].email;
+                    userName = realUsers[0].name || userEmail.split('@')[0];
+                    console.log('✅ User info inferred from _grist_ACLPrincipals:', { userName, userEmail });
+                } else if (realUsers.length > 1) {
+                    console.log('⚠️ Multiple users found, cannot infer specific user');
+                }
+            }
+        } catch (principalsError) {
+            console.log('⚠️ Cannot access _grist_ACLPrincipals:', principalsError.message);
+        }
+
+        // Check localStorage for cached user info
+        const cachedUser = localStorage.getItem('grist_cluster_quest_user');
+        if (cachedUser) {
+            try {
+                const cached = JSON.parse(cachedUser);
+                if (cached.userId === userId) {
+                    userName = userName || cached.userName;
+                    userEmail = userEmail || cached.userEmail;
+                    console.log('✅ User info restored from cache:', { userName, userEmail });
+                }
+            } catch (e) {
+                console.warn('Failed to parse cached user info');
+            }
+        }
+
+        // Default name if still unknown
+        userName = userName || 'Utilisateur Grist';
+
+        console.log('👤 User identified via stable token:', { userId, userName, userEmail });
+    } catch (tokenError) {
+        console.warn('⚠️ getAccessToken() failed:', tokenError);
+
+        // Method 2: Fallback to persistent localStorage ID
+        let storedUserId = localStorage.getItem('grist_widget_user_id');
+        if (!storedUserId) {
+            storedUserId = 'local_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+            localStorage.setItem('grist_widget_user_id', storedUserId);
+        }
+
+        userId = storedUserId;
+        identificationMethod = 'localStorage';
+
+        // Try to get cached user info
+        const cachedUser = localStorage.getItem('grist_cluster_quest_user');
+        if (cachedUser) {
+            try {
+                const cached = JSON.parse(cachedUser);
+                userName = cached.userName || 'Utilisateur';
+                userEmail = cached.userEmail || null;
+            } catch (e) {
+                userName = 'Utilisateur';
+            }
+        } else {
+            userName = 'Utilisateur';
+        }
+
+        console.log('👤 User identified via localStorage:', { userId, userName, identificationMethod });
+    }
+
+    // Save to cache
+    localStorage.setItem('grist_cluster_quest_user', JSON.stringify({
+        userId, userName, userEmail, identificationMethod
+    }));
+
+    return {
+        id: userId,
+        name: userName,
+        email: userEmail,
+        method: identificationMethod
+    };
+}
+
 async function initializeWidget() {
     console.log('✅ Grist API ready');
     appState.gristReady = true;
     appState.gristApi = grist.docApi;
-    
+
     updateConnectionStatus('connecting', 'Récupération utilisateur...');
-    
+
     try {
-        let user = null;
+        const user = await identifyUser();
 
-        // Essayer d'obtenir un token d'accès
-        try {
-            const access = await grist.getAccessToken();
-            console.log('✅ Access token obtenu');
-
-            // Le token permet de faire des appels API mais ne contient pas d'infos user
-            // On génère un ID unique basé sur le token pour identifier l'utilisateur
-            const tokenHash = btoa(access.token).substring(0, 16);
-            const userId = 'grist_' + tokenHash;
-
-            user = {
-                id: userId,
-                email: null,
-                name: 'Utilisateur Grist'
-            };
-            console.log('👤 Utilisateur identifié via token:', user);
-        } catch (accessError) {
-            console.warn('⚠️ getAccessToken() non disponible:', accessError);
-
-            // Fallback: générer un ID local persistant
-            let storedUserId = localStorage.getItem('grist_widget_user_id');
-            if (!storedUserId) {
-                storedUserId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-                localStorage.setItem('grist_widget_user_id', storedUserId);
-            }
-
-            user = {
-                id: storedUserId,
-                email: null,
-                name: 'Utilisateur'
-            };
-            console.log('👤 Utilisateur généré localement:', user);
-        }
-        
         if (user) {
             appState.gristUser = user;
-            appState.userName = user.name || user.email || 'Utilisateur';
+            appState.userName = user.name || 'Utilisateur';
             appState.userEmail = user.email || null;
             appState.gristUserId = user.id;
-            
+
             document.getElementById('grist-user-display').textContent = appState.userName;
         } else {
             throw new Error('Impossible de récupérer les informations utilisateur');
         }
-        
+
     } catch (error) {
         console.error('❌ Erreur récupération utilisateur:', error);
-        
+
         appState.requireManualLogin = true;
-        document.getElementById('grist-user-display').innerHTML = 
+        document.getElementById('grist-user-display').innerHTML =
             '<span style="color: var(--color-warning);">Mode manuel requis</span>';
-        
+
         const loginCard = document.querySelector('.login-card');
         loginCard.innerHTML = `
             <h2 style="text-align: center; margin-top: 0;">🎮 Bienvenue !</h2>
@@ -145,15 +218,38 @@ async function initializeWidget() {
     }
     
     updateConnectionStatus('connecting', 'Vérification des tables...');
-    
+
     try {
         const tablesCheck = await checkRequiredTables();
-        
+
         if (tablesCheck.allExist) {
             updateConnectionStatus('connected', 'Connecté à Grist');
+
+            // Check for existing session
+            try {
+                const existingSession = await checkExistingSession();
+                if (existingSession) {
+                    console.log('📂 Existing session found:', existingSession);
+
+                    // Propose to resume
+                    const decision = await proposeResumeSession(existingSession);
+
+                    if (decision.action === 'resume') {
+                        await resumeSession(existingSession);
+                    } else if (decision.action === 'restart') {
+                        // Will create new session when user clicks start button
+                        console.log('🔄 User chose to restart');
+                    }
+                } else {
+                    console.log('📝 No existing session found');
+                }
+            } catch (sessionError) {
+                console.error('⚠️ Error checking session:', sessionError);
+                // Continue with normal flow
+            }
         } else {
             updateConnectionStatus('warning', 'Tables manquantes');
-            
+
             const loginError = document.getElementById('login-error');
             if (loginError) {
                 loginError.innerHTML = `
@@ -375,6 +471,171 @@ function updateConnectionStatus(status, text) {
 // ========================================
 // SESSION MANAGEMENT
 // ========================================
+
+async function checkExistingSession() {
+    // Check localStorage for existing session data
+    const storedSession = localStorage.getItem(CONFIG.STORAGE_KEY);
+    if (!storedSession) {
+        return null;
+    }
+
+    try {
+        const sessionData = JSON.parse(storedSession);
+
+        // Verify session exists in Grist
+        if (!sessionData.sessionId) {
+            return null;
+        }
+
+        // Fetch session from Grist to verify it's still valid
+        const sessions = await appState.gristApi.fetchTable(CONFIG.TABLES.SESSIONS);
+        if (!sessions || !sessions.id) {
+            return null;
+        }
+
+        // Find the session
+        for (let i = 0; i < sessions.id.length; i++) {
+            if (sessions.id[i] === sessionData.sessionId) {
+                return {
+                    sessionId: sessionData.sessionId,
+                    userId: sessionData.userId,
+                    gristUserId: sessionData.gristUserId,
+                    userName: sessionData.userName,
+                    userEmail: sessionData.userEmail,
+                    startTime: sessionData.startTime,
+                    currentChapter: sessions.chapitre ? sessions.chapitre[i] : 1,
+                    currentScore: sessions.score ? sessions.score[i] : 0,
+                    timeSpent: sessions.temps_passe ? sessions.temps_passe[i] : 0
+                };
+            }
+        }
+
+        // Session not found in Grist, clear localStorage
+        localStorage.removeItem(CONFIG.STORAGE_KEY);
+        return null;
+    } catch (error) {
+        console.error('❌ Error checking existing session:', error);
+        return null;
+    }
+}
+
+async function proposeResumeSession(sessionData) {
+    return new Promise((resolve) => {
+        const loginModal = document.getElementById('user-login');
+        const loginCard = document.querySelector('.login-card');
+
+        loginCard.innerHTML = `
+            <h2 style="text-align: center; margin-top: 0;">🎮 Session Trouvée !</h2>
+            <p style="font-size: 0.9em; text-align: center; opacity: 0.8;">
+                Bonjour <strong>${sessionData.userName}</strong> !<br>
+                Vous avez une session en cours.
+            </p>
+
+            <div class="card" style="background: rgba(33, 150, 243, 0.1); margin: 1em 0; padding: 1em;">
+                <h3 style="margin: 0 0 0.5em 0; font-size: 1em;">📊 Progression actuelle</h3>
+                <p style="margin: 0.3em 0; font-size: 0.9em;">
+                    📚 <strong>Chapitre ${sessionData.currentChapter}/9</strong>
+                </p>
+                <p style="margin: 0.3em 0; font-size: 0.9em;">
+                    🎯 <strong>${sessionData.currentScore} points</strong>
+                </p>
+                <p style="margin: 0.3em 0; font-size: 0.9em;">
+                    ⏱️ <strong>${Math.round(sessionData.timeSpent / 60)} minutes</strong>
+                </p>
+            </div>
+
+            <button id="resume-button" style="
+                width: 100%;
+                padding: 0.8em;
+                margin: 0.5em 0;
+                background: linear-gradient(135deg, #2196F3, #1976D2);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 1em;
+                font-weight: bold;
+            ">
+                ▶️ Reprendre la Formation
+            </button>
+
+            <button id="restart-button" style="
+                width: 100%;
+                padding: 0.8em;
+                margin: 0.5em 0;
+                background: rgba(255, 255, 255, 0.1);
+                color: white;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.9em;
+            ">
+                🔄 Recommencer de Zéro
+            </button>
+
+            <p style="font-size: 0.75em; margin-top: 1em; opacity: 0.6; text-align: center;">
+                Votre progression sera toujours sauvegardée
+            </p>
+
+            <div id="login-error" class="message-box error" style="display: none; margin-top: 1em;"></div>
+        `;
+
+        // Handle resume
+        document.getElementById('resume-button').addEventListener('click', () => {
+            resolve({ action: 'resume', sessionData });
+        });
+
+        // Handle restart
+        document.getElementById('restart-button').addEventListener('click', () => {
+            if (confirm('⚠️ Êtes-vous sûr de vouloir recommencer ? Votre progression actuelle sera perdue.')) {
+                localStorage.removeItem(CONFIG.STORAGE_KEY);
+                resolve({ action: 'restart', sessionData: null });
+            }
+        });
+    });
+}
+
+async function resumeSession(sessionData) {
+    console.log('▶️ Resuming session:', sessionData);
+
+    // Restore app state
+    appState.userId = sessionData.userId;
+    appState.sessionId = sessionData.sessionId;
+    appState.gristUserId = sessionData.gristUserId;
+    appState.userName = sessionData.userName;
+    appState.userEmail = sessionData.userEmail;
+    appState.currentScore = sessionData.currentScore;
+    appState.startTime = new Date(sessionData.startTime);
+
+    // Update UI
+    document.getElementById('user-login').style.display = 'none';
+    document.getElementById('user-name').textContent = appState.userName;
+    document.getElementById('user-score').textContent = appState.currentScore;
+    document.getElementById('current-chapter').textContent = sessionData.currentChapter;
+
+    // Force Reveal.js layout update
+    requestAnimationFrame(() => {
+        if (typeof Reveal !== 'undefined') {
+            Reveal.layout();
+
+            // Navigate to the last chapter after a short delay
+            setTimeout(() => {
+                // Calculate slide index for chapter
+                // Chapters 1, 3, 5 have vertical slides, others are single
+                let targetSlide = sessionData.currentChapter;
+                if (sessionData.currentChapter > 5) {
+                    targetSlide = sessionData.currentChapter + 1; // Account for vertical slides
+                }
+
+                Reveal.slide(targetSlide, 0);
+                console.log(`🎬 Navigated to chapter ${sessionData.currentChapter}`);
+            }, 300);
+        }
+    });
+
+    console.log('✅ Session resumed successfully');
+}
+
 async function startSession() {
     const startButton = document.getElementById('start-button');
     
@@ -660,7 +921,7 @@ window.createAdvancedProduct = async function() {
 async function displayCreatedProducts() {
     try {
         const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
-        
+
         if (!products || !products.id) {
             console.log('Aucun produit trouvé');
             return;
@@ -683,7 +944,7 @@ async function displayCreatedProducts() {
 
         const container = document.getElementById('created-products');
         const list = document.getElementById('products-list');
-        
+
         list.innerHTML = userProducts.map(p => `
             <div class="record-item">
                 <strong>${p.nom}</strong> - ${p.categorie}<br>
@@ -696,6 +957,242 @@ async function displayCreatedProducts() {
         console.error('Erreur displayCreatedProducts:', error);
     }
 }
+
+// ========================================
+// FORMULA TESTING EXERCISES
+// ========================================
+
+window.testFormulaCreateVector = async function() {
+    const formulaInput = document.getElementById('formula-create-vector');
+    const feedback = document.getElementById('ch2-5-feedback');
+    const resultContainer = document.getElementById('vector-result');
+    const resultDetails = document.getElementById('vector-details');
+
+    const formula = formulaInput.value.trim();
+
+    if (!formula) {
+        showFeedback(feedback, false, '❌ Veuillez entrer une formule');
+        return;
+    }
+
+    // Basic validation
+    if (!formula.toUpperCase().includes('CREATE_VECTOR')) {
+        showFeedback(feedback, false, '❌ La formule doit contenir CREATE_VECTOR()');
+        return;
+    }
+
+    try {
+        showFeedback(feedback, true, '⏳ Exécution de la formule...');
+
+        // Extract text from formula (simple parsing)
+        const match = formula.match(/CREATE_VECTOR\s*\(\s*["']([^"']+)["']\s*\)/i);
+        if (!match) {
+            showFeedback(feedback, false, '❌ Syntaxe incorrecte. Utilisez: CREATE_VECTOR("votre texte")');
+            return;
+        }
+
+        const textToVectorize = match[1];
+
+        // First, check if Exercices_Produits table has a vector column
+        // If not, we'll need to create a test table or use an existing product
+        // For simplicity, let's create a test product and retrieve its vector
+
+        // Create a test product with the user's text
+        const testProductResult = await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.PRODUITS, null, {
+                user_id: appState.userId,
+                nom: 'Test Vector',
+                description: textToVectorize,
+                prix: 0,
+                categorie: 'Test'
+            }]
+        ]);
+
+        const testProductId = testProductResult.retValues ? testProductResult.retValues[0] : testProductResult[0];
+
+        // Wait a bit for Grist to calculate the vector (if column exists)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Fetch the product table to check for vector columns
+        const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+
+        // Look for vector columns (columns starting with "vecteur" or "vector" or "embedding")
+        const vectorColumns = Object.keys(products).filter(col =>
+            col.toLowerCase().includes('vect') || col.toLowerCase().includes('embed')
+        );
+
+        if (vectorColumns.length === 0) {
+            showFeedback(feedback, false,
+                '⚠️ Aucune colonne vectorielle trouvée dans la table Exercices_Produits.\n' +
+                'Ajoutez une colonne de formule avec CREATE_VECTOR($nom, $description) dans Grist d\'abord.');
+            resultContainer.style.display = 'none';
+            return;
+        }
+
+        // Get the vector from the test product
+        const productIndex = products.id.indexOf(testProductId);
+        if (productIndex === -1) {
+            showFeedback(feedback, false, '❌ Erreur: produit test non trouvé');
+            return;
+        }
+
+        // Get vector from first vector column
+        const vectorColumn = vectorColumns[0];
+        const vectorData = products[vectorColumn][productIndex];
+
+        if (!vectorData || vectorData.length === 0) {
+            showFeedback(feedback, false,
+                `⚠️ Le vecteur n'a pas encore été calculé. \n` +
+                `Assurez-vous que la colonne "${vectorColumn}" contient la formule CREATE_VECTOR().`);
+            resultContainer.style.display = 'none';
+            return;
+        }
+
+        // Display vector information
+        const vectorArray = Array.isArray(vectorData) ? vectorData : JSON.parse(vectorData);
+        const dimension = vectorArray.length;
+        const firstValues = vectorArray.slice(0, 5).map(v => v.toFixed(4)).join(', ');
+        const magnitude = Math.sqrt(vectorArray.reduce((sum, v) => sum + v * v, 0));
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <p><strong>📏 Dimension du vecteur:</strong> ${dimension}</p>
+                <p><strong>📊 Premiers éléments:</strong> [${firstValues}, ...]</p>
+                <p><strong>📐 Magnitude (norme):</strong> ${magnitude.toFixed(4)}</p>
+                <p><strong>✅ Texte vectorisé:</strong> "${textToVectorize}"</p>
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em;">
+                    💡 Ce vecteur de ${dimension} dimensions représente le sens sémantique de votre texte.
+                    Des textes similaires auront des vecteurs proches dans l'espace vectoriel.
+                </p>
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+        showFeedback(feedback, true,
+            '🎉 Formule exécutée avec succès ! +' + CONFIG.POINTS.QUIZ + ' points');
+
+        // Award points
+        appState.currentScore += CONFIG.POINTS.QUIZ;
+        updateScoreDisplay();
+        await saveExercise(2, 'test_create_vector', formula, true);
+
+    } catch (error) {
+        console.error('Erreur testFormulaCreateVector:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
+
+window.testFormulaVectorSearch = async function() {
+    const queryInput = document.getElementById('search-query');
+    const thresholdInput = document.getElementById('search-threshold');
+    const limitInput = document.getElementById('search-limit');
+    const feedback = document.getElementById('ch4-5-feedback');
+    const resultContainer = document.getElementById('search-results');
+    const resultDetails = document.getElementById('search-details');
+
+    const query = queryInput.value.trim();
+    const threshold = parseFloat(thresholdInput.value);
+    const limit = parseInt(limitInput.value);
+
+    if (!query) {
+        showFeedback(feedback, false, '❌ Veuillez entrer une requête de recherche');
+        return;
+    }
+
+    if (isNaN(threshold) || threshold < 0 || threshold > 1) {
+        showFeedback(feedback, false, '❌ Le seuil doit être entre 0 et 1');
+        return;
+    }
+
+    try {
+        showFeedback(feedback, true, '⏳ Recherche en cours...');
+
+        // Fetch all products
+        const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+
+        if (!products || !products.id || products.id.length === 0) {
+            showFeedback(feedback, false,
+                '⚠️ Aucun produit trouvé. Créez d\'abord des produits dans le chapitre 3.');
+            resultContainer.style.display = 'none';
+            return;
+        }
+
+        // Look for vector columns
+        const vectorColumns = Object.keys(products).filter(col =>
+            col.toLowerCase().includes('vect') || col.toLowerCase().includes('embed')
+        );
+
+        if (vectorColumns.length === 0) {
+            showFeedback(feedback, false,
+                '⚠️ Aucune colonne vectorielle trouvée. \n' +
+                'Ajoutez une colonne de formule avec CREATE_VECTOR() dans Grist d\'abord.');
+            resultContainer.style.display = 'none';
+            return;
+        }
+
+        // For actual vector search, we need to:
+        // 1. Create a vector from the query
+        // 2. Compare it with all product vectors
+        // 3. Calculate cosine similarity
+        // 4. Return top results
+
+        // Since VECTOR_SEARCH is a Grist function, we can't execute it directly from the widget
+        // We'll create a test record with the query and use Grist's VECTOR_SEARCH in a formula column
+
+        // Alternative: Manual implementation of cosine similarity
+        // But this requires the query vector first
+
+        // Simplified approach: Show all products and suggest using VECTOR_SEARCH formula in Grist
+        showFeedback(feedback, true,
+            '💡 Pour utiliser VECTOR_SEARCH(), ajoutez une colonne de formule dans Grist:\n' +
+            `VECTOR_SEARCH("${CONFIG.TABLES.PRODUITS}", "${query}", threshold=${threshold}, limit=${limit})`);
+
+        // Display all products as example
+        const allProducts = [];
+        for (let i = 0; i < Math.min(products.id.length, limit); i++) {
+            allProducts.push({
+                id: products.id[i],
+                nom: products.nom ? products.nom[i] : 'Sans nom',
+                description: products.description ? products.description[i] : '',
+                categorie: products.categorie ? products.categorie[i] : '',
+                prix: products.prix ? products.prix[i] : 0
+            });
+        }
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <p><strong>🔍 Requête:</strong> "${query}"</p>
+                <p><strong>📊 Paramètres:</strong> threshold=${threshold}, limit=${limit}</p>
+                <p style="font-size: 0.85em; opacity: 0.8; margin: 1em 0;">
+                    💡 <strong>Pour utiliser VECTOR_SEARCH() dans Grist:</strong><br>
+                    1. Ouvrez la table "${CONFIG.TABLES.PRODUITS}"<br>
+                    2. Ajoutez une colonne de formule<br>
+                    3. Entrez: <code>VECTOR_SEARCH("${CONFIG.TABLES.PRODUITS}", "${query}", threshold=${threshold})</code>
+                </p>
+                <h4 style="margin: 1em 0 0.5em 0;">Produits disponibles (${allProducts.length}):</h4>
+                ${allProducts.map(p => `
+                    <div style="padding: 0.5em; border-left: 3px solid rgba(33, 150, 243, 0.5); margin: 0.5em 0; background: rgba(0,0,0,0.2);">
+                        <strong>${p.nom}</strong> - ${p.categorie} (${p.prix}€)<br>
+                        <span style="font-size: 0.85em; opacity: 0.7;">${p.description.substring(0, 80)}${p.description.length > 80 ? '...' : ''}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+
+        // Award points
+        appState.currentScore += CONFIG.POINTS.QUIZ;
+        updateScoreDisplay();
+        await saveExercise(4, 'test_vector_search', query, true);
+
+    } catch (error) {
+        console.error('Erreur testFormulaVectorSearch:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
 
 async function saveExercise(chapter, exerciseId, answer, correct) {
     if (!appState.userId) return;
