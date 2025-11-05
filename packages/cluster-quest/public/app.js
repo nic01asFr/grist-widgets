@@ -867,11 +867,18 @@ function initializeRevealJS() {
 }
 
 // Attendre que Reveal.js soit chargé
-if (typeof Reveal !== 'undefined') {
-    initializeRevealJS();
-} else {
-    window.addEventListener('load', initializeRevealJS);
+function waitForReveal() {
+    if (typeof Reveal !== 'undefined') {
+        console.log('✅ Reveal.js détecté, initialisation...');
+        initializeRevealJS();
+    } else {
+        console.log('⏳ Attente de Reveal.js...');
+        setTimeout(waitForReveal, 100);
+    }
 }
+
+// Démarrer l'attente
+waitForReveal();
 
 console.log('🎮 Grist Cluster Quest Widget initialized');
 console.log('📝 Version: 1.0.0');
