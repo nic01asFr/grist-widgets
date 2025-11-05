@@ -435,24 +435,9 @@ async function startSession() {
         document.getElementById('user-login').style.display = 'none';
         document.getElementById('user-name').textContent = appState.userName;
 
-        // Force Reveal.js à se synchroniser après la fermeture du modal
-        setTimeout(() => {
-            if (typeof Reveal !== 'undefined' && Reveal.isReady && Reveal.isReady()) {
-                Reveal.sync();
-                Reveal.layout();
-                console.log('🎬 Reveal.js synchronisé et affiché');
-            } else {
-                console.warn('⚠️ Reveal.js not ready, reinitializing...');
-                initializeRevealJS();
-                setTimeout(() => {
-                    if (typeof Reveal !== 'undefined') {
-                        Reveal.sync();
-                        Reveal.layout();
-                        console.log('🎬 Reveal.js synchronisé (2ème tentative)');
-                    }
-                }, 300);
-            }
-        }, 150);
+        // NOTE: Ne PAS appeler Reveal.sync() ou Reveal.layout() ici
+        // Ces méthodes causent une boucle infinie avec les URLs complexes de Grist
+        console.log('🎬 Modal fermé, slides Reveal.js devraient être visibles');
 
         console.log('✅ Session démarrée:', { userId, sessionId });
     } catch (error) {
