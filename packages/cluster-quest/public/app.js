@@ -434,7 +434,16 @@ async function startSession() {
 
         document.getElementById('user-login').style.display = 'none';
         document.getElementById('user-name').textContent = appState.userName;
-        
+
+        // Force Reveal.js à se synchroniser après la fermeture du modal
+        setTimeout(() => {
+            if (typeof Reveal !== 'undefined') {
+                Reveal.sync();
+                Reveal.layout();
+                console.log('🎬 Reveal.js synchronisé');
+            }
+        }, 100);
+
         console.log('✅ Session démarrée:', { userId, sessionId });
     } catch (error) {
         console.error('❌ Erreur démarrage session:', error);
@@ -472,7 +481,7 @@ async function createOrFindUser(gristUserId, name, email) {
             }]
         ]);
 
-        const newUserId = result[0];
+        const newUserId = result.retValues ? result.retValues[0] : result[0];
         console.log('✓ Nouvel utilisateur créé:', newUserId);
         return newUserId;
     } catch (error) {
@@ -492,7 +501,7 @@ async function createSession(userId) {
             }]
         ]);
 
-        const sessionId = result[0];
+        const sessionId = result.retValues ? result.retValues[0] : result[0];
         console.log('✓ Session créée:', sessionId);
         return sessionId;
     } catch (error) {
