@@ -127,26 +127,56 @@
             </section>
 
             <!-- CHAPITRE 2: THÉORIE -->
-            <section data-chapter="2">
-                <h2>🧠 Chapitre 2: Comment ça marche ?</h2>
-                <span class="level-indicator level-1">Débutant</span>
-                
-                <div class="card">
-                    <h3>🔢 Les Vecteurs en Action</h3>
-                    <p style="font-size: 0.9em;">
-                        Dans Grist, <code>CREATE_VECTOR()</code> transforme vos textes<br>
-                        en représentations mathématiques pour la recherche
-                    </p>
-                </div>
+            <section>
+                <section data-chapter="2">
+                    <h2>🧠 Chapitre 2: Comment ça marche ?</h2>
+                    <span class="level-indicator level-1">Débutant</span>
 
-                <div class="card">
-                    <p style="font-size: 0.85em; text-align: left;">
-                        <strong>Exemple:</strong><br>
-                        • "T-shirt coton bio" → [0.23, 0.45, 0.12, ...]<br>
-                        • "Pull laine douce" → [0.19, 0.51, 0.08, ...]<br>
-                        • Proximité = Similarité sémantique
-                    </p>
-                </div>
+                    <div class="card">
+                        <h3>🔢 Les Vecteurs en Action</h3>
+                        <p style="font-size: 0.9em;">
+                            Dans Grist, <code>CREATE_VECTOR()</code> transforme vos textes<br>
+                            en représentations mathématiques pour la recherche
+                        </p>
+                    </div>
+
+                    <div class="card">
+                        <p style="font-size: 0.85em; text-align: left;">
+                            <strong>Exemple:</strong><br>
+                            • "T-shirt coton bio" → [0.23, 0.45, 0.12, ...]<br>
+                            • "Pull laine douce" → [0.19, 0.51, 0.08, ...]<br>
+                            • Proximité = Similarité sémantique
+                        </p>
+                    </div>
+                </section>
+
+                <!-- CHAPITRE 2.5: EXERCICE FORMULE CREATE_VECTOR -->
+                <section data-chapter="2">
+                    <h2>⚡ Exercice: CREATE_VECTOR()</h2>
+                    <span class="level-indicator level-2">Intermédiaire</span>
+
+                    <div class="exercise">
+                        <h3>🧪 Testez la formule CREATE_VECTOR()</h3>
+                        <p style="font-size: 0.85em;">Écrivez une formule pour créer un vecteur à partir d'un texte</p>
+
+                        <div class="card" style="background: rgba(255, 193, 7, 0.1); margin-bottom: 1em;">
+                            <p style="font-size: 0.8em; margin: 0;">
+                                💡 <strong>Syntaxe:</strong> <code>CREATE_VECTOR("votre texte ici")</code><br>
+                                Ou avec plusieurs champs: <code>CREATE_VECTOR($nom, $description)</code>
+                            </p>
+                        </div>
+
+                        <textarea id="formula-create-vector" rows="3" placeholder='CREATE_VECTOR("T-shirt coton bio confortable")' style="font-family: monospace; font-size: 0.9em;"></textarea>
+
+                        <button onclick="testFormulaCreateVector()">▶️ Exécuter la formule</button>
+                        <div id="ch2-5-feedback" class="feedback"></div>
+
+                        <div id="vector-result" class="data-preview" style="display: none; margin-top: 1em;">
+                            <h4 style="margin-top: 0;">📊 Résultat du vecteur</h4>
+                            <div id="vector-details"></div>
+                        </div>
+                    </div>
+                </section>
             </section>
 
             <!-- CHAPITRE 3: EXERCICE PRATIQUE -->
@@ -203,26 +233,64 @@
             </section>
 
             <!-- CHAPITRE 4: RECHERCHE VECTORIELLE -->
-            <section data-chapter="4">
-                <h2>🔍 Chapitre 4: Recherche Sémantique</h2>
-                <span class="level-indicator level-2">Intermédiaire</span>
-                
-                <div class="card">
-                    <h3>🎯 VECTOR_SEARCH en Action</h3>
-                    <p style="font-size: 0.9em;">
-                        La fonction <code>VECTOR_SEARCH()</code> trouve<br>
-                        les produits similaires automatiquement
-                    </p>
-                </div>
+            <section>
+                <section data-chapter="4">
+                    <h2>🔍 Chapitre 4: Recherche Sémantique</h2>
+                    <span class="level-indicator level-2">Intermédiaire</span>
 
-                <div class="card">
-                    <p style="font-size: 0.85em; text-align: left;">
-                        <strong>Paramètres clés:</strong><br>
-                        • <code>threshold</code>: Seuil de similarité (0-1)<br>
-                        • <code>limit</code>: Nombre de résultats<br>
-                        • <code>embedding_column</code>: Colonne vectorielle spécifique
-                    </p>
-                </div>
+                    <div class="card">
+                        <h3>🎯 VECTOR_SEARCH en Action</h3>
+                        <p style="font-size: 0.9em;">
+                            La fonction <code>VECTOR_SEARCH()</code> trouve<br>
+                            les produits similaires automatiquement
+                        </p>
+                    </div>
+
+                    <div class="card">
+                        <p style="font-size: 0.85em; text-align: left;">
+                            <strong>Paramètres clés:</strong><br>
+                            • <code>threshold</code>: Seuil de similarité (0-1)<br>
+                            • <code>limit</code>: Nombre de résultats<br>
+                            • <code>embedding_column</code>: Colonne vectorielle spécifique
+                        </p>
+                    </div>
+                </section>
+
+                <!-- CHAPITRE 4.5: EXERCICE FORMULE VECTOR_SEARCH -->
+                <section data-chapter="4">
+                    <h2>⚡ Exercice: VECTOR_SEARCH()</h2>
+                    <span class="level-indicator level-2">Intermédiaire</span>
+
+                    <div class="exercise">
+                        <h3>🧪 Testez la recherche vectorielle</h3>
+                        <p style="font-size: 0.85em;">Cherchez des produits similaires avec VECTOR_SEARCH()</p>
+
+                        <div class="card" style="background: rgba(255, 193, 7, 0.1); margin-bottom: 1em;">
+                            <p style="font-size: 0.8em; margin: 0;">
+                                💡 <strong>Syntaxe:</strong><br>
+                                <code>VECTOR_SEARCH(table_name, query_text, threshold=0.7, limit=5)</code><br>
+                                Exemple: <code>VECTOR_SEARCH("Exercices_Produits", "vêtements confortables", threshold=0.6)</code>
+                            </p>
+                        </div>
+
+                        <label style="font-size: 0.9em; margin-bottom: 0.3em; display: block;">Requête de recherche:</label>
+                        <input type="text" id="search-query" placeholder="Ex: vêtements confortables pour l'été" style="margin-bottom: 0.5em;">
+
+                        <label style="font-size: 0.9em; margin-bottom: 0.3em; display: block;">Seuil de similarité (0.0 - 1.0):</label>
+                        <input type="number" id="search-threshold" value="0.6" min="0" max="1" step="0.1" style="margin-bottom: 0.5em;">
+
+                        <label style="font-size: 0.9em; margin-bottom: 0.3em; display: block;">Nombre de résultats:</label>
+                        <input type="number" id="search-limit" value="5" min="1" max="20" step="1" style="margin-bottom: 1em;">
+
+                        <button onclick="testFormulaVectorSearch()">🔍 Rechercher</button>
+                        <div id="ch4-5-feedback" class="feedback"></div>
+
+                        <div id="search-results" class="data-preview" style="display: none; margin-top: 1em;">
+                            <h4 style="margin-top: 0;">📊 Résultats de recherche</h4>
+                            <div id="search-details"></div>
+                        </div>
+                    </div>
+                </section>
             </section>
 
             <!-- CHAPITRE 5: MULTI-VECTEURS -->
