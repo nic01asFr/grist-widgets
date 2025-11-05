@@ -54,37 +54,39 @@ async function initializeWidget() {
     
     try {
         let user = null;
-        
+
+        // Essayer d'obtenir un token d'accès
         try {
-            user = await grist.getUser();
-            console.log('👤 Utilisateur Grist récupéré:', user);
-        } catch (userError) {
-            console.warn('⚠️ grist.getUser() non disponible:', userError);
-            
-            try {
-                const access = await grist.getAccessToken();
-                user = {
-                    id: access.userId || 'anonymous',
-                    email: access.userEmail || null,
-                    name: access.userName || 'Utilisateur'
-                };
-                console.log('👤 Utilisateur via access token:', user);
-            } catch (accessError) {
-                console.warn('⚠️ getAccessToken() non disponible:', accessError);
-                
-                let storedUserId = localStorage.getItem('grist_widget_user_id');
-                if (!storedUserId) {
-                    storedUserId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-                    localStorage.setItem('grist_widget_user_id', storedUserId);
-                }
-                
-                user = {
-                    id: storedUserId,
-                    email: null,
-                    name: 'Utilisateur'
-                };
-                console.log('👤 Utilisateur généré localement:', user);
+            const access = await grist.getAccessToken();
+            console.log('✅ Access token obtenu');
+
+            // Le token permet de faire des appels API mais ne contient pas d'infos user
+            // On génère un ID unique basé sur le token pour identifier l'utilisateur
+            const tokenHash = btoa(access.token).substring(0, 16);
+            const userId = 'grist_' + tokenHash;
+
+            user = {
+                id: userId,
+                email: null,
+                name: 'Utilisateur Grist'
+            };
+            console.log('👤 Utilisateur identifié via token:', user);
+        } catch (accessError) {
+            console.warn('⚠️ getAccessToken() non disponible:', accessError);
+
+            // Fallback: générer un ID local persistant
+            let storedUserId = localStorage.getItem('grist_widget_user_id');
+            if (!storedUserId) {
+                storedUserId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                localStorage.setItem('grist_widget_user_id', storedUserId);
             }
+
+            user = {
+                id: storedUserId,
+                email: null,
+                name: 'Utilisateur'
+            };
+            console.log('👤 Utilisateur généré localement:', user);
         }
         
         if (user) {
