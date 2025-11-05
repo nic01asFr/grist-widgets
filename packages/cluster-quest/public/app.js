@@ -823,7 +823,7 @@ function initializeRevealJS() {
 
     try {
         Reveal.initialize({
-            hash: true,
+            hash: false,  // CRITICAL: Must be false in iframe to avoid infinite loop
             slideNumber: 'c/t',
             transition: 'slide',
             embedded: true,
