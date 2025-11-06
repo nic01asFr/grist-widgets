@@ -432,7 +432,7 @@ async function createMissingTables() {
                     {id: 'remise', type: 'Numeric'},
                     {id: 'stock', type: 'Int'},
                     {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'},
-                    {id: 'age_jours', type: 'Int', isFormula: true, formula: '(TODAY() - $date_creation).days'},
+                    {id: 'age_jours', type: 'Int', isFormula: true, formula: 'int((NOW() - $date_creation).total_seconds() / 86400)'},
                     {id: 'vecteur_simple', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description)'},
                     {id: 'vecteur_filtre', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description) if $statut == "publié" else None'},
                     {id: 'vecteur_enrichi', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR(("🔥 PROMO -" + str($remise) + "% " if $remise > 20 else "") + ("🆕 " if $age_jours < 7 else "") + $nom + " " + $description) if $statut == "publié" else None'}
