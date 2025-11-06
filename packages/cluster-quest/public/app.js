@@ -7,13 +7,15 @@ const CONFIG = {
         SESSIONS: 'Sessions',
         EXERCICES: 'Exercices',
         PRODUITS: 'Exercices_Produits',
-        PRODUITS_AVANCES: 'Exercices_Produits_Avances'
+        PRODUITS_AVANCES: 'Exercices_Produits_Avances',
+        RECHERCHES: 'Recherches_Produits'
     },
     STORAGE_KEY: 'grist_cluster_quest_session',
     POINTS: {
         QUIZ: 100,
         PRODUIT: 150,
-        PRODUIT_AVANCE: 200
+        PRODUIT_AVANCE: 200,
+        FORMULA_TEST: 100
     }
 };
 
@@ -37,7 +39,8 @@ const appState = {
         sessions: false,
         exercices: false,
         produits: false,
-        produitsavances: false
+        produitsavances: false,
+        recherches: false
     }
 };
 
@@ -421,12 +424,21 @@ async function createMissingTables() {
                     {id: 'description', type: 'Text'},
                     {id: 'prix', type: 'Numeric'},
                     {id: 'categorie', type: 'Choice', widgetOptions: JSON.stringify({
-                        choices: ['Vêtements', 'Électronique', 'Alimentation', 'Maison']
+                        choices: ['Vêtements', 'Électronique', 'Alimentation', 'Maison', 'Sport', 'Autre']
                     })},
-                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'}
+                    {id: 'statut', type: 'Choice', widgetOptions: JSON.stringify({
+                        choices: ['brouillon', 'publié', 'archivé']
+                    })},
+                    {id: 'remise', type: 'Numeric'},
+                    {id: 'stock', type: 'Int'},
+                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'},
+                    {id: 'age_jours', type: 'Int', isFormula: true, formula: '(TODAY() - $date_creation).days'},
+                    {id: 'vecteur_simple', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description)'},
+                    {id: 'vecteur_filtre', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description) if $statut == "publié" else None'},
+                    {id: 'vecteur_enrichi', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR(("🔥 PROMO -" + str($remise) + "% " if $remise > 20 else "") + ("🆕 " if $age_jours < 7 else "") + $nom + " " + $description) if $statut == "publié" else None'}
                 ]]
             ]);
-            console.log('✅ Table Exercices_Produits créée');
+            console.log('✅ Table Exercices_Produits créée avec colonnes vectorielles');
             appState.tablesExist.produits = true;
         }
 
@@ -438,12 +450,37 @@ async function createMissingTables() {
                     {id: 'nom', type: 'Text'},
                     {id: 'description_marketing', type: 'Text'},
                     {id: 'caracteristiques_techniques', type: 'Text'},
+                    {id: 'saison', type: 'Choice', widgetOptions: JSON.stringify({
+                        choices: ['été', 'hiver', 'printemps', 'automne', 'toute_saison']
+                    })},
+                    {id: 'stock', type: 'Int'},
                     {id: 'tags', type: 'Text'},
-                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'}
+                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'},
+                    {id: 'vecteur_marketing', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description_marketing)'},
+                    {id: 'vecteur_technique', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($caracteristiques_techniques)'},
+                    {id: 'vecteur_complet', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR(("☀️ " if $saison == "été" else "❄️ " if $saison == "hiver" else "") + $nom + " " + $description_marketing) if $stock > 0 else None'}
                 ]]
             ]);
-            console.log('✅ Table Exercices_Produits_Avances créée');
+            console.log('✅ Table Exercices_Produits_Avances créée avec multi-vecteurs');
             appState.tablesExist.produitsavances = true;
+        }
+
+        if (!appState.tablesExist.recherches) {
+            console.log('Création table Recherches_Produits...');
+            await appState.gristApi.applyUserActions([
+                ['AddTable', CONFIG.TABLES.RECHERCHES, [
+                    {id: 'user_id', type: 'Ref:' + CONFIG.TABLES.USERS},
+                    {id: 'requete', type: 'Text'},
+                    {id: 'threshold', type: 'Numeric'},
+                    {id: 'limite', type: 'Int'},
+                    {id: 'embedding_column', type: 'Text'},
+                    {id: 'date_recherche', type: 'DateTime', isFormula: true, formula: 'NOW()'}
+                    // Note: Les colonnes RefList pour resultats seront ajoutées manuellement car elles nécessitent une configuration avancée
+                ]]
+            ]);
+            console.log('✅ Table Recherches_Produits créée');
+            console.log('⚠️ NOTE: Ajoutez manuellement les colonnes RefList pour les résultats de recherche');
+            appState.tablesExist.recherches = true;
         }
 
         console.log('🎉 Toutes les tables ont été créées avec succès !');
