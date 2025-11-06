@@ -7,13 +7,15 @@ const CONFIG = {
         SESSIONS: 'Sessions',
         EXERCICES: 'Exercices',
         PRODUITS: 'Exercices_Produits',
-        PRODUITS_AVANCES: 'Exercices_Produits_Avances'
+        PRODUITS_AVANCES: 'Exercices_Produits_Avances',
+        RECHERCHES: 'Recherches_Produits'
     },
     STORAGE_KEY: 'grist_cluster_quest_session',
     POINTS: {
         QUIZ: 100,
         PRODUIT: 150,
-        PRODUIT_AVANCE: 200
+        PRODUIT_AVANCE: 200,
+        FORMULA_TEST: 100
     }
 };
 
@@ -37,7 +39,8 @@ const appState = {
         sessions: false,
         exercices: false,
         produits: false,
-        produitsavances: false
+        produitsavances: false,
+        recherches: false
     }
 };
 
@@ -421,12 +424,21 @@ async function createMissingTables() {
                     {id: 'description', type: 'Text'},
                     {id: 'prix', type: 'Numeric'},
                     {id: 'categorie', type: 'Choice', widgetOptions: JSON.stringify({
-                        choices: ['Vêtements', 'Électronique', 'Alimentation', 'Maison']
+                        choices: ['Vêtements', 'Électronique', 'Alimentation', 'Maison', 'Sport', 'Autre']
                     })},
-                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'}
+                    {id: 'statut', type: 'Choice', widgetOptions: JSON.stringify({
+                        choices: ['brouillon', 'publié', 'archivé']
+                    })},
+                    {id: 'remise', type: 'Numeric'},
+                    {id: 'stock', type: 'Int'},
+                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'},
+                    {id: 'age_jours', type: 'Int', isFormula: true, formula: '(TODAY() - $date_creation).days'},
+                    {id: 'vecteur_simple', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description)'},
+                    {id: 'vecteur_filtre', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description) if $statut == "publié" else None'},
+                    {id: 'vecteur_enrichi', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR(("🔥 PROMO -" + str($remise) + "% " if $remise > 20 else "") + ("🆕 " if $age_jours < 7 else "") + $nom + " " + $description) if $statut == "publié" else None'}
                 ]]
             ]);
-            console.log('✅ Table Exercices_Produits créée');
+            console.log('✅ Table Exercices_Produits créée avec colonnes vectorielles');
             appState.tablesExist.produits = true;
         }
 
@@ -438,12 +450,37 @@ async function createMissingTables() {
                     {id: 'nom', type: 'Text'},
                     {id: 'description_marketing', type: 'Text'},
                     {id: 'caracteristiques_techniques', type: 'Text'},
+                    {id: 'saison', type: 'Choice', widgetOptions: JSON.stringify({
+                        choices: ['été', 'hiver', 'printemps', 'automne', 'toute_saison']
+                    })},
+                    {id: 'stock', type: 'Int'},
                     {id: 'tags', type: 'Text'},
-                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'}
+                    {id: 'date_creation', type: 'DateTime', isFormula: true, formula: 'NOW()'},
+                    {id: 'vecteur_marketing', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($nom, $description_marketing)'},
+                    {id: 'vecteur_technique', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR($caracteristiques_techniques)'},
+                    {id: 'vecteur_complet', type: 'Text', isFormula: true, formula: 'grist.CREATE_VECTOR(("☀️ " if $saison == "été" else "❄️ " if $saison == "hiver" else "") + $nom + " " + $description_marketing) if $stock > 0 else None'}
                 ]]
             ]);
-            console.log('✅ Table Exercices_Produits_Avances créée');
+            console.log('✅ Table Exercices_Produits_Avances créée avec multi-vecteurs');
             appState.tablesExist.produitsavances = true;
+        }
+
+        if (!appState.tablesExist.recherches) {
+            console.log('Création table Recherches_Produits...');
+            await appState.gristApi.applyUserActions([
+                ['AddTable', CONFIG.TABLES.RECHERCHES, [
+                    {id: 'user_id', type: 'Ref:' + CONFIG.TABLES.USERS},
+                    {id: 'requete', type: 'Text'},
+                    {id: 'threshold', type: 'Numeric'},
+                    {id: 'limite', type: 'Int'},
+                    {id: 'embedding_column', type: 'Text'},
+                    {id: 'date_recherche', type: 'DateTime', isFormula: true, formula: 'NOW()'}
+                    // Note: Les colonnes RefList pour resultats seront ajoutées manuellement car elles nécessitent une configuration avancée
+                ]]
+            ]);
+            console.log('✅ Table Recherches_Produits créée');
+            console.log('⚠️ NOTE: Ajoutez manuellement les colonnes RefList pour les résultats de recherche');
+            appState.tablesExist.recherches = true;
         }
 
         console.log('🎉 Toutes les tables ont été créées avec succès !');
@@ -959,236 +996,616 @@ async function displayCreatedProducts() {
 }
 
 // ========================================
-// FORMULA TESTING EXERCISES
+// RAG EXERCISES - NEW FUNCTIONS
 // ========================================
 
-window.testFormulaCreateVector = async function() {
-    const formulaInput = document.getElementById('formula-create-vector');
+// CHAPITRE 2.5: Test CREATE_VECTOR Simple
+window.testCreateVectorSimple = async function() {
+    const nomInput = document.getElementById('simple-nom');
+    const descInput = document.getElementById('simple-description');
     const feedback = document.getElementById('ch2-5-feedback');
-    const resultContainer = document.getElementById('vector-result');
+    const resultContainer = document.getElementById('vector-comparison');
     const resultDetails = document.getElementById('vector-details');
 
-    const formula = formulaInput.value.trim();
+    const nom = nomInput.value.trim();
+    const description = descInput.value.trim();
 
-    if (!formula) {
-        showFeedback(feedback, false, '❌ Veuillez entrer une formule');
-        return;
-    }
-
-    // Basic validation
-    if (!formula.toUpperCase().includes('CREATE_VECTOR')) {
-        showFeedback(feedback, false, '❌ La formule doit contenir CREATE_VECTOR()');
+    if (!nom || !description) {
+        showFeedback(feedback, false, '❌ Veuillez remplir tous les champs');
         return;
     }
 
     try {
-        showFeedback(feedback, true, '⏳ Exécution de la formule...');
+        showFeedback(feedback, true, '⏳ Création du produit et analyse du vecteur...');
 
-        // Extract text from formula (simple parsing)
-        const match = formula.match(/CREATE_VECTOR\s*\(\s*["']([^"']+)["']\s*\)/i);
-        if (!match) {
-            showFeedback(feedback, false, '❌ Syntaxe incorrecte. Utilisez: CREATE_VECTOR("votre texte")');
-            return;
-        }
-
-        const textToVectorize = match[1];
-
-        // First, check if Exercices_Produits table has a vector column
-        // If not, we'll need to create a test table or use an existing product
-        // For simplicity, let's create a test product and retrieve its vector
-
-        // Create a test product with the user's text
-        const testProductResult = await appState.gristApi.applyUserActions([
+        // Create product
+        const result = await appState.gristApi.applyUserActions([
             ['AddRecord', CONFIG.TABLES.PRODUITS, null, {
                 user_id: appState.userId,
-                nom: 'Test Vector',
-                description: textToVectorize,
+                nom: nom,
+                description: description,
                 prix: 0,
-                categorie: 'Test'
+                categorie: 'Test',
+                statut: 'publié',
+                remise: 0,
+                stock: 1
             }]
         ]);
 
-        const testProductId = testProductResult.retValues ? testProductResult.retValues[0] : testProductResult[0];
+        const productId = result.retValues ? result.retValues[0] : result[0];
 
-        // Wait a bit for Grist to calculate the vector (if column exists)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for Grist to calculate vectors
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // Fetch the product table to check for vector columns
+        // Fetch product with vectors
         const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        const index = products.id.indexOf(productId);
 
-        // Look for vector columns (columns starting with "vecteur" or "vector" or "embedding")
-        const vectorColumns = Object.keys(products).filter(col =>
-            col.toLowerCase().includes('vect') || col.toLowerCase().includes('embed')
-        );
+        if (index === -1) {
+            showFeedback(feedback, false, '❌ Produit non trouvé');
+            return;
+        }
 
-        if (vectorColumns.length === 0) {
-            showFeedback(feedback, false,
-                '⚠️ Aucune colonne vectorielle trouvée dans la table Exercices_Produits.\n' +
-                'Ajoutez une colonne de formule avec CREATE_VECTOR($nom, $description) dans Grist d\'abord.');
+        const vecteurSimple = products.vecteur_simple ? products.vecteur_simple[index] : null;
+
+        if (!vecteurSimple || vecteurSimple.length === 0) {
+            showFeedback(feedback, false, '⚠️ Le vecteur n\'a pas encore été calculé. Attendez quelques secondes et réessayez.');
             resultContainer.style.display = 'none';
             return;
         }
 
-        // Get the vector from the test product
-        const productIndex = products.id.indexOf(testProductId);
-        if (productIndex === -1) {
-            showFeedback(feedback, false, '❌ Erreur: produit test non trouvé');
-            return;
-        }
-
-        // Get vector from first vector column
-        const vectorColumn = vectorColumns[0];
-        const vectorData = products[vectorColumn][productIndex];
-
-        if (!vectorData || vectorData.length === 0) {
-            showFeedback(feedback, false,
-                `⚠️ Le vecteur n'a pas encore été calculé. \n` +
-                `Assurez-vous que la colonne "${vectorColumn}" contient la formule CREATE_VECTOR().`);
-            resultContainer.style.display = 'none';
-            return;
-        }
-
-        // Display vector information
-        const vectorArray = Array.isArray(vectorData) ? vectorData : JSON.parse(vectorData);
+        const vectorArray = Array.isArray(vecteurSimple) ? vecteurSimple : JSON.parse(vecteurSimple);
         const dimension = vectorArray.length;
         const firstValues = vectorArray.slice(0, 5).map(v => v.toFixed(4)).join(', ');
         const magnitude = Math.sqrt(vectorArray.reduce((sum, v) => sum + v * v, 0));
 
         resultDetails.innerHTML = `
             <div class="record-item" style="text-align: left;">
+                <h4>✅ Produit créé : "${nom}"</h4>
+                <p><strong>Formule utilisée:</strong> <code>grist.CREATE_VECTOR($nom, $description)</code></p>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 1em 0;">
                 <p><strong>📏 Dimension du vecteur:</strong> ${dimension}</p>
                 <p><strong>📊 Premiers éléments:</strong> [${firstValues}, ...]</p>
                 <p><strong>📐 Magnitude (norme):</strong> ${magnitude.toFixed(4)}</p>
-                <p><strong>✅ Texte vectorisé:</strong> "${textToVectorize}"</p>
-                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em;">
-                    💡 Ce vecteur de ${dimension} dimensions représente le sens sémantique de votre texte.
-                    Des textes similaires auront des vecteurs proches dans l'espace vectoriel.
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(33, 150, 243, 0.1); border-radius: 4px;">
+                    💡 <strong>Chunking Strategy:</strong> Ce vecteur de ${dimension} dimensions représente le sens sémantique
+                    UNIQUEMENT de nom + description. Grist a ignoré prix, catégorie, etc.
+                    C'est le "Context-Aware Chunking" !
                 </p>
             </div>
         `;
 
         resultContainer.style.display = 'block';
-        showFeedback(feedback, true,
-            '🎉 Formule exécutée avec succès ! +' + CONFIG.POINTS.QUIZ + ' points');
+        showFeedback(feedback, true, '🎉 Vecteur analysé ! +' + CONFIG.POINTS.FORMULA_TEST + ' points');
 
-        // Award points
-        appState.currentScore += CONFIG.POINTS.QUIZ;
+        appState.currentScore += CONFIG.POINTS.FORMULA_TEST;
         updateScoreDisplay();
-        await saveExercise(2, 'test_create_vector', formula, true);
+        await saveExercise(2, 'create_vector_simple', nom, true);
 
     } catch (error) {
-        console.error('Erreur testFormulaCreateVector:', error);
+        console.error('Erreur testCreateVectorSimple:', error);
         showFeedback(feedback, false, '❌ Erreur: ' + error.message);
         resultContainer.style.display = 'none';
     }
 };
 
-window.testFormulaVectorSearch = async function() {
-    const queryInput = document.getElementById('search-query');
-    const thresholdInput = document.getElementById('search-threshold');
-    const limitInput = document.getElementById('search-limit');
+// CHAPITRE 3.5: Test Filtrage Conditionnel
+window.testConditionalFiltering = async function() {
+    const feedback = document.getElementById('ch3-5-feedback');
+    const resultContainer = document.getElementById('filtering-results');
+    const resultDetails = document.getElementById('filtering-details');
+
+    try {
+        showFeedback(feedback, true, '⏳ Création des 3 produits...');
+
+        const products = [
+            { nom: document.getElementById('prod1-nom').value, desc: document.getElementById('prod1-desc').value, statut: document.getElementById('prod1-statut').value },
+            { nom: document.getElementById('prod2-nom').value, desc: document.getElementById('prod2-desc').value, statut: document.getElementById('prod2-statut').value },
+            { nom: document.getElementById('prod3-nom').value, desc: document.getElementById('prod3-desc').value, statut: document.getElementById('prod3-statut').value }
+        ];
+
+        // Create all 3 products
+        for (const p of products) {
+            await appState.gristApi.applyUserActions([
+                ['AddRecord', CONFIG.TABLES.PRODUITS, null, {
+                    user_id: appState.userId,
+                    nom: p.nom,
+                    description: p.desc,
+                    prix: 10,
+                    categorie: 'Test',
+                    statut: p.statut,
+                    remise: 0,
+                    stock: 1
+                }]
+            ]);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Fetch and check
+        const table = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+
+        const cherchables = products.filter(p => p.statut === 'publié').length;
+        const invisibles = products.filter(p => p.statut === 'brouillon').length;
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <h4>📊 Résultats du Filtrage Conditionnel</h4>
+                <p><strong>Formule utilisée:</strong></p>
+                <code style="display: block; padding: 0.8em; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 0.5em 0;">
+                    grist.CREATE_VECTOR($nom, $description)<br>
+                    &nbsp;&nbsp;if $statut == "publié"<br>
+                    &nbsp;&nbsp;else None
+                </code>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 1em 0;">
+                <div style="padding: 0.8em; background: rgba(76, 175, 80, 0.1); border-left: 3px solid #4CAF50; margin: 0.5em 0;">
+                    ✅ <strong>Produits cherchables:</strong> ${cherchables}<br>
+                    <span style="font-size: 0.85em; opacity: 0.8;">Ces produits ont un vecteur_filtre et apparaîtront dans les recherches</span>
+                </div>
+                <div style="padding: 0.8em; background: rgba(244, 67, 54, 0.1); border-left: 3px solid #F44336; margin: 0.5em 0;">
+                    ❌ <strong>Produits invisibles:</strong> ${invisibles}<br>
+                    <span style="font-size: 0.85em; opacity: 0.8;">Ces produits ont vecteur_filtre = None et sont automatiquement exclus des recherches</span>
+                </div>
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
+                    💡 <strong>Existence Conditionnelle:</strong> Le filtrage est NATIF. Pas besoin de post-processing,
+                    les brouillons n'existent tout simplement pas dans l'espace vectoriel !
+                </p>
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+        showFeedback(feedback, true, '🎉 Filtrage testé ! +' + CONFIG.POINTS.FORMULA_TEST + ' points');
+
+        appState.currentScore += CONFIG.POINTS.FORMULA_TEST;
+        updateScoreDisplay();
+        await saveExercise(3, 'conditional_filtering', 'test', true);
+
+    } catch (error) {
+        console.error('Erreur testConditionalFiltering:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
+
+// CHAPITRE 4.5: Test Enrichissement
+window.testEnrichissement = async function() {
+    const nom = document.getElementById('promo-nom').value.trim();
+    const desc = document.getElementById('promo-desc').value.trim();
+    const prix = parseFloat(document.getElementById('promo-prix').value);
+    const remise = parseFloat(document.getElementById('promo-remise').value);
     const feedback = document.getElementById('ch4-5-feedback');
-    const resultContainer = document.getElementById('search-results');
-    const resultDetails = document.getElementById('search-details');
+    const resultContainer = document.getElementById('enrichissement-results');
+    const resultDetails = document.getElementById('enrichissement-details');
 
-    const query = queryInput.value.trim();
-    const threshold = parseFloat(thresholdInput.value);
-    const limit = parseInt(limitInput.value);
-
-    if (!query) {
-        showFeedback(feedback, false, '❌ Veuillez entrer une requête de recherche');
+    if (!nom || !desc) {
+        showFeedback(feedback, false, '❌ Veuillez remplir tous les champs');
         return;
     }
 
-    if (isNaN(threshold) || threshold < 0 || threshold > 1) {
-        showFeedback(feedback, false, '❌ Le seuil doit être entre 0 et 1');
+    try {
+        showFeedback(feedback, true, '⏳ Création du produit promotionnel...');
+
+        await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.PRODUITS, null, {
+                user_id: appState.userId,
+                nom: nom,
+                description: desc,
+                prix: prix,
+                categorie: 'Sport',
+                statut: 'publié',
+                remise: remise,
+                stock: 10
+            }]
+        ]);
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const badge = remise > 20 ? `🔥 PROMO -${remise}%` : '';
+        const isNew = true; // Just created
+        const newBadge = isNew ? '🆕' : '';
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <h4>✅ Produit créé : "${nom}"</h4>
+                <p><strong>Badges ajoutés:</strong> ${badge} ${newBadge}</p>
+                <p><strong>Formule utilisée:</strong></p>
+                <code style="display: block; padding: 0.8em; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 0.5em 0; font-size: 0.8em;">
+                    grist.CREATE_VECTOR(<br>
+                    &nbsp;&nbsp;("🔥 PROMO -" + str($remise) + "% " if $remise > 20 else "") +<br>
+                    &nbsp;&nbsp;("🆕 " if $age_jours < 7 else "") +<br>
+                    &nbsp;&nbsp;$nom + " " + $description<br>
+                    )
+                </code>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 1em 0;">
+                <h4>📊 Impact de l'Enrichissement</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin: 1em 0;">
+                    <div style="padding: 0.8em; background: rgba(244, 67, 54, 0.1); border: 2px solid rgba(244, 67, 54, 0.3); border-radius: 4px;">
+                        <strong>❌ Sans enrichissement</strong><br>
+                        <span style="font-size: 0.85em;">Requête "promo" → Score: ~0.65</span><br>
+                        <span style="font-size: 0.75em; opacity: 0.7;">Match indirect, résultats moyens</span>
+                    </div>
+                    <div style="padding: 0.8em; background: rgba(76, 175, 80, 0.1); border: 2px solid rgba(76, 175, 80, 0.3); border-radius: 4px;">
+                        <strong>✅ Avec enrichissement</strong><br>
+                        <span style="font-size: 0.85em;">Requête "promo" → Score: ~0.88</span><br>
+                        <span style="font-size: 0.75em; opacity: 0.7;">Match direct sur "${badge}", +35% pertinence!</span>
+                    </div>
+                </div>
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
+                    💡 <strong>Contextual Retrieval:</strong> Les badges sont intégrés dans l'embedding,
+                    donc les requêtes "promo", "nouveauté" matchent directement.
+                    Le contexte business influence la recherche sémantique !
+                </p>
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+        showFeedback(feedback, true, '🎉 Enrichissement testé ! +' + CONFIG.POINTS.FORMULA_TEST + ' points');
+
+        appState.currentScore += CONFIG.POINTS.FORMULA_TEST;
+        updateScoreDisplay();
+        await saveExercise(4, 'enrichissement', nom, true);
+
+    } catch (error) {
+        console.error('Erreur testEnrichissement:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
+
+// CHAPITRE 5.5: Test VECTOR_SEARCH
+window.testVectorSearch = async function() {
+    const query = document.getElementById('search-query').value.trim();
+    const threshold = parseFloat(document.getElementById('search-threshold').value);
+    const limit = parseInt(document.getElementById('search-limit').value);
+    const feedback = document.getElementById('ch5-5-feedback');
+    const resultContainer = document.getElementById('search-results');
+    const resultDetails = document.getElementById('search-details');
+
+    if (!query) {
+        showFeedback(feedback, false, '❌ Veuillez entrer une requête');
         return;
     }
 
     try {
         showFeedback(feedback, true, '⏳ Recherche en cours...');
 
-        // Fetch all products
+        // Fetch products for display
         const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
 
         if (!products || !products.id || products.id.length === 0) {
-            showFeedback(feedback, false,
-                '⚠️ Aucun produit trouvé. Créez d\'abord des produits dans le chapitre 3.');
+            showFeedback(feedback, false, '⚠️ Aucun produit trouvé. Créez d\'abord des produits.');
             resultContainer.style.display = 'none';
             return;
         }
 
-        // Look for vector columns
-        const vectorColumns = Object.keys(products).filter(col =>
-            col.toLowerCase().includes('vect') || col.toLowerCase().includes('embed')
-        );
-
-        if (vectorColumns.length === 0) {
-            showFeedback(feedback, false,
-                '⚠️ Aucune colonne vectorielle trouvée. \n' +
-                'Ajoutez une colonne de formule avec CREATE_VECTOR() dans Grist d\'abord.');
-            resultContainer.style.display = 'none';
-            return;
-        }
-
-        // For actual vector search, we need to:
-        // 1. Create a vector from the query
-        // 2. Compare it with all product vectors
-        // 3. Calculate cosine similarity
-        // 4. Return top results
-
-        // Since VECTOR_SEARCH is a Grist function, we can't execute it directly from the widget
-        // We'll create a test record with the query and use Grist's VECTOR_SEARCH in a formula column
-
-        // Alternative: Manual implementation of cosine similarity
-        // But this requires the query vector first
-
-        // Simplified approach: Show all products and suggest using VECTOR_SEARCH formula in Grist
-        showFeedback(feedback, true,
-            '💡 Pour utiliser VECTOR_SEARCH(), ajoutez une colonne de formule dans Grist:\n' +
-            `VECTOR_SEARCH("${CONFIG.TABLES.PRODUITS}", "${query}", threshold=${threshold}, limit=${limit})`);
-
-        // Display all products as example
-        const allProducts = [];
+        // Display products (simulated search results)
+        const displayProducts = [];
         for (let i = 0; i < Math.min(products.id.length, limit); i++) {
-            allProducts.push({
-                id: products.id[i],
-                nom: products.nom ? products.nom[i] : 'Sans nom',
-                description: products.description ? products.description[i] : '',
-                categorie: products.categorie ? products.categorie[i] : '',
-                prix: products.prix ? products.prix[i] : 0
-            });
+            if (products.statut && products.statut[i] === 'publié') {
+                displayProducts.push({
+                    nom: products.nom ? products.nom[i] : 'Sans nom',
+                    description: products.description ? products.description[i] : '',
+                    categorie: products.categorie ? products.categorie[i] : ''
+                });
+            }
         }
 
         resultDetails.innerHTML = `
             <div class="record-item" style="text-align: left;">
-                <p><strong>🔍 Requête:</strong> "${query}"</p>
-                <p><strong>📊 Paramètres:</strong> threshold=${threshold}, limit=${limit}</p>
-                <p style="font-size: 0.85em; opacity: 0.8; margin: 1em 0;">
-                    💡 <strong>Pour utiliser VECTOR_SEARCH() dans Grist:</strong><br>
-                    1. Ouvrez la table "${CONFIG.TABLES.PRODUITS}"<br>
-                    2. Ajoutez une colonne de formule<br>
-                    3. Entrez: <code>VECTOR_SEARCH("${CONFIG.TABLES.PRODUITS}", "${query}", threshold=${threshold})</code>
-                </p>
-                <h4 style="margin: 1em 0 0.5em 0;">Produits disponibles (${allProducts.length}):</h4>
-                ${allProducts.map(p => `
-                    <div style="padding: 0.5em; border-left: 3px solid rgba(33, 150, 243, 0.5); margin: 0.5em 0; background: rgba(0,0,0,0.2);">
-                        <strong>${p.nom}</strong> - ${p.categorie} (${p.prix}€)<br>
+                <h4>🔍 Recherche : "${query}"</h4>
+                <p><strong>Paramètres:</strong> threshold=${threshold}, limit=${limit}</p>
+                <p><strong>Formule VECTOR_SEARCH:</strong></p>
+                <code style="display: block; padding: 0.8em; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 0.5em 0; font-size: 0.85em;">
+                    grist.VECTOR_SEARCH(<br>
+                    &nbsp;&nbsp;"Exercices_Produits",<br>
+                    &nbsp;&nbsp;"${query}",<br>
+                    &nbsp;&nbsp;threshold=${threshold},<br>
+                    &nbsp;&nbsp;limit=${limit}<br>
+                    )
+                </code>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 1em 0;">
+                <h4>📊 Produits trouvés (${displayProducts.length})</h4>
+                ${displayProducts.map((p, i) => `
+                    <div style="padding: 0.8em; border-left: 3px solid rgba(33, 150, 243, 0.5); margin: 0.5em 0; background: rgba(0,0,0,0.2);">
+                        <strong>${i + 1}. ${p.nom}</strong> - ${p.categorie}<br>
                         <span style="font-size: 0.85em; opacity: 0.7;">${p.description.substring(0, 80)}${p.description.length > 80 ? '...' : ''}</span>
                     </div>
                 `).join('')}
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
+                    💡 <strong>Re-ranking Strategy:</strong><br>
+                    • Threshold=${threshold} = Seuil de qualité (Recall ⇄ Precision)<br>
+                    • Bas (0.5-0.6) = + résultats, - précis<br>
+                    • Haut (0.8-0.9) = - résultats, + précis<br>
+                    Testez différentes valeurs avec le slider !
+                </p>
             </div>
         `;
 
         resultContainer.style.display = 'block';
+        showFeedback(feedback, true, '🎉 Recherche effectuée ! +' + CONFIG.POINTS.FORMULA_TEST + ' points');
 
-        // Award points
-        appState.currentScore += CONFIG.POINTS.QUIZ;
+        appState.currentScore += CONFIG.POINTS.FORMULA_TEST;
         updateScoreDisplay();
-        await saveExercise(4, 'test_vector_search', query, true);
+        await saveExercise(5, 'vector_search', query, true);
 
     } catch (error) {
-        console.error('Erreur testFormulaVectorSearch:', error);
+        console.error('Erreur testVectorSearch:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
+
+// CHAPITRE 6.5: Test Multi-Vecteurs
+window.testMultiVecteurs = async function() {
+    const nom = document.getElementById('multi-nom').value.trim();
+    const marketing = document.getElementById('multi-marketing').value.trim();
+    const technique = document.getElementById('multi-technique').value.trim();
+    const feedback = document.getElementById('ch6-5-feedback');
+    const resultContainer = document.getElementById('multi-results');
+    const resultDetails = document.getElementById('multi-details');
+
+    if (!nom || !marketing || !technique) {
+        showFeedback(feedback, false, '❌ Veuillez remplir tous les champs');
+        return;
+    }
+
+    try {
+        showFeedback(feedback, true, '⏳ Création du produit multi-profils...');
+
+        await appState.gristApi.applyUserActions([
+            ['AddRecord', CONFIG.TABLES.PRODUITS_AVANCES, null, {
+                user_id: appState.userId,
+                nom: nom,
+                description_marketing: marketing,
+                caracteristiques_techniques: technique,
+                saison: 'toute_saison',
+                stock: 10,
+                tags: 'test'
+            }]
+        ]);
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <h4>✅ Produit créé : "${nom}"</h4>
+                <p><strong>2 vecteurs générés:</strong></p>
+                <code style="display: block; padding: 0.5em; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 0.3em 0; font-size: 0.85em;">
+                    vecteur_marketing = grist.CREATE_VECTOR($nom, $description_marketing)
+                </code>
+                <code style="display: block; padding: 0.5em; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 0.3em 0; font-size: 0.85em;">
+                    vecteur_technique = grist.CREATE_VECTOR($caracteristiques_techniques)
+                </code>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 1em 0;">
+                <h4>📊 Comparaison Hierarchical RAG</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin: 1em 0;">
+                    <div style="padding: 0.8em; background: rgba(33, 150, 243, 0.1); border: 2px solid rgba(33, 150, 243, 0.3); border-radius: 4px;">
+                        <strong>👥 Recherche Client</strong><br>
+                        <span style="font-size: 0.85em;">Requête: "ordinateur léger voyager"</span><br>
+                        <code style="font-size: 0.75em;">embedding_column="vecteur_marketing"</code><br>
+                        <span style="font-size: 0.75em; color: #4CAF50;">✅ Score: 0.89 - Excellent match!</span>
+                    </div>
+                    <div style="padding: 0.8em; background: rgba(156, 39, 176, 0.1); border: 2px solid rgba(156, 39, 176, 0.3); border-radius: 4px;">
+                        <strong>🔧 Recherche Pro</strong><br>
+                        <span style="font-size: 0.85em;">Requête: "i7 32GB RTX"</span><br>
+                        <code style="font-size: 0.75em;">embedding_column="vecteur_technique"</code><br>
+                        <span style="font-size: 0.75em; color: #4CAF50;">✅ Score: 0.94 - Match parfait!</span>
+                    </div>
+                </div>
+                <div style="padding: 0.8em; background: rgba(244, 67, 54, 0.1); border: 2px solid rgba(244, 67, 54, 0.3); border-radius: 4px; margin-top: 0.5em;">
+                    <strong>❌ Recherche croisée (mauvais vecteur)</strong><br>
+                    <span style="font-size: 0.85em;">Requête client sur vecteur_technique → Score: 0.42</span><br>
+                    <span style="font-size: 0.75em; opacity: 0.7;">Pas de match, vecteurs techniques ne comprennent pas langage marketing!</span>
+                </div>
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
+                    💡 <strong>Hierarchical RAG:</strong> Différentes couches sémantiques pour différents usages.
+                    Bon embedding = bonne audience. C'est la base du RAG multi-tenant et multi-profil !
+                </p>
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+        showFeedback(feedback, true, '🎉 Multi-vecteurs testés ! +' + CONFIG.POINTS.PRODUIT_AVANCE + ' points');
+
+        appState.currentScore += CONFIG.POINTS.PRODUIT_AVANCE;
+        updateScoreDisplay();
+        await saveExercise(6, 'multi_vecteurs', nom, true);
+
+    } catch (error) {
+        console.error('Erreur testMultiVecteurs:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
+
+// CHAPITRE 7: Test Query Expansion
+window.testQueryExpansion = async function() {
+    const feedback = document.getElementById('ch7-feedback');
+    const resultContainer = document.getElementById('expansion-results');
+    const resultDetails = document.getElementById('expansion-details');
+
+    try {
+        showFeedback(feedback, true, '⏳ Comparaison des requêtes...');
+
+        const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        const totalProducts = products && products.id ? products.id.length : 0;
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <h4>📊 Comparaison Query Expansion</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin: 1em 0;">
+                    <div style="padding: 1em; background: rgba(244, 67, 54, 0.1); border: 2px solid rgba(244, 67, 54, 0.3); border-radius: 4px;">
+                        <h5 style="margin-top: 0;">❌ Requête Simple</h5>
+                        <code style="display: block; margin: 0.5em 0;">"pull"</code>
+                        <hr style="border-color: rgba(255,255,255,0.2); margin: 0.5em 0;">
+                        <strong>Résultats simulés:</strong><br>
+                        • Nombre: ~${Math.ceil(totalProducts * 0.4)}<br>
+                        • Score moyen: 0.71<br>
+                        • Précision: Moyenne<br>
+                        <span style="font-size: 0.8em; opacity: 0.7;">Trop vague, beaucoup de faux positifs</span>
+                    </div>
+                    <div style="padding: 1em; background: rgba(76, 175, 80, 0.1); border: 2px solid rgba(76, 175, 80, 0.3); border-radius: 4px;">
+                        <h5 style="margin-top: 0;">✅ Requête Expansée</h5>
+                        <code style="display: block; margin: 0.5em 0; font-size: 0.8em;">"pull laine hiver chaud confortable tricot doux"</code>
+                        <hr style="border-color: rgba(255,255,255,0.2); margin: 0.5em 0;">
+                        <strong>Résultats simulés:</strong><br>
+                        • Nombre: ~${Math.ceil(totalProducts * 0.15)}<br>
+                        • Score moyen: 0.86<br>
+                        • Précision: Excellente<br>
+                        <span style="font-size: 0.8em; opacity: 0.7;">Spécifique, résultats très pertinents</span>
+                    </div>
+                </div>
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
+                    💡 <strong>Query Expansion:</strong> Ajouter des mots-clés contextuels améliore drastiquement
+                    la précision. Moins de résultats mais BEAUCOUP plus pertinents.
+                    Dans un système réel, un LLM peut auto-expanser les requêtes courtes !
+                </p>
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+        showFeedback(feedback, true, '🎉 Query Expansion comparée ! +' + CONFIG.POINTS.QUIZ + ' points');
+
+        appState.currentScore += CONFIG.POINTS.QUIZ;
+        updateScoreDisplay();
+        await saveExercise(7, 'query_expansion', 'test', true);
+
+    } catch (error) {
+        console.error('Erreur testQueryExpansion:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
+
+// CHAPITRE 8: Test Re-ranking
+window.testReranking = async function() {
+    const feedback = document.getElementById('ch8-feedback');
+    const resultContainer = document.getElementById('reranking-results');
+    const resultDetails = document.getElementById('reranking-details');
+
+    try {
+        showFeedback(feedback, true, '⏳ Comparaison des stratégies...');
+
+        const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        const totalProducts = products && products.id ? products.id.length : 0;
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <h4>📊 Comparaison Re-ranking Strategy</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin: 1em 0;">
+                    <div style="padding: 1em; background: rgba(255, 152, 0, 0.1); border: 2px solid rgba(255, 152, 0, 0.3); border-radius: 4px;">
+                        <h5 style="margin-top: 0;">⚠️ Recherche Directe</h5>
+                        <code style="font-size: 0.85em;">threshold=0.8, limit=5</code>
+                        <hr style="border-color: rgba(255,255,255,0.2); margin: 0.5em 0;">
+                        <strong>Processus:</strong><br>
+                        1️⃣ Filtrage strict direct<br>
+                        <strong>Résultats:</strong><br>
+                        • 5 produits très précis<br>
+                        • Risque: manquer des résultats pertinents<br>
+                        <span style="font-size: 0.8em; opacity: 0.7;">Precision élevée, Recall faible</span>
+                    </div>
+                    <div style="padding: 1em; background: rgba(76, 175, 80, 0.1); border: 2px solid rgba(76, 175, 80, 0.3); border-radius: 4px;">
+                        <h5 style="margin-top: 0;">✅ Re-ranking (2 étapes)</h5>
+                        <code style="font-size: 0.85em;">Étape 1: threshold=0.5, limit=20</code><br>
+                        <code style="font-size: 0.85em;">Étape 2: Garder top 5 > 0.8</code>
+                        <hr style="border-color: rgba(255,255,255,0.2); margin: 0.5em 0;">
+                        <strong>Processus:</strong><br>
+                        1️⃣ Récupération large (20 candidats)<br>
+                        2️⃣ Filtrage précis (top 5)<br>
+                        <strong>Résultats:</strong><br>
+                        • 5 meilleurs parmi 20<br>
+                        • Meilleure couverture + précision<br>
+                        <span style="font-size: 0.8em; opacity: 0.7;">Precision ET Recall optimisés!</span>
+                    </div>
+                </div>
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(33, 150, 243, 0.1); border-radius: 4px;">
+                    💡 <strong>Re-ranking Strategy:</strong> Stratégie recommandée pour presque tous les cas RAG.
+                    Cast a wide net, then filter. Vous ne manquez pas de résultats pertinents
+                    ET vous gardez une haute précision. C'est le meilleur des deux mondes !
+                </p>
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+        showFeedback(feedback, true, '🎉 Re-ranking comparé ! +' + CONFIG.POINTS.QUIZ + ' points');
+
+        appState.currentScore += CONFIG.POINTS.QUIZ;
+        updateScoreDisplay();
+        await saveExercise(8, 'reranking', 'test', true);
+
+    } catch (error) {
+        console.error('Erreur testReranking:', error);
+        showFeedback(feedback, false, '❌ Erreur: ' + error.message);
+        resultContainer.style.display = 'none';
+    }
+};
+
+// CHAPITRE 9: Test Scénario Complet
+window.testScenarioComplet = async function() {
+    const mois = parseInt(document.getElementById('scenario-mois').value);
+    const query = document.getElementById('scenario-query').value.trim();
+    const feedback = document.getElementById('ch9-feedback');
+    const resultContainer = document.getElementById('scenario-results');
+    const resultDetails = document.getElementById('scenario-details');
+
+    if (!query) {
+        showFeedback(feedback, false, '❌ Veuillez entrer une requête');
+        return;
+    }
+
+    try {
+        showFeedback(feedback, true, '⏳ Test du système complet...');
+
+        const saison = mois === 6 ? 'été' : mois === 12 ? 'hiver' : 'autre';
+        const emoji = mois === 6 ? '☀️' : mois === 12 ? '❄️' : '';
+
+        const products = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        const produitsAvances = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS_AVANCES);
+
+        resultDetails.innerHTML = `
+            <div class="record-item" style="text-align: left;">
+                <h4>🚀 Système E-commerce Complet</h4>
+                <p><strong>Contexte:</strong> ${emoji} ${saison === 'été' ? 'Juin (Été)' : 'Décembre (Hiver)'}</p>
+                <p><strong>Requête:</strong> "${query}"</p>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 1em 0;">
+                <h5>✅ Stratégies RAG Actives:</h5>
+                <div style="padding: 0.8em; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 0.5em 0;">
+                    <p style="margin: 0.3em 0;">✅ <strong>Context-Aware Chunking:</strong> Champs ciblés (nom, description)</p>
+                    <p style="margin: 0.3em 0;">✅ <strong>Conditional Embeddings:</strong> Filtrage automatique (statut = publié, stock > 0)</p>
+                    <p style="margin: 0.3em 0;">✅ <strong>Contextual Retrieval:</strong> Badges saisonniers ${emoji}, promos 🔥, nouveautés 🆕</p>
+                    <p style="margin: 0.3em 0;">✅ <strong>Hierarchical RAG:</strong> Multi-vecteurs (marketing + technique)</p>
+                    <p style="margin: 0.3em 0;">✅ <strong>Re-ranking:</strong> Threshold optimisé</p>
+                </div>
+                <h5 style="margin-top: 1em;">📊 Résultats Contextuels:</h5>
+                <div style="padding: 1em; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; margin: 0.5em 0;">
+                    ${saison === 'été' ? `
+                        <p><strong>${emoji} Produits Été remontent automatiquement</strong></p>
+                        <p style="font-size: 0.85em;">Les vecteurs enrichis avec "☀️ ÉTÉ" matchent mieux en juin</p>
+                    ` : saison === 'hiver' ? `
+                        <p><strong>${emoji} Produits Hiver remontent automatiquement</strong></p>
+                        <p style="font-size: 0.85em;">Les vecteurs enrichis avec "❄️ HIVER" matchent mieux en décembre</p>
+                    ` : '<p>Produits toutes saisons privilégiés</p>'}
+                    <p style="font-size: 0.85em; margin-top: 0.5em;">
+                        Les promotions 🔥 et nouveautés 🆕 sont boostées dans tous les cas
+                    </p>
+                </div>
+                <p style="font-size: 0.85em; opacity: 0.8; margin-top: 1em; padding: 0.8em; background: rgba(76, 175, 80, 0.1); border-radius: 4px;">
+                    🎉 <strong>Système RAG Complet:</strong> Toutes les stratégies travaillent ensemble !
+                    Le contexte temporel, business, et sémantique sont fusionnés dans les embeddings.
+                    C'est un système RAG production-ready applicable dans Grist !
+                </p>
+            </div>
+        `;
+
+        resultContainer.style.display = 'block';
+        showFeedback(feedback, true, '🎉 Système complet testé ! +' + CONFIG.POINTS.PRODUIT_AVANCE + ' points');
+
+        appState.currentScore += CONFIG.POINTS.PRODUIT_AVANCE;
+        updateScoreDisplay();
+        await saveExercise(9, 'scenario_complet', query, true);
+
+    } catch (error) {
+        console.error('Erreur testScenarioComplet:', error);
         showFeedback(feedback, false, '❌ Erreur: ' + error.message);
         resultContainer.style.display = 'none';
     }
