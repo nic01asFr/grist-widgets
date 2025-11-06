@@ -1018,7 +1018,23 @@ window.testCreateVectorSimple = async function() {
     try {
         showFeedback(feedback, true, '⏳ Création du produit et analyse du vecteur...');
 
-        // Create product
+        // Check if table has new structure (with vector columns)
+        const table = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        const hasNewStructure = table && ('vecteur_simple' in table || 'statut' in table || 'remise' in table);
+
+        if (!hasNewStructure) {
+            showFeedback(feedback, false,
+                '⚠️ La table Exercices_Produits utilise l\'ancienne structure.\n\n' +
+                'Pour utiliser les exercices RAG, veuillez :\n' +
+                '1. Supprimer la table "Exercices_Produits" dans Grist\n' +
+                '2. Rafraîchir le widget\n' +
+                '3. La table sera recréée avec les colonnes vectorielles'
+            );
+            resultContainer.style.display = 'none';
+            return;
+        }
+
+        // Create product with new structure
         const result = await appState.gristApi.applyUserActions([
             ['AddRecord', CONFIG.TABLES.PRODUITS, null, {
                 user_id: appState.userId,
@@ -1098,6 +1114,22 @@ window.testConditionalFiltering = async function() {
     try {
         showFeedback(feedback, true, '⏳ Création des 3 produits...');
 
+        // Check if table has new structure
+        const table = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        const hasNewStructure = table && ('vecteur_filtre' in table || 'statut' in table || 'remise' in table);
+
+        if (!hasNewStructure) {
+            showFeedback(feedback, false,
+                '⚠️ La table Exercices_Produits utilise l\'ancienne structure.\n\n' +
+                'Pour utiliser les exercices RAG, veuillez :\n' +
+                '1. Supprimer la table "Exercices_Produits" dans Grist\n' +
+                '2. Rafraîchir le widget\n' +
+                '3. La table sera recréée avec les colonnes vectorielles'
+            );
+            resultContainer.style.display = 'none';
+            return;
+        }
+
         const products = [
             { nom: document.getElementById('prod1-nom').value, desc: document.getElementById('prod1-desc').value, statut: document.getElementById('prod1-statut').value },
             { nom: document.getElementById('prod2-nom').value, desc: document.getElementById('prod2-desc').value, statut: document.getElementById('prod2-statut').value },
@@ -1122,8 +1154,8 @@ window.testConditionalFiltering = async function() {
 
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // Fetch and check
-        const table = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        // Fetch updated table with newly created products
+        const productsTable = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
 
         const cherchables = products.filter(p => p.statut === 'publié').length;
         const invisibles = products.filter(p => p.statut === 'brouillon').length;
@@ -1184,6 +1216,22 @@ window.testEnrichissement = async function() {
 
     try {
         showFeedback(feedback, true, '⏳ Création du produit promotionnel...');
+
+        // Check if table has new structure
+        const table = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS);
+        const hasNewStructure = table && ('vecteur_enrichi' in table || 'statut' in table || 'remise' in table);
+
+        if (!hasNewStructure) {
+            showFeedback(feedback, false,
+                '⚠️ La table Exercices_Produits utilise l\'ancienne structure.\n\n' +
+                'Pour utiliser les exercices RAG, veuillez :\n' +
+                '1. Supprimer la table "Exercices_Produits" dans Grist\n' +
+                '2. Rafraîchir le widget\n' +
+                '3. La table sera recréée avec les colonnes vectorielles'
+            );
+            resultContainer.style.display = 'none';
+            return;
+        }
 
         await appState.gristApi.applyUserActions([
             ['AddRecord', CONFIG.TABLES.PRODUITS, null, {
@@ -1278,6 +1326,21 @@ window.testVectorSearch = async function() {
             return;
         }
 
+        // Check if table has new structure (with statut column)
+        const hasNewStructure = products && ('statut' in products || 'vecteur_simple' in products);
+
+        if (!hasNewStructure) {
+            showFeedback(feedback, false,
+                '⚠️ La table Exercices_Produits utilise l\'ancienne structure.\n\n' +
+                'Pour utiliser les exercices RAG, veuillez :\n' +
+                '1. Supprimer la table "Exercices_Produits" dans Grist\n' +
+                '2. Rafraîchir le widget\n' +
+                '3. La table sera recréée avec les colonnes vectorielles'
+            );
+            resultContainer.style.display = 'none';
+            return;
+        }
+
         // Display products (simulated search results)
         const displayProducts = [];
         for (let i = 0; i < Math.min(products.id.length, limit); i++) {
@@ -1351,6 +1414,22 @@ window.testMultiVecteurs = async function() {
 
     try {
         showFeedback(feedback, true, '⏳ Création du produit multi-profils...');
+
+        // Check if table has new structure (with vector columns)
+        const table = await appState.gristApi.fetchTable(CONFIG.TABLES.PRODUITS_AVANCES);
+        const hasNewStructure = table && ('vecteur_marketing' in table || 'vecteur_technique' in table);
+
+        if (!hasNewStructure) {
+            showFeedback(feedback, false,
+                '⚠️ La table Exercices_Produits_Avances utilise l\'ancienne structure.\n\n' +
+                'Pour utiliser les exercices RAG, veuillez :\n' +
+                '1. Supprimer la table "Exercices_Produits_Avances" dans Grist\n' +
+                '2. Rafraîchir le widget\n' +
+                '3. La table sera recréée avec les colonnes vectorielles'
+            );
+            resultContainer.style.display = 'none';
+            return;
+        }
 
         await appState.gristApi.applyUserActions([
             ['AddRecord', CONFIG.TABLES.PRODUITS_AVANCES, null, {
