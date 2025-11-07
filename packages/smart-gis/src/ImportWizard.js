@@ -3,16 +3,17 @@
  *
  * Assistant d'import de données géographiques depuis catalogues externes
  * Workflow:
- * 1. Rechercher dans catalogues (IGN, OSM)
+ * 1. Rechercher dans catalogues (IGN, OSM) - Textuel ou Sémantique (VECTOR_SEARCH)
  * 2. Sélectionner dataset
  * 3. Configurer requête (bbox, filtres, limite)
  * 4. Preview résultats
  * 5. Importer dans table projet
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import * as IGNService from './services/IGNService';
 import * as OSMService from './services/OSMService';
+import { searchCatalogsSemantic, searchCatalogsTextual } from './systemInfrastructure';
 
 const ImportWizard = ({ catalogs, onImport, onClose, gristApi }) => {
   const [step, setStep] = useState(1); // 1: Search, 2: Configure, 3: Preview
@@ -27,16 +28,52 @@ const ImportWizard = ({ catalogs, onImport, onClose, gristApi }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Phase 8: Semantic search state
+  const [searchMode, setSearchMode] = useState('textual'); // 'textual' | 'semantic'
+  const [semanticResults, setSemanticResults] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Handle semantic search
+  const handleSemanticSearch = useCallback(async () => {
+    if (!searchQuery || !gristApi || !gristApi.docApi) {
+      setError('Recherche sémantique non disponible');
+      return;
+    }
+
+    setSearchLoading(true);
+    setError(null);
+
+    try {
+      const result = await searchCatalogsSemantic(gristApi.docApi, searchQuery);
+
+      if (result.success) {
+        setSemanticResults(result.catalogs);
+        setSearchMode('semantic');
+        console.log(`✅ Semantic search returned ${result.count} catalogs`);
+      } else {
+        throw new Error(result.error || 'Semantic search failed');
+      }
+    } catch (err) {
+      console.error('Semantic search error:', err);
+      setError('Recherche sémantique échouée. Utilisation de la recherche textuelle.');
+      setSearchMode('textual');
+      setSemanticResults(null);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [searchQuery, gristApi]);
+
   // Filter catalogs by search query
   const filteredCatalogs = useMemo(() => {
-    if (!catalogs || !searchQuery) return catalogs || [];
+    // If semantic results available, use them
+    if (searchMode === 'semantic' && semanticResults) {
+      return semanticResults;
+    }
 
-    const lower = searchQuery.toLowerCase();
-    return catalogs.filter(catalog => {
-      const searchText = `${catalog.title} ${catalog.description || ''} ${catalog.keywords || ''}`.toLowerCase();
-      return searchText.includes(lower);
-    });
-  }, [catalogs, searchQuery]);
+    // Otherwise, use textual search
+    if (!catalogs || !searchQuery) return catalogs || [];
+    return searchCatalogsTextual(catalogs, searchQuery);
+  }, [catalogs, searchQuery, searchMode, semanticResults]);
 
   const handleCatalogSelect = (catalog) => {
     setSelectedCatalog(catalog);
@@ -172,6 +209,22 @@ const ImportWizard = ({ catalogs, onImport, onClose, gristApi }) => {
 
   return (
     <div style={styles.overlay}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
       <div style={styles.modal}>
         {/* Header */}
         <div style={styles.header}>
@@ -212,6 +265,9 @@ const ImportWizard = ({ catalogs, onImport, onClose, gristApi }) => {
               onQueryChange={setSearchQuery}
               catalogs={filteredCatalogs}
               onSelect={handleCatalogSelect}
+              searchMode={searchMode}
+              searchLoading={searchLoading}
+              onSemanticSearch={handleSemanticSearch}
             />
           )}
 
@@ -242,7 +298,7 @@ const ImportWizard = ({ catalogs, onImport, onClose, gristApi }) => {
 };
 
 // Step 1: Catalog Search
-const CatalogSearch = ({ query, onQueryChange, catalogs, onSelect }) => {
+const CatalogSearch = ({ query, onQueryChange, catalogs, onSelect, searchMode, searchLoading, onSemanticSearch }) => {
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ marginBottom: '20px' }}>
@@ -254,6 +310,30 @@ const CatalogSearch = ({ query, onQueryChange, catalogs, onSelect }) => {
           style={styles.searchInput}
           autoFocus
         />
+        <div style={{ display: 'flex', gap: '10px', marginTop: '10px', alignItems: 'center' }}>
+          <button
+            onClick={onSemanticSearch}
+            disabled={!query || searchLoading}
+            style={{
+              ...styles.button,
+              backgroundColor: searchMode === 'semantic' ? '#4CAF50' : '#2196F3',
+              opacity: (!query || searchLoading) ? 0.5 : 1,
+              cursor: (!query || searchLoading) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {searchLoading ? '⏳ Recherche...' : '🤖 Recherche Sémantique (IA)'}
+          </button>
+          {searchMode === 'semantic' && (
+            <span style={{ fontSize: '12px', color: '#4CAF50', fontWeight: '600' }}>
+              ✨ Résultats par pertinence (VECTOR_SEARCH)
+            </span>
+          )}
+          {searchMode === 'textual' && query && (
+            <span style={{ fontSize: '12px', color: '#999' }}>
+              📝 Recherche textuelle
+            </span>
+          )}
+        </div>
       </div>
 
       <div style={styles.catalogList}>
@@ -457,7 +537,8 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10000,
-    padding: '20px'
+    padding: '20px',
+    animation: 'fadeIn 0.2s ease-out'
   },
   modal: {
     backgroundColor: 'white',
@@ -467,7 +548,8 @@ const styles = {
     maxHeight: '90vh',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    animation: 'slideUp 0.3s ease-out'
   },
   header: {
     padding: '20px 24px',

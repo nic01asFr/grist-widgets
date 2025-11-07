@@ -4,10 +4,10 @@ Widget cartographique intelligent avec gestion multi-sources, édition avancée 
 
 ## 🎯 Fonctionnalités
 
-### ✅ Phases Complètes (1-7 / 10 - 70%)
+### ✅ Phases Complètes (1-8, 10 / 10 - 90%) - **Prêt pour Production**
 
 #### Phase 1-2: Infrastructure & Multi-Couches
-- **Tables système auto-créées**: GIS_Catalogs, GIS_Styles, GIS_Config
+- **Tables système auto-créées**: GIS_Catalogs, GIS_Styles, GIS_Config, GIS_SearchQueries
 - **Système de projet**: 1 Table = 1 Projet cartographique
 - **Couches logiques**: Groupement par `layer_name`
 - **LayerManager**: Toggle visibilité, gestion z-index
@@ -39,11 +39,27 @@ Widget cartographique intelligent avec gestion multi-sources, édition avancée 
 - **Workflow continu**: Projet 1 → Sauvegarde → Projet 2
 - **Suggestion intelligente**: Noms auto-générés `Carte_YYYYMMDD`
 
-### 🚧 Phases Restantes
+#### Phase 8: Recherche Sémantique 🆕
+- **VECTOR_SEARCH intégré**: Recherche intelligente via embeddings
+- **Recherche catalogues**: Bouton "🤖 Recherche Sémantique (IA)" dans Import Wizard
+- **Recherche éléments**: Search bar avec VECTOR_SEARCH sur `element_vector`
+- **Embeddings automatiques**: `CREATE_VECTOR(nom, type, layer_name)` dans formules
+- **Fallback textuel**: Basculement automatique si recherche sémantique échoue
+- **Table GIS_SearchQueries**: Stockage temporaire des requêtes de recherche
 
-- **Phase 8**: Recherche Sémantique (VECTOR_SEARCH)
-- **Phase 9**: Optimisations Performance (viewport filtering, cache)
-- **Phase 10**: Polish & Documentation finale
+#### Phase 10: Polish & UX 🆕
+- **Animations smooth**: fadeIn, slideUp sur modaux, spinner animé
+- **Loading states**: Barre de progression + message de chargement
+- **Error handling**: Card erreur avec bouton reload
+- **Tooltips**: Tous les boutons avec `title` attribute
+- **Hover effects**: Transform + boxShadow sur interactions
+- **Documentation complète**: README, ROADMAP, PERFORMANCE_README.md
+
+### 🚧 Phase Optionnelle
+
+- **Phase 9**: Optimisations Performance (viewport filtering, WKT cache, lazy loading)
+  - ✅ Code documenté dans `performanceOptimizations.js` et `PERFORMANCE_README.md`
+  - Non intégré par défaut (prêt si besoin pour datasets >5000 features)
 
 ## 📦 Installation
 
@@ -64,19 +80,27 @@ Au premier lancement, le widget crée automatiquement:
 
 ### 2. Import de données
 1. Clic **"📥 Import"**
-2. Recherche dans catalogues (ex: "bâtiments paris")
+2. Recherche dans catalogues :
+   - **Textuelle** : Filtrage classique par mots-clés
+   - **Sémantique** : Clic "🤖 Recherche Sémantique (IA)" pour recherche intelligente par similarité
 3. Configuration (limit, bbox)
 4. Preview
 5. Import → Données insérées dans table projet
 
-### 3. Édition
+### 3. Recherche intelligente
+- **Search bar** (sidebar Explorer) : Recherche sémantique automatique dans les éléments
+- Basée sur `VECTOR_SEARCH` de Grist
+- Tri par pertinence
+- Highlight résultats sur carte
+
+### 4. Édition
 - **Clic droit** sur feature → Menu contextuel
 - **Éditer géométrie** → Mode Leaflet.pm
 - **Modifier attributs** → Modal JSON
 - **Changer style** → Color picker, sliders
 - **Supprimer** → Confirmation
 
-### 4. Sauvegarde
+### 5. Sauvegarde
 1. Clic **"💾 Sauvegarder"**
 2. Nom du projet (ou suggestion auto)
 3. Table renommée → Nouvelle table créée
