@@ -5,6 +5,7 @@
  * - GIS_Catalogs: External data sources (IGN, OSM, etc.)
  * - GIS_Styles: Reusable style library
  * - GIS_Config: Widget configuration
+ * - GIS_SearchQueries: Semantic search with VECTOR_SEARCH (Phase 8)
  */
 
 // System table schemas
@@ -37,7 +38,7 @@ const SYSTEM_TABLES = {
       { id: 'catalog_vector', type: 'Any' } // Vector type if available, else Any
     ],
     formulas: {
-      catalog_vector: 'CREATE_VECTOR("Dataset: " + $title, "Source: " + $source_type, "Keywords: " + $keywords, "Description: " + $description)'
+      catalog_vector: 'grist.CREATE_VECTOR("Dataset: " + $title, "Source: " + $source_type, "Keywords: " + $keywords, "Description: " + $description)'
     }
   },
 
@@ -63,6 +64,24 @@ const SYSTEM_TABLES = {
         choiceOptions: {}
       })}
     ]
+  },
+
+  GIS_SearchQueries: {
+    columns: [
+      { id: 'search_query', type: 'Text' },
+      { id: 'search_mode', type: 'Choice', widgetOptions: JSON.stringify({
+        choices: ['Catalogs', 'Elements'],
+        choiceOptions: {}
+      })},
+      { id: 'workspace_table', type: 'Text' }, // Name of workspace table to search
+      { id: 'catalog_results', type: 'Any' }, // RefList:GIS_Catalogs
+      { id: 'element_results', type: 'Any' }, // RefList to workspace table
+      { id: 'timestamp', type: 'DateTime', isFormula: true, formula: 'NOW()' }
+    ],
+    formulas: {
+      catalog_results: 'grist.VECTOR_SEARCH(GIS_Catalogs, $search_query, embedding_column="catalog_vector", threshold=0.7, limit=10) if $search_mode == "Catalogs" else []',
+      element_results: 'grist.VECTOR_SEARCH($workspace_table, $search_query, embedding_column="element_vector", threshold=0.6, limit=20) if $search_mode == "Elements" and $workspace_table else []'
+    }
   }
 };
 
@@ -512,7 +531,7 @@ export async function setupSystemInfrastructure(gristApi) {
   try {
     // Step 1: Check and create system tables
     console.log('\n📋 Step 1/4: Checking system tables...');
-    const systemTables = ['GIS_Catalogs', 'GIS_Styles', 'GIS_Config'];
+    const systemTables = ['GIS_Catalogs', 'GIS_Styles', 'GIS_Config', 'GIS_SearchQueries'];
 
     for (const tableName of systemTables) {
       const exists = await tableExists(docApi, tableName);
@@ -613,4 +632,208 @@ export async function setConfig(docApi, key, value, type = 'string') {
     console.error(`Error setting config ${key}:`, error);
     return false;
   }
+}
+
+/**
+ * PHASE 8: SEMANTIC SEARCH FUNCTIONS
+ *
+ * Search catalogs and elements using VECTOR_SEARCH via GIS_SearchQueries table
+ */
+
+/**
+ * Search catalogs using semantic search (VECTOR_SEARCH)
+ * @param {Object} docApi - Grist docApi
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} - Array of catalog records sorted by relevance
+ */
+export async function searchCatalogsSemantic(docApi, query) {
+  if (!query || query.trim() === '') {
+    return { success: false, catalogs: [], error: 'Empty query' };
+  }
+
+  try {
+    console.log(`🔍 Semantic search catalogs: "${query}"`);
+
+    // Create search query record (Grist will calculate VECTOR_SEARCH via formula)
+    const result = await docApi.applyUserActions([
+      ['AddRecord', 'GIS_SearchQueries', null, {
+        search_query: query.trim(),
+        search_mode: 'Catalogs',
+        workspace_table: '' // Not needed for catalog search
+      }]
+    ]);
+
+    const queryRecordId = result.retValues[0];
+
+    // Wait for Grist to calculate VECTOR_SEARCH formula (1.5s delay)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Fetch the record with calculated results
+    const searchData = await docApi.fetchTable('GIS_SearchQueries');
+    const idx = searchData.id.indexOf(queryRecordId);
+
+    if (idx === -1) {
+      throw new Error('Search record not found');
+    }
+
+    const catalogResultIds = searchData.catalog_results[idx];
+
+    // If no results from VECTOR_SEARCH, return empty
+    if (!catalogResultIds || catalogResultIds.length === 0) {
+      console.log('  ℹ️ No results from VECTOR_SEARCH');
+
+      // Clean up search record
+      await docApi.applyUserActions([
+        ['RemoveRecord', 'GIS_SearchQueries', queryRecordId]
+      ]);
+
+      return { success: true, catalogs: [], method: 'semantic', count: 0 };
+    }
+
+    // Fetch catalog details
+    const catalogsData = await docApi.fetchTable('GIS_Catalogs');
+    const catalogs = catalogResultIds.map(catalogId => {
+      const catalogIdx = catalogsData.id.indexOf(catalogId);
+      if (catalogIdx === -1) return null;
+
+      return {
+        id: catalogsData.id[catalogIdx],
+        source_type: catalogsData.source_type[catalogIdx],
+        dataset_id: catalogsData.dataset_id[catalogIdx],
+        title: catalogsData.title[catalogIdx],
+        description: catalogsData.description[catalogIdx],
+        keywords: catalogsData.keywords[catalogIdx],
+        endpoint_url: catalogsData.endpoint_url[catalogIdx],
+        layer_name: catalogsData.layer_name[catalogIdx],
+        layer_type: catalogsData.layer_type[catalogIdx],
+        geometry_type: catalogsData.geometry_type[catalogIdx],
+        crs: catalogsData.crs[catalogIdx],
+        license: catalogsData.license[catalogIdx],
+        attribution: catalogsData.attribution[catalogIdx],
+        usage_count: catalogsData.usage_count[catalogIdx],
+        is_favorite: catalogsData.is_favorite[catalogIdx]
+      };
+    }).filter(Boolean); // Remove null entries
+
+    // Clean up search record
+    await docApi.applyUserActions([
+      ['RemoveRecord', 'GIS_SearchQueries', queryRecordId]
+    ]);
+
+    console.log(`  ✅ Found ${catalogs.length} catalogs via VECTOR_SEARCH`);
+
+    return {
+      success: true,
+      catalogs,
+      method: 'semantic',
+      count: catalogs.length
+    };
+
+  } catch (error) {
+    console.error('❌ Semantic search failed:', error);
+    return {
+      success: false,
+      catalogs: [],
+      error: error.message || 'Search failed',
+      method: 'semantic'
+    };
+  }
+}
+
+/**
+ * Search elements in workspace table using semantic search (VECTOR_SEARCH)
+ * @param {Object} docApi - Grist docApi
+ * @param {string} workspaceTable - Name of workspace table to search
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} - Array of element record IDs sorted by relevance
+ */
+export async function searchElementsSemantic(docApi, workspaceTable, query) {
+  if (!query || query.trim() === '') {
+    return { success: false, elementIds: [], error: 'Empty query' };
+  }
+
+  if (!workspaceTable) {
+    return { success: false, elementIds: [], error: 'No workspace table specified' };
+  }
+
+  try {
+    console.log(`🔍 Semantic search elements in "${workspaceTable}": "${query}"`);
+
+    // Create search query record
+    const result = await docApi.applyUserActions([
+      ['AddRecord', 'GIS_SearchQueries', null, {
+        search_query: query.trim(),
+        search_mode: 'Elements',
+        workspace_table: workspaceTable
+      }]
+    ]);
+
+    const queryRecordId = result.retValues[0];
+
+    // Wait for Grist to calculate VECTOR_SEARCH formula
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Fetch the record with calculated results
+    const searchData = await docApi.fetchTable('GIS_SearchQueries');
+    const idx = searchData.id.indexOf(queryRecordId);
+
+    if (idx === -1) {
+      throw new Error('Search record not found');
+    }
+
+    const elementResultIds = searchData.element_results[idx];
+
+    // If no results from VECTOR_SEARCH, return empty
+    if (!elementResultIds || elementResultIds.length === 0) {
+      console.log('  ℹ️ No results from VECTOR_SEARCH');
+
+      // Clean up search record
+      await docApi.applyUserActions([
+        ['RemoveRecord', 'GIS_SearchQueries', queryRecordId]
+      ]);
+
+      return { success: true, elementIds: [], method: 'semantic', count: 0 };
+    }
+
+    // Clean up search record
+    await docApi.applyUserActions([
+      ['RemoveRecord', 'GIS_SearchQueries', queryRecordId]
+    ]);
+
+    console.log(`  ✅ Found ${elementResultIds.length} elements via VECTOR_SEARCH`);
+
+    return {
+      success: true,
+      elementIds: elementResultIds, // Array of IDs sorted by relevance
+      method: 'semantic',
+      count: elementResultIds.length
+    };
+
+  } catch (error) {
+    console.error('❌ Semantic search elements failed:', error);
+    return {
+      success: false,
+      elementIds: [],
+      error: error.message || 'Search failed',
+      method: 'semantic'
+    };
+  }
+}
+
+/**
+ * Fallback: Search catalogs using text matching (when VECTOR_SEARCH unavailable)
+ * @param {Array} catalogs - Array of all catalog records
+ * @param {string} query - Search query
+ * @returns {Array} - Filtered catalogs
+ */
+export function searchCatalogsTextual(catalogs, query) {
+  if (!query || query.trim() === '') {
+    return catalogs;
+  }
+
+  const lower = query.toLowerCase();
+  return catalogs.filter(catalog => {
+    const searchText = `${catalog.title} ${catalog.description || ''} ${catalog.keywords || ''}`.toLowerCase();
+    return searchText.includes(lower);
+  });
 }

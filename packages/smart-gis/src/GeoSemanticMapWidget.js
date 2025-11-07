@@ -5,7 +5,7 @@ import L from 'leaflet';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import 'leaflet/dist/leaflet.css';
-import { setupSystemInfrastructure } from './systemInfrastructure';
+import { setupSystemInfrastructure, searchElementsSemantic } from './systemInfrastructure';
 import {
   groupByLayers,
   sortLayersByZIndex
@@ -867,11 +867,56 @@ function GeoSemanticMapWidget() {
   }, []);
 
   const handleSearch = useCallback(async (query) => {
-    console.log('Searching for:', query);
-    // TODO: Implement Albert API semantic search
-    // This would call your Albert API endpoint with the query and embeddings
-    setSearchResults([]);
-  }, []);
+    if (!query || !query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    console.log('🔍 Semantic search elements:', query);
+
+    try {
+      const docApi = gristApiRef.current?.docApi;
+      if (!docApi) {
+        console.warn('⚠️ Grist API not available for semantic search');
+        setSearchResults([]);
+        return;
+      }
+
+      // Use VECTOR_SEARCH via GIS_SearchQueries
+      const result = await searchElementsSemantic(docApi, WORKSPACE_TABLE_NAME, query);
+
+      if (result.success && result.elementIds.length > 0) {
+        console.log(`✅ Found ${result.count} elements via VECTOR_SEARCH`);
+
+        // Filter allRecords to get full record data for found IDs
+        const foundRecords = allRecords.filter(record => {
+          const recId = record.id || record.fields?.id;
+          return result.elementIds.includes(recId);
+        });
+
+        // Sort by relevance (same order as VECTOR_SEARCH results)
+        const sortedRecords = result.elementIds
+          .map(id => foundRecords.find(rec => (rec.id || rec.fields?.id) === id))
+          .filter(Boolean);
+
+        setSearchResults(sortedRecords);
+
+        // Highlight first result on map
+        if (sortedRecords.length > 0) {
+          const firstId = sortedRecords[0].id || sortedRecords[0].fields?.id;
+          setSelectedIds([firstId]);
+        }
+
+        console.log(`  Displaying ${sortedRecords.length} search results`);
+      } else {
+        console.log('  ℹ️ No results from semantic search');
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('❌ Semantic search failed:', error);
+      setSearchResults([]);
+    }
+  }, [allRecords]);
 
   const handleRecordClick = useCallback((recordId) => {
     if (gristApiRef.current && gristApiRef.current.setCursorPos) {
@@ -1153,20 +1198,111 @@ function GeoSemanticMapWidget() {
 
   if (error) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: '16px', padding: '20px' }}>
-        <div style={{ fontSize: '48px' }}>⚠️</div>
-        <div style={{ color: '#e74c3c', textAlign: 'center' }}>
-          <strong>Erreur:</strong> {error}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '20px',
+        padding: '20px',
+        animation: 'fadeIn 0.3s ease-in'
+      }}>
+        <div style={{ fontSize: '64px', animation: 'pulse 2s infinite' }}>⚠️</div>
+        <div style={{
+          color: '#e74c3c',
+          textAlign: 'center',
+          maxWidth: '500px',
+          padding: '16px',
+          backgroundColor: '#ffe5e5',
+          borderRadius: '8px',
+          border: '2px solid #e74c3c'
+        }}>
+          <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+            Une erreur est survenue
+          </div>
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            {error}
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '16px',
+              padding: '8px 16px',
+              backgroundColor: '#e74c3c',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            🔄 Recharger le widget
+          </button>
         </div>
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+          }
+        `}</style>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ fontSize: '48px' }}>🗺️</div>
-        <div>Chargement de la carte...</div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '20px',
+        animation: 'fadeIn 0.3s ease-in'
+      }}>
+        <div style={{ fontSize: '64px', animation: 'spin 2s linear infinite' }}>🗺️</div>
+        <div style={{
+          fontSize: '16px',
+          color: '#2c3e50',
+          fontWeight: '500'
+        }}>
+          Chargement de Smart GIS...
+        </div>
+        <div style={{
+          width: '200px',
+          height: '4px',
+          backgroundColor: '#ecf0f1',
+          borderRadius: '2px',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            height: '100%',
+            width: '40%',
+            backgroundColor: '#3498db',
+            animation: 'loading 1.5s ease-in-out infinite'
+          }} />
+        </div>
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes loading {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(250%); }
+            100% { transform: translateX(-100%); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -1235,6 +1371,7 @@ function GeoSemanticMapWidget() {
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            title="Ouvrir/Fermer le panneau d'exploration et de recherche"
             style={{
               padding: '6px 14px',
               backgroundColor: sidebarOpen ? '#16B378' : '#34495e',
@@ -1244,13 +1381,17 @@ function GeoSemanticMapWidget() {
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: '500',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s ease',
+              boxShadow: sidebarOpen ? '0 2px 8px rgba(22,179,120,0.3)' : 'none'
             }}
+            onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
+            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
           >
             {sidebarOpen ? '◀ Fermer' : '▶ Explorer'}
           </button>
           <button
             onClick={() => setEditMode(!editMode)}
+            title={editMode ? 'Désactiver le mode édition' : 'Activer le mode édition (dessiner sur la carte)'}
             style={{
               padding: '6px 14px',
               backgroundColor: editMode ? '#e74c3c' : '#34495e',
@@ -1260,13 +1401,17 @@ function GeoSemanticMapWidget() {
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: '500',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s ease',
+              boxShadow: editMode ? '0 2px 8px rgba(231,76,60,0.3)' : 'none'
             }}
+            onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
+            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
           >
             {editMode ? '✓ Édition Active' : '✏️ Éditer'}
           </button>
           <button
             onClick={() => setShowImportWizard(true)}
+            title="Importer des données depuis IGN Géoplateforme ou OpenStreetMap"
             style={{
               padding: '6px 14px',
               backgroundColor: '#16B378',
@@ -1276,13 +1421,22 @@ function GeoSemanticMapWidget() {
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: '600',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.transform = 'translateY(-1px)';
+              e.target.style.boxShadow = '0 4px 12px rgba(22,179,120,0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
             }}
           >
             📥 Import
           </button>
           <button
             onClick={() => setShowSaveDialog(true)}
+            title="Sauvegarder le projet dans une nouvelle table"
             style={{
               padding: '6px 14px',
               backgroundColor: '#3498db',
@@ -1292,7 +1446,15 @@ function GeoSemanticMapWidget() {
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: '600',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.transform = 'translateY(-1px)';
+              e.target.style.boxShadow = '0 4px 12px rgba(52,152,219,0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
             }}
           >
             💾 Sauvegarder
