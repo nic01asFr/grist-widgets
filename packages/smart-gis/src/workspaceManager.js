@@ -153,6 +153,12 @@ export async function addToWorkspace(docApi, record) {
  */
 export async function bulkAddToWorkspace(docApi, records) {
   try {
+    // Vérifier que nous avons des records à insérer
+    if (!records || records.length === 0) {
+      console.warn('⚠️ No records to add to workspace');
+      return { success: true, count: 0 };
+    }
+
     // Préparer les données au format Grist
     const colData = {};
     const firstRecord = records[0];

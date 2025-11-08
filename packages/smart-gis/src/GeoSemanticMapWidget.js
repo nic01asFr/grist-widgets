@@ -914,10 +914,8 @@ function GeoSemanticMapWidget() {
   }, [allRecords]);
 
   const handleRecordClick = useCallback((recordId) => {
-    if (gristApiRef.current && gristApiRef.current.setCursorPos) {
-      gristApiRef.current.setCursorPos({ rowId: recordId });
-      setSelectedIds([recordId]);
-    }
+    // Widget works autonomously, don't modify host table cursor
+    setSelectedIds([recordId]);
   }, []);
 
   // Layer visibility toggle
@@ -1554,8 +1552,8 @@ function GeoSemanticMapWidget() {
                     layer.bindPopup(popupContent);
 
                     layer.on('click', () => {
-                      if (gristApiRef.current && record.id) {
-                        gristApiRef.current.setCursorPos({ rowId: record.id });
+                      // Widget works autonomously, don't modify host table cursor
+                      if (record.id) {
                         setSelectedIds([record.id]);
                       }
                     });
