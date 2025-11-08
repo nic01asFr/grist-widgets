@@ -726,20 +726,6 @@ function GeoSemanticMapWidget() {
       }
     };
 
-    const setupWorkspacePolling = () => {
-      // Charger les données initiales
-      loadWorkspaceData();
-
-      // Polling toutes les 2 secondes pour détecter les changements
-      const intervalId = setInterval(() => {
-        if (mounted) {
-          loadWorkspaceData();
-        }
-      }, 2000);
-
-      return intervalId;
-    };
-
     // Widget works with its own tables (GIS_WorkSpace), no column mapping needed
     const readyOptions = {
       requiredAccess: 'full'
@@ -795,13 +781,9 @@ function GeoSemanticMapWidget() {
         console.warn('⚠️ Failed to load catalogs:', err);
       }
 
-      // Step 4: Setup workspace polling
-      const pollingIntervalId = setupWorkspacePolling();
-
-      // Cleanup polling on unmount
-      return () => {
-        clearInterval(pollingIntervalId);
-      };
+      // Step 4: Load workspace data (one-time load, no polling)
+      // Widget updates data itself via import/edit, no need for polling
+      loadWorkspaceData();
     };
 
     try {
@@ -832,6 +814,22 @@ function GeoSemanticMapWidget() {
     return () => { mounted = false; };
   }, []);
 
+  // Refresh workspace data after modifications
+  const refreshWorkspaceData = useCallback(async () => {
+    if (!gristApiRef.current?.docApi) return;
+
+    try {
+      const result = await fetchWorkspaceData(gristApiRef.current.docApi);
+      if (result.success) {
+        setAllRecords(result.records);
+        allRecordsRef.current = result.records;
+        console.log(`🔄 Refreshed ${result.records.length} records`);
+      }
+    } catch (err) {
+      console.error('Error refreshing workspace:', err);
+    }
+  }, []);
+
   const handleGeometryCreated = useCallback(async (wkt) => {
     if (!gristApiRef.current || !gristApiRef.current.docApi) {
       console.error('Grist API not available');
@@ -853,13 +851,15 @@ function GeoSemanticMapWidget() {
 
       if (result.success) {
         console.log('✓ Geometry created successfully in workspace');
+        // Refresh data to show new geometry
+        await refreshWorkspaceData();
       } else {
         console.error('Failed to create geometry:', result.error);
       }
     } catch (err) {
       console.error('Error creating geometry:', err);
     }
-  }, []);
+  }, [refreshWorkspaceData]);
 
   const handleSearch = useCallback(async (query) => {
     if (!query || !query.trim()) {
@@ -951,6 +951,8 @@ function GeoSemanticMapWidget() {
       if (result.success) {
         console.log(`✓ Attributes updated for record ${recordId}`);
         setAttributeEditor(null);
+        // Refresh data to show updated attributes
+        await refreshWorkspaceData();
       } else {
         throw new Error(result.error || 'Failed to update attributes');
       }
@@ -959,7 +961,7 @@ function GeoSemanticMapWidget() {
       console.error('Error updating attributes:', error);
       throw error;
     }
-  }, []);
+  }, [refreshWorkspaceData]);
 
   const handleDeleteRecord = useCallback((record) => {
     setDeleteConfirm(record);
@@ -977,6 +979,8 @@ function GeoSemanticMapWidget() {
       if (result.success) {
         console.log(`✓ Record ${deleteConfirm.id} deleted from workspace`);
         setDeleteConfirm(null);
+        // Refresh data to remove deleted record
+        await refreshWorkspaceData();
       } else {
         throw new Error(result.error || 'Failed to delete record');
       }
@@ -985,7 +989,7 @@ function GeoSemanticMapWidget() {
       console.error('Error deleting record:', error);
       alert(`Erreur lors de la suppression: ${error.message}`);
     }
-  }, [deleteConfirm]);
+  }, [deleteConfirm, refreshWorkspaceData]);
 
   const handleEditStyle = useCallback((record) => {
     setStyleEditor(record);
@@ -1003,6 +1007,8 @@ function GeoSemanticMapWidget() {
       if (result.success) {
         console.log(`✓ Style updated for record ${recordId}`);
         setStyleEditor(null);
+        // Refresh data to show updated style
+        await refreshWorkspaceData();
       } else {
         throw new Error(result.error || 'Failed to update style');
       }
@@ -1011,7 +1017,7 @@ function GeoSemanticMapWidget() {
       console.error('Error updating style:', error);
       throw error;
     }
-  }, []);
+  }, [refreshWorkspaceData]);
 
   // Handle save project
   const handleSaveProject = useCallback(async (projectName) => {
@@ -1081,6 +1087,8 @@ function GeoSemanticMapWidget() {
 
         if (result.success) {
           console.log(`✅ Added raster layer "${layerName}" to workspace`);
+          // Refresh data to show new raster layer
+          await refreshWorkspaceData();
         } else {
           throw new Error(result.error || 'Failed to add raster layer');
         }
@@ -1106,6 +1114,8 @@ function GeoSemanticMapWidget() {
 
       if (result.success) {
         console.log(`✅ Imported ${result.count} records into workspace layer "${layerName}"`);
+        // Refresh data to show imported features
+        await refreshWorkspaceData();
       } else {
         throw new Error(result.error || 'Failed to import records');
       }
@@ -1114,7 +1124,7 @@ function GeoSemanticMapWidget() {
       console.error('Error importing data:', err);
       throw err;
     }
-  }, [allRecords]);
+  }, [allRecords, refreshWorkspaceData]);
 
   // Update layer z-index
   const handleUpdateLayerZIndex = useCallback(async (layerName, newZIndex) => {
