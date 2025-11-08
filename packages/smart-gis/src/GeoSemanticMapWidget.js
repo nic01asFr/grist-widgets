@@ -611,7 +611,6 @@ function Sidebar({
 // Main Widget
 function GeoSemanticMapWidget() {
   const [allRecords, setAllRecords] = useState([]);
-  const [mappedColumns, setMappedColumns] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editMode, setEditMode] = useState(false);
@@ -633,18 +632,22 @@ function GeoSemanticMapWidget() {
   const gristApiRef = useRef(null);
   const allRecordsRef = useRef([]);
 
+  // Fixed column names from GIS_WorkSpace schema
+  const GEOMETRY_COL = 'geometry';
+  const NAME_COL = 'nom';
+  const DESC_COL = 'description';
+
   // Calculate statistics
   const stats = useMemo(() => {
-    if (!allRecords || !mappedColumns?.geometry) {
+    if (!allRecords || allRecords.length === 0) {
       return { points: 0, lines: 0, polygons: 0, total: 0, totalArea: 0, totalLength: 0 };
     }
 
-    const geometryCol = mappedColumns.geometry;
     let points = 0, lines = 0, polygons = 0, totalArea = 0, totalLength = 0;
 
     allRecords.forEach(record => {
       const normalized = normalizeRecord(record);
-      const geom = normalized[geometryCol];
+      const geom = normalized[GEOMETRY_COL];
       if (!geom) return;
 
       const feature = WKTConverter.parse(geom);
@@ -663,7 +666,7 @@ function GeoSemanticMapWidget() {
     });
 
     return { points, lines, polygons, total: points + lines + polygons, totalArea, totalLength };
-  }, [allRecords, mappedColumns]);
+  }, [allRecords]);
 
   // Group records by layers (multi-layer support)
   useEffect(() => {
@@ -696,10 +699,9 @@ function GeoSemanticMapWidget() {
     if (!window.grist || typeof window.grist.ready !== 'function') {
       console.log('Grist API not available, using mock data');
       setAllRecords([
-        { id: 1, name: 'Paris', geometry: 'POINT(2.3522 48.8566)', description: 'Capitale' },
-        { id: 2, name: 'Lyon', geometry: 'POINT(4.8357 45.7640)', description: '2ème ville' }
+        { id: 1, nom: 'Paris', geometry: 'POINT(2.3522 48.8566)', description: 'Capitale' },
+        { id: 2, nom: 'Lyon', geometry: 'POINT(4.8357 45.7640)', description: '2ème ville' }
       ]);
-      setMappedColumns({ name: 'name', geometry: 'geometry', description: 'description' });
       setLoading(false);
       return;
     }
@@ -738,15 +740,8 @@ function GeoSemanticMapWidget() {
       return intervalId;
     };
 
+    // Widget works with its own tables (GIS_WorkSpace), no column mapping needed
     const readyOptions = {
-      columns: [
-        { name: 'geometry', title: 'Géométrie', description: 'WKT geometry', optional: false },
-        { name: 'name', title: 'Nom', optional: true },
-        { name: 'description', title: 'Description', optional: true },
-        { name: 'embedding', title: 'Embedding', optional: true },
-        { name: 'area_m2', title: 'Aire (m²)', optional: true },
-        { name: 'length_km', title: 'Longueur (km)', optional: true }
-      ],
       requiredAccess: 'full'
     };
 
@@ -1307,21 +1302,10 @@ function GeoSemanticMapWidget() {
     );
   }
 
-  if (!mappedColumns || !mappedColumns.geometry) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: '16px', padding: '20px', textAlign: 'center' }}>
-        <div style={{ fontSize: '48px' }}>🗺️</div>
-        <div style={{ maxWidth: '400px' }}>
-          <strong>Configuration requise</strong>
-          <p>Veuillez mapper la colonne <strong>Géométrie</strong> dans les paramètres du widget.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const geometryCol = mappedColumns.geometry;
-  const nameCol = mappedColumns.name || 'name';
-  const descCol = mappedColumns.description || 'description';
+  // Widget uses fixed column names from GIS_WorkSpace schema
+  const geometryCol = GEOMETRY_COL;
+  const nameCol = NAME_COL;
+  const descCol = DESC_COL;
 
   const validRecords = allRecords.map(normalizeRecord).filter(record => {
     const geom = record[geometryCol];

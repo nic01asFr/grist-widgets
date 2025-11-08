@@ -73,10 +73,16 @@ Le widget sera disponible dans `build/` pour déploiement.
 
 ## 🗺️ Utilisation
 
+### 0. Installation dans Grist
+⚠️ **Important** : Le widget **ne nécessite aucune configuration de colonnes**
+- Installez le widget sur **n'importe quelle table** (même vide)
+- Le widget crée et gère ses propres tables automatiquement
+- **Aucun mapping de colonnes n'est requis**
+
 ### 1. Initialisation
 Au premier lancement, le widget crée automatiquement:
-- 3 tables système (GIS_Catalogs, GIS_Styles, GIS_Config)
-- 1 table projet par défaut (`GeoMap_Project_Default`)
+- 4 tables système (GIS_Catalogs, GIS_Styles, GIS_Config, GIS_SearchQueries)
+- 1 table workspace (`GIS_WorkSpace`) pour les données géographiques
 
 ### 2. Import de données
 1. Clic **"📥 Import"**
