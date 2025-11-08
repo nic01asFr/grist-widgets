@@ -38,11 +38,24 @@ The widget is now **production-ready at 90% completion**.
 - **Zero idle bandwidth**: From ~47 MB/s continuous → 0 MB/s when idle
 - **Stable connection**: No more WebSocket crashes or 404 reconnection errors
 
-### Critical IGN Import Fix (✅ Complete)
+### Critical IGN Import Fixes (✅ Complete)
+
+**1. BBOX Coordinate Order Fix**
 - **Fixed BBOX coordinate order**: IGN WFS 2.0.0 expects longitude-first (X,Y) format
 - **Was**: `minLat,minLon,maxLat,maxLon` (Y,X,Y,X) → 0 results returned
 - **Now**: `minLon,minLat,maxLon,maxLat` (X,Y,X,Y) → correct results
-- **Impact**: All IGN imports now work (batiment, routes, communes, hydrographie)
+- **Impact**: IGN WFS queries now return features
+
+**2. WKT Parser Rewrite**
+- **Fixed parsing bug**: Previous parser left parasitic `)` characters in coordinates
+- **Error**: `Invalid LatLng object: (NaN, 2.29925484)` → Leaflet crash
+- **Root cause**: Incorrect depth-tracking algorithm in POLYGON/MULTIPOLYGON parser
+- **Solution**: Complete rewrite with proper nested parsing
+- **Now handles**:
+  - Polygons with holes: `POLYGON((outer), (hole1), (hole2))`
+  - Complex multi-polygons: `MULTIPOLYGON(((ring)), ((ring)))`
+  - Coordinate validation (filters NaN values)
+- **Impact**: IGN geometries now display correctly on map
 
 ### Phase 9: Performance Optimizations (📝 Documented)
 - **NEW FILE**: `performanceOptimizations.js` with hooks (WKT cache, viewport filtering, lazy loading)
@@ -54,13 +67,15 @@ The widget is now **production-ready at 90% completion**.
 ## 📦 Files Changed
 
 ### Modified Files
-- **src/GeoSemanticMapWidget.js** (+151 lines, -59 lines)
+- **src/GeoSemanticMapWidget.js** (+219 lines, -91 lines)
   - **CRITICAL**: Removed aggressive polling (was causing WebSocket crashes)
+  - **CRITICAL**: Rewrote WKT parser for POLYGON and MULTIPOLYGON (fixed NaN errors)
   - Removed column mapping requirement (fully autonomous widget)
   - Added Phase 8 semantic search in handleSearch()
   - Added Phase 10 UX improvements (animations, loading states, tooltips)
   - Added manual refresh after modifications (import, edit, delete, style)
   - Fixed column names: `geometry`, `nom`, `description`
+  - Enhanced WKT parser now handles polygons with holes and nested multi-polygons
 
 - **src/services/IGNService.js** (+1 line, -1 line)
   - **CRITICAL**: Fixed BBOX coordinate order for WFS 2.0.0 compliance
