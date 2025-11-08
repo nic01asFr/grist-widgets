@@ -107,41 +107,109 @@ class WKTConverter {
 
     // POLYGON
     if (trimmed.match(/^POLYGON/i)) {
-      const match = trimmed.match(/POLYGON\s*\(\((.+)\)\)/i);
+      const match = trimmed.match(/POLYGON\s*\((.+)\)/is);
       if (!match) return null;
-      const coords = match[1].split(',').map(pair => {
-        const [lng, lat] = pair.trim().split(/\s+/).map(Number);
-        return [lng, lat];
-      });
+
+      const rings = [];
+      const content = match[1];
+      let depth = 0;
+      let ringStart = -1;
+
+      // Parse each ring in the POLYGON
+      for (let i = 0; i < content.length; i++) {
+        const char = content[i];
+
+        if (char === '(') {
+          if (depth === 0) ringStart = i;
+          depth++;
+        } else if (char === ')') {
+          depth--;
+          if (depth === 0 && ringStart !== -1) {
+            // Extract one ring: x1 y1, x2 y2, ...
+            const ringStr = content.substring(ringStart + 1, i);
+            const coords = ringStr.split(',').map(pair => {
+              const [lng, lat] = pair.trim().split(/\s+/).map(Number);
+              return [lng, lat];
+            }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
+
+            if (coords.length > 0) {
+              rings.push(coords);
+            }
+            ringStart = -1;
+          }
+        }
+      }
+
+      if (rings.length === 0) return null;
+
       return {
         type: 'Feature',
-        geometry: { type: 'Polygon', coordinates: [coords] },
+        geometry: { type: 'Polygon', coordinates: rings },
         properties: {}
       };
     }
 
     // MULTIPOLYGON
     if (trimmed.match(/^MULTIPOLYGON/i)) {
-      const match = trimmed.match(/MULTIPOLYGON\s*\((.+)\)/i);
+      const match = trimmed.match(/MULTIPOLYGON\s*\((.+)\)/is);
       if (!match) return null;
+
       const polygons = [];
+      const content = match[1];
       let depth = 0;
-      let current = '';
+      let polygonStart = -1;
 
-      for (let char of match[1]) {
-        if (char === '(') depth++;
-        if (char === ')') depth--;
-        current += char;
+      // Parse each polygon in the MULTIPOLYGON
+      for (let i = 0; i < content.length; i++) {
+        const char = content[i];
 
-        if (depth === 1 && char === ')') {
-          const polyCoords = current.replace(/^\(\(|\)\)$/g, '').split(',').map(pair => {
-            const [lng, lat] = pair.trim().split(/\s+/).map(Number);
-            return [lng, lat];
-          });
-          polygons.push([polyCoords]);
-          current = '';
+        if (char === '(') {
+          if (depth === 0) polygonStart = i;
+          depth++;
+        } else if (char === ')') {
+          depth--;
+          if (depth === 0 && polygonStart !== -1) {
+            // Extract one complete polygon: ((ring1), (ring2), ...)
+            const polygonStr = content.substring(polygonStart + 1, i);
+            const rings = [];
+
+            // Parse rings within this polygon
+            let ringDepth = 0;
+            let ringStart = -1;
+
+            for (let j = 0; j < polygonStr.length; j++) {
+              const c = polygonStr[j];
+
+              if (c === '(') {
+                if (ringDepth === 0) ringStart = j;
+                ringDepth++;
+              } else if (c === ')') {
+                ringDepth--;
+                if (ringDepth === 0 && ringStart !== -1) {
+                  // Extract one ring: x1 y1, x2 y2, ...
+                  const ringStr = polygonStr.substring(ringStart + 1, j);
+                  const coords = ringStr.split(',').map(pair => {
+                    const [lng, lat] = pair.trim().split(/\s+/).map(Number);
+                    return [lng, lat];
+                  }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
+
+                  if (coords.length > 0) {
+                    rings.push(coords);
+                  }
+                  ringStart = -1;
+                }
+              }
+            }
+
+            if (rings.length > 0) {
+              polygons.push(rings);
+            }
+            polygonStart = -1;
+          }
         }
       }
+
+      if (polygons.length === 0) return null;
 
       return {
         type: 'Feature',
