@@ -41,9 +41,10 @@ function buildWFSQuery(typename, options = {}) {
   }
 
   // Bounding box (BBOX)
+  // WFS 2.0.0 avec EPSG:4326 attend: minLon,minLat,maxLon,maxLat
   if (options.bbox && Array.isArray(options.bbox) && options.bbox.length === 4) {
     const [minLon, minLat, maxLon, maxLat] = options.bbox;
-    params.set('BBOX', `${minLat},${minLon},${maxLat},${maxLon},EPSG:4326`);
+    params.set('BBOX', `${minLon},${minLat},${maxLon},${maxLat},EPSG:4326`);
   }
 
   // Filtres CQL (optionnel)
