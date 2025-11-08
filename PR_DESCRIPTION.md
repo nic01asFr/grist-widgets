@@ -38,6 +38,12 @@ The widget is now **production-ready at 90% completion**.
 - **Zero idle bandwidth**: From ~47 MB/s continuous → 0 MB/s when idle
 - **Stable connection**: No more WebSocket crashes or 404 reconnection errors
 
+### Critical IGN Import Fix (✅ Complete)
+- **Fixed BBOX coordinate order**: IGN WFS 2.0.0 expects longitude-first (X,Y) format
+- **Was**: `minLat,minLon,maxLat,maxLon` (Y,X,Y,X) → 0 results returned
+- **Now**: `minLon,minLat,maxLon,maxLat` (X,Y,X,Y) → correct results
+- **Impact**: All IGN imports now work (batiment, routes, communes, hydrographie)
+
 ### Phase 9: Performance Optimizations (📝 Documented)
 - **NEW FILE**: `performanceOptimizations.js` with hooks (WKT cache, viewport filtering, lazy loading)
 - **NEW FILE**: `PERFORMANCE_README.md` with integration guide
@@ -55,6 +61,11 @@ The widget is now **production-ready at 90% completion**.
   - Added Phase 10 UX improvements (animations, loading states, tooltips)
   - Added manual refresh after modifications (import, edit, delete, style)
   - Fixed column names: `geometry`, `nom`, `description`
+
+- **src/services/IGNService.js** (+1 line, -1 line)
+  - **CRITICAL**: Fixed BBOX coordinate order for WFS 2.0.0 compliance
+  - Changed from latitude-first (Y,X) to longitude-first (X,Y) format
+  - Fixes all IGN imports returning 0 features
 
 - **src/ImportWizard.js** (+51 lines)
   - Added semantic search button and state management
