@@ -6,3 +6,4 @@
 export { default as EntityList } from './EntityList';
 export { default as StatsPanel } from './StatsPanel';
 export { default as StyleEditor } from './StyleEditor';
+export { default as EntityPanel } from './EntityPanel';

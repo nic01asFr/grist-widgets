@@ -196,13 +196,13 @@ const EditionToolbar = ({
 const styles = {
   container: {
     position: 'absolute',
-    top: spacing.md,
+    top: '12px',
     right: '1%',
     zIndex: 1000,
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row-reverse',
     alignItems: 'stretch',
-    gap: spacing.xs,
+    gap: '4px',
     backgroundColor: colors.white,
     border: `1px solid ${colors.border}`,
     borderRadius: borderRadius.lg,
@@ -309,6 +309,8 @@ const styles = {
   },
   contextGroup: {
     display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: spacing.xs,
     padding: `${spacing.xs} ${spacing.sm}`,
@@ -327,8 +329,9 @@ const styles = {
   },
   actionsGroup: {
     display: 'flex',
+    justifyContent: 'center',
     flexDirection: 'column-reverse',
-    gap: spacing.xs,
+    gap: '4px',
   },
   cancelButton: {
     padding: `${spacing.sm} ${spacing.md}`,
