@@ -1,8 +1,8 @@
 # Smart GIS Widget v3.0 - Demo Mode
 
-## Testing Phase 1 & 2 Components
+## Testing Phase 1, 2 & 3 Components
 
-To visually test the new UI components and layout:
+To visually test the new UI components, layout, and selection system:
 
 ### Method 1: Temporary Switch
 ```bash
@@ -42,6 +42,13 @@ import { Navbar, MainMenu, AdjacentPanel } from './components/layout';
 - **MenuSection**: Collapsible section component
 - **MenuDivider**: Visual separator
 
+### Phase 3: Map Selection (✅ Complete)
+- **useMapSelection Hook**: Selection state management with layer filtering
+- **SelectionTools**: Floating toolbar with 4 selection modes (pointer, rectangle, circle, lasso)
+- **SelectionActionsBar**: Bottom action bar with copy, delete, export, style, zoom, edit buttons
+- **Selection Behaviors**: Click, Ctrl+click (toggle), Shift+click (range)
+- **Geometric Selection**: Rectangle, Circle, Lasso (with modifier support)
+
 ## Demo Page Features
 
 The demo page (`src/components/DemoPage.js`) showcases:
@@ -55,6 +62,7 @@ The demo page (`src/components/DemoPage.js`) showcases:
    - Collapsible sections
    - All UI components displayed
    - Adjacent panel trigger
+   - **NEW (Phase 3)**: Selection controls with layer filter, quick selection buttons, mode toggles
 
 3. **AdjacentPanel**
    - Opens to the right of menu
@@ -69,17 +77,22 @@ The demo page (`src/components/DemoPage.js`) showcases:
    - Select dropdown
    - Modal dialog
 
-## Next Steps
+5. **Map Selection System (Phase 3)**
+   - SelectionTools floating at top of map
+   - 4 selection modes with visual feedback
+   - Active layer context display
+   - Selection count badge
+   - SelectionActionsBar at bottom when entities selected
+   - Action buttons: Zoom, Style, Edit, Copy, Export, Delete
+   - Selection info in menu sidebar
 
-### Phase 3: Map Selection (Pending)
-- `hooks/useMapSelection.js`
-- `components/map/SelectionTools.js`
-- `components/map/SelectionActionsBar.js`
+## Next Steps
 
 ### Phase 4: Layer Management (Pending)
 - `components/menu/LayersSection.js`
 - `components/menu/LayerItem.js`
 - `components/panels/EntityList.js`
+- `components/panels/StatsPanel.js`
 
 ### Phase 5: Style Editor (Pending)
 - `components/panels/StyleEditor.js`
@@ -90,15 +103,15 @@ The demo page (`src/components/DemoPage.js`) showcases:
 ```
 src/
 ├── components/
-│   ├── ui/           ✅ Phase 1
-│   ├── layout/       ✅ Phase 2
+│   ├── ui/           ✅ Phase 1 (7 components)
+│   ├── layout/       ✅ Phase 2 (3 components)
+│   ├── map/          ✅ Phase 3 (2 components)
 │   ├── menu/         ⏳ Phase 4
 │   ├── panels/       ⏳ Phase 5
-│   ├── map/          ⏳ Phase 3
-│   └── DemoPage.js   ✅ Test page
-├── constants/        ✅ Phase 1
-├── hooks/            ⏳ Phase 3+
-└── utils/            ⏳ Phase 3+
+│   └── DemoPage.js   ✅ Test page (updated for Phase 3)
+├── constants/        ✅ Phase 1 (colors, styles)
+├── hooks/            ✅ Phase 3 (useMapSelection)
+└── utils/            ⏳ Future phases
 ```
 
 ## Keyboard Shortcuts (Planned)

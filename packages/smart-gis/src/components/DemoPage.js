@@ -1,12 +1,23 @@
 /**
  * DemoPage Component
- * Test page for Phase 1 & 2 components
+ * Test page for Phase 1, 2 & 3 components
  */
 
 import React, { useState } from 'react';
 import { Button, Input, ColorPicker, Slider, Checkbox, Select, Modal } from './ui';
 import { Navbar, MainMenu, MenuSection, MenuDivider, AdjacentPanel } from './layout';
+import { SelectionTools, SelectionActionsBar } from './map';
+import useMapSelection from '../hooks/useMapSelection';
 import { colors } from '../constants/colors';
+
+// Mock data for testing selection
+const mockRecords = [
+  { id: 1, name: 'Point A', layer_name: 'Couche 1', geometry: 'POINT(2.3522 48.8566)' },
+  { id: 2, name: 'Point B', layer_name: 'Couche 1', geometry: 'POINT(2.3540 48.8580)' },
+  { id: 3, name: 'Zone C', layer_name: 'Couche 2', geometry: 'POLYGON((2.35 48.85, 2.36 48.85, 2.36 48.86, 2.35 48.86, 2.35 48.85))' },
+  { id: 4, name: 'Route D', layer_name: 'Couche 2', geometry: 'LINESTRING(2.35 48.85, 2.36 48.86)' },
+  { id: 5, name: 'Point E', layer_name: 'Couche 3', geometry: 'POINT(2.3500 48.8550)' },
+];
 
 const DemoPage = () => {
   // Layout state
@@ -22,6 +33,55 @@ const DemoPage = () => {
   const [checkboxValue, setCheckboxValue] = useState(true);
   const [selectValue, setSelectValue] = useState('option1');
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Selection state (Phase 3)
+  const [activeLayer, setActiveLayer] = useState(null);
+  const {
+    selection,
+    selectedRecords,
+    selectionInfo,
+    selectionMode,
+    setSelectionMode,
+    selectEntity,
+    selectByIds,
+    clearSelection,
+    selectAll,
+    isSelected,
+  } = useMapSelection(mockRecords, activeLayer);
+
+  // Selection actions
+  const handleCopy = () => {
+    console.log('Copy:', selectedRecords);
+    alert(`Copier ${selectedRecords.length} entité(s)`);
+  };
+
+  const handleDelete = () => {
+    console.log('Delete:', selectedRecords);
+    if (window.confirm(`Supprimer ${selectedRecords.length} entité(s) ?`)) {
+      clearSelection();
+      alert('Entités supprimées (démo)');
+    }
+  };
+
+  const handleExport = () => {
+    console.log('Export:', selectedRecords);
+    alert(`Exporter ${selectedRecords.length} entité(s) en GeoJSON`);
+  };
+
+  const handleEditStyle = () => {
+    console.log('Edit style:', selectedRecords);
+    setAdjacentPanelOpen(true);
+  };
+
+  const handleZoomTo = () => {
+    console.log('Zoom to:', selectedRecords);
+    alert(`Recentrer sur ${selectedRecords.length} entité(s)`);
+  };
+
+  const handleEditGeometry = () => {
+    console.log('Edit geometry:', selectedRecords[0]);
+    alert(`Éditer la géométrie de "${selectedRecords[0]?.name}"`);
+  };
 
   return (
     <div style={styles.container}>
@@ -116,6 +176,106 @@ const DemoPage = () => {
 
             <MenuDivider />
 
+            {/* Selection Demo Section (Phase 3) */}
+            <MenuSection title="🎯 Sélection (Phase 3)" icon="🎯" defaultExpanded={true}>
+              <div style={styles.demoSection}>
+                <h4 style={styles.demoTitle}>Couche Active</h4>
+                <Select
+                  value={activeLayer || ''}
+                  onChange={(val) => setActiveLayer(val === '' ? null : val)}
+                  options={[
+                    { value: '', label: 'Toutes les couches' },
+                    { value: 'Couche 1', label: 'Couche 1' },
+                    { value: 'Couche 2', label: 'Couche 2' },
+                    { value: 'Couche 3', label: 'Couche 3' },
+                  ]}
+                  label="Filtrer par couche"
+                  fullWidth
+                />
+
+                <h4 style={styles.demoTitle}>Sélection rapide</h4>
+                <div style={styles.buttonGrid}>
+                  <Button onClick={() => selectEntity(1)} size="small">
+                    Point A
+                  </Button>
+                  <Button onClick={() => selectEntity(2)} size="small">
+                    Point B
+                  </Button>
+                  <Button onClick={() => selectEntity(3)} size="small">
+                    Zone C
+                  </Button>
+                  <Button onClick={() => selectEntity(4)} size="small">
+                    Route D
+                  </Button>
+                  <Button onClick={() => selectEntity(5)} size="small">
+                    Point E
+                  </Button>
+                  <Button onClick={() => selectByIds([1, 2, 3])} size="small" variant="secondary">
+                    Multi 1-3
+                  </Button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <Button onClick={selectAll} variant="success" fullWidth>
+                    Tout sélectionner
+                  </Button>
+                  <Button onClick={clearSelection} variant="danger" fullWidth>
+                    Effacer
+                  </Button>
+                </div>
+
+                <h4 style={styles.demoTitle}>Mode de sélection</h4>
+                <div style={styles.buttonGrid}>
+                  <Button
+                    onClick={() => setSelectionMode('pointer')}
+                    variant={selectionMode === 'pointer' ? 'primary' : 'ghost'}
+                    size="small"
+                  >
+                    👆 Pointeur
+                  </Button>
+                  <Button
+                    onClick={() => setSelectionMode('rectangle')}
+                    variant={selectionMode === 'rectangle' ? 'primary' : 'ghost'}
+                    size="small"
+                  >
+                    ▢ Rectangle
+                  </Button>
+                  <Button
+                    onClick={() => setSelectionMode('circle')}
+                    variant={selectionMode === 'circle' ? 'primary' : 'ghost'}
+                    size="small"
+                  >
+                    ⭕ Cercle
+                  </Button>
+                  <Button
+                    onClick={() => setSelectionMode('lasso')}
+                    variant={selectionMode === 'lasso' ? 'primary' : 'ghost'}
+                    size="small"
+                  >
+                    ✏️ Lasso
+                  </Button>
+                </div>
+
+                {selection.length > 0 && (
+                  <>
+                    <h4 style={styles.demoTitle}>Sélection actuelle</h4>
+                    <div style={styles.selectionInfo}>
+                      <p><strong>Nombre:</strong> {selectionInfo.count}</p>
+                      <p><strong>Couches:</strong> {selectionInfo.layerCount}</p>
+                      <p><strong>Entités:</strong></p>
+                      <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '12px' }}>
+                        {selectedRecords.map(r => (
+                          <li key={r.id}>{r.name} ({r.layer_name})</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </div>
+            </MenuSection>
+
+            <MenuDivider />
+
             {/* Test Section */}
             <MenuSection title="🧪 Tests" icon="🧪" defaultExpanded={false}>
               <div style={styles.demoSection}>
@@ -178,18 +338,47 @@ const DemoPage = () => {
 
         {/* Map area */}
         <div style={styles.mapArea}>
+          {/* Selection Tools (Phase 3) */}
+          <SelectionTools
+            selectionMode={selectionMode}
+            onModeChange={setSelectionMode}
+            activeLayer={activeLayer}
+            selectionCount={selection.length}
+            onClear={clearSelection}
+          />
+
+          {/* Map Placeholder */}
           <div style={styles.mapPlaceholder}>
             <h1>🗺️</h1>
-            <h2>Zone Carte</h2>
+            <h2>Zone Carte (Phase 3 Demo)</h2>
             <p>Project: {projectName}</p>
-            <p>Color: {colorValue}</p>
-            <p>Slider: {sliderValue}%</p>
-            <p>Checkbox: {checkboxValue ? 'Coché' : 'Décoché'}</p>
-            <p>Select: {selectValue}</p>
+            <div style={{ marginTop: '20px', padding: '16px', backgroundColor: colors.white, borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+              <p><strong>Mode de sélection:</strong> {selectionMode}</p>
+              <p><strong>Couche active:</strong> {activeLayer || 'Toutes'}</p>
+              <p><strong>Entités sélectionnées:</strong> {selection.length}</p>
+              {selection.length > 0 && (
+                <p style={{ fontSize: '12px', marginTop: '8px', color: colors.textSecondary }}>
+                  IDs: [{selection.join(', ')}]
+                </p>
+              )}
+            </div>
             <p style={{ marginTop: '20px', fontSize: '12px', color: colors.textSecondary }}>
               Mode: {fullscreen ? 'Plein écran' : 'Normal'}
             </p>
           </div>
+
+          {/* Selection Actions Bar (Phase 3) */}
+          <SelectionActionsBar
+            selectionCount={selection.length}
+            selectionInfo={selectionInfo}
+            onCopy={handleCopy}
+            onDelete={handleDelete}
+            onExport={handleExport}
+            onEditStyle={handleEditStyle}
+            onZoomTo={handleZoomTo}
+            onEditGeometry={handleEditGeometry}
+            onClear={clearSelection}
+          />
         </div>
       </div>
 
@@ -243,6 +432,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative', // For absolute positioned selection components
   },
   mapPlaceholder: {
     textAlign: 'center',
@@ -263,6 +453,14 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '8px',
+  },
+  selectionInfo: {
+    padding: '12px',
+    backgroundColor: colors.grayVeryLight,
+    borderRadius: '6px',
+    border: `1px solid ${colors.border}`,
+    fontSize: '13px',
+    color: colors.textPrimary,
   },
 };
 
