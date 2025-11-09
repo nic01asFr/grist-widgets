@@ -1,8 +1,8 @@
 # Smart GIS Widget v3.0 - Demo Mode
 
-## Testing Phase 1, 2 & 3 Components
+## Testing Phase 1, 2, 3 & 4 Components
 
-To visually test the new UI components, layout, and selection system:
+To visually test the new UI components, layout, selection system, and layer management:
 
 ### Method 1: Temporary Switch
 ```bash
@@ -49,6 +49,15 @@ import { Navbar, MainMenu, AdjacentPanel } from './components/layout';
 - **Selection Behaviors**: Click, Ctrl+click (toggle), Shift+click (range)
 - **Geometric Selection**: Rectangle, Circle, Lasso (with modifier support)
 
+### Phase 4: Layer Management (✅ Complete)
+- **LayersSection**: Full layer management with search, sorting, visibility toggle
+- **LayerItem**: Individual layer display with actions (👁️ visibility, 📋 list, 📊 stats, 🎨 style, ✏️ rename, 🗑️ delete)
+- **EntityList Panel**: Filterable entity list with checkbox selection, sorting, batch actions
+- **StatsPanel**: Layer statistics (entity count, geometry types distribution, bounding box, extent)
+- **Geometry Type Detection**: Automatic detection and icons for POINT, LINESTRING, POLYGON, MULTI*
+- **Layer Visibility**: Toggle individual layers on/off
+- **Active Layer Context**: Selection and operations respect active layer
+
 ## Demo Page Features
 
 The demo page (`src/components/DemoPage.js`) showcases:
@@ -86,13 +95,20 @@ The demo page (`src/components/DemoPage.js`) showcases:
    - Action buttons: Zoom, Style, Edit, Copy, Export, Delete
    - Selection info in menu sidebar
 
-## Next Steps
+6. **Layer Management (Phase 4)**
+   - LayersSection in menu with search and sorting
+   - Layer visibility toggles (eye icon)
+   - Click layer to set as active
+   - Hover layer for action buttons
+   - Click "📋 Liste" to open EntityList panel
+   - Click "📊 Stats" to open StatsPanel
+   - Click "🎨 Style" to open style editor
+   - Click "✏️" to rename layer (inline editing)
+   - Click "🗑️" to delete layer (with confirmation)
+   - EntityList panel: search, filter by geometry type, sort, checkbox selection, batch actions
+   - StatsPanel: entity count, geometry type distribution with bars, bounding box
 
-### Phase 4: Layer Management (Pending)
-- `components/menu/LayersSection.js`
-- `components/menu/LayerItem.js`
-- `components/panels/EntityList.js`
-- `components/panels/StatsPanel.js`
+## Next Steps
 
 ### Phase 5: Style Editor (Pending)
 - `components/panels/StyleEditor.js`
@@ -103,14 +119,14 @@ The demo page (`src/components/DemoPage.js`) showcases:
 ```
 src/
 ├── components/
-│   ├── ui/           ✅ Phase 1 (7 components)
-│   ├── layout/       ✅ Phase 2 (3 components)
-│   ├── map/          ✅ Phase 3 (2 components)
-│   ├── menu/         ⏳ Phase 4
-│   ├── panels/       ⏳ Phase 5
-│   └── DemoPage.js   ✅ Test page (updated for Phase 3)
-├── constants/        ✅ Phase 1 (colors, styles)
-├── hooks/            ✅ Phase 3 (useMapSelection)
+│   ├── ui/           ✅ Phase 1 (7 components: Button, Input, ColorPicker, Slider, Checkbox, Select, Modal)
+│   ├── layout/       ✅ Phase 2 (3 components: Navbar, MainMenu+MenuSection, AdjacentPanel)
+│   ├── map/          ✅ Phase 3 (2 components: SelectionTools, SelectionActionsBar)
+│   ├── menu/         ✅ Phase 4 (2 components: LayersSection, LayerItem)
+│   ├── panels/       ✅ Phase 4 (2 components: EntityList, StatsPanel)
+│   └── DemoPage.js   ✅ Test page (updated for Phases 1-4)
+├── constants/        ✅ Phase 1 (colors.js, styles.js)
+├── hooks/            ✅ Phase 3 (useMapSelection.js)
 └── utils/            ⏳ Future phases
 ```
 

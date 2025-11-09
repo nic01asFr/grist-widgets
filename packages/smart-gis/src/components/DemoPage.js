@@ -1,22 +1,28 @@
 /**
  * DemoPage Component
- * Test page for Phase 1, 2 & 3 components
+ * Test page for Phase 1, 2, 3 & 4 components
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button, Input, ColorPicker, Slider, Checkbox, Select, Modal } from './ui';
 import { Navbar, MainMenu, MenuSection, MenuDivider, AdjacentPanel } from './layout';
 import { SelectionTools, SelectionActionsBar } from './map';
+import { LayersSection } from './menu';
+import { EntityList, StatsPanel } from './panels';
 import useMapSelection from '../hooks/useMapSelection';
 import { colors } from '../constants/colors';
 
-// Mock data for testing selection
+// Mock data for testing (expanded with more entities)
 const mockRecords = [
   { id: 1, name: 'Point A', layer_name: 'Couche 1', geometry: 'POINT(2.3522 48.8566)' },
   { id: 2, name: 'Point B', layer_name: 'Couche 1', geometry: 'POINT(2.3540 48.8580)' },
-  { id: 3, name: 'Zone C', layer_name: 'Couche 2', geometry: 'POLYGON((2.35 48.85, 2.36 48.85, 2.36 48.86, 2.35 48.86, 2.35 48.85))' },
-  { id: 4, name: 'Route D', layer_name: 'Couche 2', geometry: 'LINESTRING(2.35 48.85, 2.36 48.86)' },
-  { id: 5, name: 'Point E', layer_name: 'Couche 3', geometry: 'POINT(2.3500 48.8550)' },
+  { id: 3, name: 'Point C', layer_name: 'Couche 1', geometry: 'POINT(2.3510 48.8570)' },
+  { id: 4, name: 'Zone Alpha', layer_name: 'Couche 2', geometry: 'POLYGON((2.35 48.85, 2.36 48.85, 2.36 48.86, 2.35 48.86, 2.35 48.85))' },
+  { id: 5, name: 'Zone Beta', layer_name: 'Couche 2', geometry: 'POLYGON((2.36 48.86, 2.37 48.86, 2.37 48.87, 2.36 48.87, 2.36 48.86))' },
+  { id: 6, name: 'Route Nord', layer_name: 'Couche 2', geometry: 'LINESTRING(2.35 48.85, 2.36 48.86)' },
+  { id: 7, name: 'Point Central', layer_name: 'Couche 3', geometry: 'POINT(2.3500 48.8550)' },
+  { id: 8, name: 'Route Sud', layer_name: 'Couche 3', geometry: 'LINESTRING(2.34 48.84, 2.35 48.85)' },
+  { id: 9, name: 'MultiPoint Test', layer_name: 'Couche 3', geometry: 'MULTIPOINT((2.35 48.85), (2.36 48.86))' },
 ];
 
 const DemoPage = () => {
@@ -48,6 +54,17 @@ const DemoPage = () => {
     selectAll,
     isSelected,
   } = useMapSelection(mockRecords, activeLayer);
+
+  // Layer management state (Phase 4)
+  const [visibleLayers, setVisibleLayers] = useState(new Set(['Couche 1', 'Couche 2', 'Couche 3']));
+  const [panelType, setPanelType] = useState(null); // null | 'entities' | 'stats' | 'style'
+  const [panelLayerName, setPanelLayerName] = useState(null);
+
+  // Get entities for active panel layer
+  const panelEntities = useMemo(() => {
+    if (!panelLayerName) return [];
+    return mockRecords.filter(r => r.layer_name === panelLayerName);
+  }, [panelLayerName]);
 
   // Selection actions
   const handleCopy = () => {
@@ -81,6 +98,50 @@ const DemoPage = () => {
   const handleEditGeometry = () => {
     console.log('Edit geometry:', selectedRecords[0]);
     alert(`Éditer la géométrie de "${selectedRecords[0]?.name}"`);
+  };
+
+  // Layer management handlers (Phase 4)
+  const handleLayerVisibilityToggle = (layerName) => {
+    setVisibleLayers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(layerName)) {
+        newSet.delete(layerName);
+      } else {
+        newSet.add(layerName);
+      }
+      return newSet;
+    });
+  };
+
+  const handleLayerEdit = (layerName) => {
+    console.log('Edit layer style:', layerName);
+    setPanelType('style');
+    setPanelLayerName(layerName);
+    setAdjacentPanelOpen(true);
+  };
+
+  const handleLayerDelete = (layerName) => {
+    console.log('Delete layer:', layerName);
+    alert(`Supprimer la couche "${layerName}" (démo)`);
+  };
+
+  const handleLayerRename = (oldName, newName) => {
+    console.log('Rename layer:', oldName, '->', newName);
+    alert(`Renommer "${oldName}" en "${newName}" (démo)`);
+  };
+
+  const handleEntityListOpen = (layerName) => {
+    console.log('Open entity list:', layerName);
+    setPanelType('entities');
+    setPanelLayerName(layerName);
+    setAdjacentPanelOpen(true);
+  };
+
+  const handleStatsOpen = (layerName) => {
+    console.log('Open stats:', layerName);
+    setPanelType('stats');
+    setPanelLayerName(layerName);
+    setAdjacentPanelOpen(true);
   };
 
   return (
@@ -173,6 +234,22 @@ const DemoPage = () => {
                 </Button>
               </div>
             </MenuSection>
+
+            <MenuDivider />
+
+            {/* Layers Section (Phase 4) */}
+            <LayersSection
+              records={mockRecords}
+              activeLayer={activeLayer}
+              onActiveLayerChange={setActiveLayer}
+              onLayerVisibilityToggle={handleLayerVisibilityToggle}
+              onLayerEdit={handleLayerEdit}
+              onLayerDelete={handleLayerDelete}
+              onLayerRename={handleLayerRename}
+              onEntityListOpen={handleEntityListOpen}
+              onStatsOpen={handleStatsOpen}
+              visibleLayers={visibleLayers}
+            />
 
             <MenuDivider />
 
@@ -290,49 +367,122 @@ const DemoPage = () => {
           </MainMenu>
         )}
 
-        {/* Adjacent Panel */}
+        {/* Adjacent Panel (Phase 4) */}
         {!fullscreen && (
           <AdjacentPanel
             isOpen={adjacentPanelOpen}
-            onClose={() => setAdjacentPanelOpen(false)}
-            title="🎨 Éditeur de Style"
+            onClose={() => {
+              setAdjacentPanelOpen(false);
+              setPanelType(null);
+              setPanelLayerName(null);
+            }}
+            title={
+              panelType === 'entities' ? `📋 Entités - ${panelLayerName}` :
+              panelType === 'stats' ? `📊 Statistiques - ${panelLayerName}` :
+              panelType === 'style' ? `🎨 Style - ${panelLayerName}` :
+              '🎨 Éditeur de Style'
+            }
           >
-            <div style={{ padding: '16px' }}>
-              <h4>Exemple de contenu</h4>
-              <p>Ce panneau apparaît à droite du menu principal.</p>
-
-              <ColorPicker
-                value={colorValue}
-                onChange={setColorValue}
-                label="Couleur"
+            {panelType === 'entities' ? (
+              <EntityList
+                entities={panelEntities}
+                layerName={panelLayerName}
+                selection={selection}
+                onEntityClick={(id) => {
+                  selectEntity(id);
+                  alert(`Clic sur entité #${id}`);
+                }}
+                onEntitySelect={selectEntity}
+                onZoomTo={(ids) => alert(`Recentrer sur: ${Array.isArray(ids) ? ids.join(', ') : ids}`)}
+                onEdit={(ids) => alert(`Éditer: ${Array.isArray(ids) ? ids.join(', ') : ids}`)}
+                onDelete={(ids) => {
+                  if (window.confirm(`Supprimer ${Array.isArray(ids) ? ids.length : 1} entité(s) ?`)) {
+                    alert('Entités supprimées (démo)');
+                  }
+                }}
+                onSelectAll={(ids) => selectByIds(ids)}
+                onClearSelection={clearSelection}
               />
+            ) : panelType === 'stats' ? (
+              <StatsPanel
+                layerName={panelLayerName}
+                entities={panelEntities}
+              />
+            ) : panelType === 'style' ? (
+              <div style={{ padding: '16px' }}>
+                <h4>Éditeur de Style</h4>
+                <p>Édition du style pour la couche: <strong>{panelLayerName}</strong></p>
 
-              <div style={{ marginTop: '16px' }}>
-                <Slider
-                  value={sliderValue}
-                  onChange={setSliderValue}
-                  label="Transparence"
-                  unit="%"
+                <ColorPicker
+                  value={colorValue}
+                  onChange={setColorValue}
+                  label="Couleur de remplissage"
                 />
-              </div>
 
-              <div style={{ marginTop: '16px' }}>
-                <Checkbox
-                  checked={checkboxValue}
-                  onChange={setCheckboxValue}
-                  label="Activer remplissage"
+                <div style={{ marginTop: '16px' }}>
+                  <Slider
+                    value={sliderValue}
+                    onChange={setSliderValue}
+                    label="Opacité"
+                    unit="%"
+                  />
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <Checkbox
+                    checked={checkboxValue}
+                    onChange={setCheckboxValue}
+                    label="Afficher les bordures"
+                  />
+                </div>
+
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                  <Button variant="secondary" onClick={() => setAdjacentPanelOpen(false)} fullWidth>
+                    Annuler
+                  </Button>
+                  <Button variant="primary" fullWidth>
+                    Appliquer
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '16px' }}>
+                <h4>Exemple de contenu</h4>
+                <p>Ce panneau apparaît à droite du menu principal.</p>
+
+                <ColorPicker
+                  value={colorValue}
+                  onChange={setColorValue}
+                  label="Couleur"
                 />
-              </div>
 
-              <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                <Button variant="secondary" onClick={() => setAdjacentPanelOpen(false)} fullWidth>
-                  Annuler
-                </Button>
-                <Button variant="primary" fullWidth>
-                  Appliquer
-                </Button>
+                <div style={{ marginTop: '16px' }}>
+                  <Slider
+                    value={sliderValue}
+                    onChange={setSliderValue}
+                    label="Transparence"
+                    unit="%"
+                  />
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <Checkbox
+                    checked={checkboxValue}
+                    onChange={setCheckboxValue}
+                    label="Activer remplissage"
+                  />
+                </div>
+
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                  <Button variant="secondary" onClick={() => setAdjacentPanelOpen(false)} fullWidth>
+                    Annuler
+                  </Button>
+                  <Button variant="primary" fullWidth>
+                    Appliquer
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </AdjacentPanel>
         )}
 
