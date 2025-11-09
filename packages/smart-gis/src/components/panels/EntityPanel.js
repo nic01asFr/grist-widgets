@@ -21,9 +21,15 @@ const EntityPanel = ({
   onDelete,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'style'
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
+
+  const tabs = [
+    { id: 'details', icon: '📋', label: 'Détails' },
+    { id: 'style', icon: '🎨', label: 'Style' },
+  ];
 
   if (selectedEntityIds.length === 0) {
     return null;
@@ -116,85 +122,175 @@ const EntityPanel = ({
         </div>
       )}
 
+      {/* Tab Headers */}
+      <div style={styles.tabHeader}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            style={{
+              ...styles.tab,
+              ...(activeTab === tab.id ? styles.tabActive : {}),
+            }}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <span style={styles.tabIcon}>{tab.icon}</span>
+            <span style={styles.tabLabel}>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Entity Content */}
       <div style={styles.content}>
-        {!isEditing ? (
-          /* View Mode */
+        {activeTab === 'details' && (
           <>
-            {/* Name */}
-            <div style={styles.field}>
-              <div style={styles.fieldLabel}>Nom</div>
-              <div style={styles.fieldValue}>{currentEntity.name || 'Sans nom'}</div>
-            </div>
-
-            {/* Layer */}
-            <div style={styles.field}>
-              <div style={styles.fieldLabel}>Couche</div>
-              <div style={styles.fieldValue}>{currentEntity.layer_name || 'Aucune'}</div>
-            </div>
-
-            {/* Description */}
-            <div style={styles.field}>
-              <div style={styles.fieldLabel}>Description</div>
-              <div style={styles.fieldValue}>
-                {currentEntity.description || 'Aucune description'}
-              </div>
-            </div>
-
-            {/* Geometry */}
-            {currentEntity.geometry && (
-              <div style={styles.field}>
-                <div style={styles.fieldLabel}>Géométrie</div>
-                <div style={{...styles.fieldValue, ...styles.geometryValue}}>
-                  {currentEntity.geometry.substring(0, 80)}
-                  {currentEntity.geometry.length > 80 && '...'}
+            {!isEditing ? (
+              /* View Mode - Details */
+              <>
+                {/* Name */}
+                <div style={styles.field}>
+                  <div style={styles.fieldLabel}>Nom</div>
+                  <div style={styles.fieldValue}>{currentEntity.name || 'Sans nom'}</div>
                 </div>
-              </div>
+
+                {/* Layer */}
+                <div style={styles.field}>
+                  <div style={styles.fieldLabel}>Couche</div>
+                  <div style={styles.fieldValue}>{currentEntity.layer_name || 'Aucune'}</div>
+                </div>
+
+                {/* Description */}
+                <div style={styles.field}>
+                  <div style={styles.fieldLabel}>Description</div>
+                  <div style={styles.fieldValue}>
+                    {currentEntity.description || 'Aucune description'}
+                  </div>
+                </div>
+
+                {/* Geometry */}
+                {currentEntity.geometry && (
+                  <div style={styles.field}>
+                    <div style={styles.fieldLabel}>Géométrie</div>
+                    <div style={{...styles.fieldValue, ...styles.geometryValue}}>
+                      {currentEntity.geometry.substring(0, 80)}
+                      {currentEntity.geometry.length > 80 && '...'}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Edit Mode - Details */
+              <>
+                {/* Name Input */}
+                <div style={styles.field}>
+                  <label style={styles.fieldLabel}>Nom</label>
+                  <input
+                    type="text"
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    style={styles.input}
+                    placeholder="Nom de l'entité"
+                  />
+                </div>
+
+                {/* Layer (read-only in edit) */}
+                <div style={styles.field}>
+                  <div style={styles.fieldLabel}>Couche</div>
+                  <div style={styles.fieldValue}>{currentEntity.layer_name || 'Aucune'}</div>
+                </div>
+
+                {/* Description Textarea */}
+                <div style={styles.field}>
+                  <label style={styles.fieldLabel}>Description</label>
+                  <textarea
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    style={styles.textarea}
+                    placeholder="Description de l'entité"
+                    rows={4}
+                  />
+                </div>
+
+                {/* Geometry (read-only) */}
+                {currentEntity.geometry && (
+                  <div style={styles.field}>
+                    <div style={styles.fieldLabel}>Géométrie</div>
+                    <div style={{...styles.fieldValue, ...styles.geometryValue}}>
+                      {currentEntity.geometry.substring(0, 80)}
+                      {currentEntity.geometry.length > 80 && '...'}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
-        ) : (
-          /* Edit Mode */
+        )}
+
+        {activeTab === 'style' && (
+          /* Style Tab */
           <>
-            {/* Name Input */}
             <div style={styles.field}>
-              <label style={styles.fieldLabel}>Nom</label>
-              <input
-                type="text"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                style={styles.input}
-                placeholder="Nom de l'entité"
-              />
-            </div>
-
-            {/* Layer (read-only in edit) */}
-            <div style={styles.field}>
-              <div style={styles.fieldLabel}>Couche</div>
-              <div style={styles.fieldValue}>{currentEntity.layer_name || 'Aucune'}</div>
-            </div>
-
-            {/* Description Textarea */}
-            <div style={styles.field}>
-              <label style={styles.fieldLabel}>Description</label>
-              <textarea
-                value={editedDescription}
-                onChange={(e) => setEditedDescription(e.target.value)}
-                style={styles.textarea}
-                placeholder="Description de l'entité"
-                rows={4}
-              />
-            </div>
-
-            {/* Geometry (read-only) */}
-            {currentEntity.geometry && (
-              <div style={styles.field}>
-                <div style={styles.fieldLabel}>Géométrie</div>
-                <div style={{...styles.fieldValue, ...styles.geometryValue}}>
-                  {currentEntity.geometry.substring(0, 80)}
-                  {currentEntity.geometry.length > 80 && '...'}
-                </div>
+              <div style={styles.fieldLabel}>Couleur</div>
+              <div style={styles.colorRow}>
+                <input
+                  type="color"
+                  defaultValue="#3388ff"
+                  style={styles.colorInput}
+                />
+                <span style={styles.colorValue}>#3388ff</span>
               </div>
-            )}
+            </div>
+
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Transparence</div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                defaultValue="70"
+                style={styles.rangeInput}
+              />
+              <span style={styles.rangeValue}>70%</span>
+            </div>
+
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Remplissage</div>
+              <div style={styles.colorRow}>
+                <input
+                  type="color"
+                  defaultValue="#3388ff"
+                  style={styles.colorInput}
+                />
+                <span style={styles.colorValue}>#3388ff</span>
+              </div>
+            </div>
+
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Bordure</div>
+              <div style={styles.colorRow}>
+                <input
+                  type="color"
+                  defaultValue="#3388ff"
+                  style={styles.colorInput}
+                />
+                <span style={styles.colorValue}>#3388ff</span>
+              </div>
+            </div>
+
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Épaisseur bordure</div>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                defaultValue="2"
+                style={styles.rangeInput}
+              />
+              <span style={styles.rangeValue}>2px</span>
+            </div>
+
+            <button style={styles.applyStyleButton}>
+              Appliquer le style
+            </button>
           </>
         )}
       </div>
@@ -341,6 +437,41 @@ const styles = {
     whiteSpace: 'nowrap',
     padding: `0 ${spacing.sm}`,
   },
+  tabHeader: {
+    display: 'flex',
+    borderBottom: `2px solid ${colors.border}`,
+    backgroundColor: colors.grayVeryLight,
+    flexShrink: 0,
+  },
+  tab: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    padding: `${spacing.xs} ${spacing.sm}`,
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderBottom: '3px solid transparent',
+    cursor: 'pointer',
+    transition: `all ${transitions.fast}`,
+    outline: 'none',
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    color: colors.textSecondary,
+  },
+  tabActive: {
+    backgroundColor: colors.white,
+    borderBottomColor: colors.primary,
+    color: colors.primary,
+    fontWeight: fontWeight.semibold,
+  },
+  tabIcon: {
+    fontSize: fontSize.sm,
+  },
+  tabLabel: {
+    fontSize: fontSize.xs,
+  },
   content: {
     flex: 1,
     overflow: 'auto',
@@ -424,6 +555,45 @@ const styles = {
     outline: 'none',
     resize: 'vertical',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    transition: `all ${transitions.fast}`,
+  },
+  colorRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  colorInput: {
+    width: '60px',
+    height: '36px',
+    border: `1px solid ${colors.border}`,
+    borderRadius: borderRadius.md,
+    cursor: 'pointer',
+  },
+  colorValue: {
+    fontSize: fontSize.sm,
+    fontFamily: 'monospace',
+    color: colors.textSecondary,
+  },
+  rangeInput: {
+    width: '100%',
+    marginBottom: spacing.xs,
+  },
+  rangeValue: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.textPrimary,
+  },
+  applyStyleButton: {
+    width: '100%',
+    padding: spacing.sm,
+    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    border: `1px solid ${colors.primary}`,
+    borderRadius: borderRadius.md,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.white,
+    cursor: 'pointer',
     transition: `all ${transitions.fast}`,
   },
 };

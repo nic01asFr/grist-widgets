@@ -207,7 +207,6 @@ const styles = {
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     backdropFilter: 'blur(10px)',
     transition: `all ${transitions.normal}`,
-    minWidth: '100px',
   },
   warning: {
     position: 'absolute',
