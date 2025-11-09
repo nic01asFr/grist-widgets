@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar, MainMenu, MenuDivider, AdjacentPanel } from './components/layout';
-import { SelectionTools, SelectionActionsBar, EditionToolbar } from './components/map';
+import { SelectionTools, SelectionActionsBar, EditionToolbar, MapView } from './components/map';
 import { LayersSection, ProjectSection, SearchSection } from './components/menu';
 import { EntityList, StatsPanel, StyleEditor } from './components/panels';
 import useMapSelection from './hooks/useMapSelection';
@@ -381,18 +381,13 @@ const SmartGISWidget = () => {
             onClear={clearSelection}
           />
 
-          {/* Map Placeholder - TODO: Replace with real Leaflet map */}
-          <div style={styles.mapPlaceholder}>
-            <h1>🗺️</h1>
-            <h2>Smart GIS Widget v3.0</h2>
-            <p>Carte Leaflet à intégrer ici</p>
-            <div style={{ marginTop: '20px', padding: '16px', backgroundColor: colors.white, borderRadius: '8px' }}>
-              <p><strong>Entités:</strong> {workspaceData.length}</p>
-              <p><strong>Couches:</strong> {visibleLayers.size}</p>
-              <p><strong>Couche active:</strong> {activeLayer || 'Aucune'}</p>
-              <p><strong>Sélection:</strong> {selection.length}</p>
-            </div>
-          </div>
+          {/* Leaflet Map */}
+          <MapView
+            records={workspaceData}
+            visibleLayers={visibleLayers}
+            selectedIds={selection}
+            onEntityClick={selectEntity}
+          />
 
           {/* Selection Actions Bar */}
           <SelectionActionsBar
@@ -446,10 +441,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  mapPlaceholder: {
-    textAlign: 'center',
-    color: colors.textSecondary,
   },
   loading: {
     display: 'flex',
