@@ -7,7 +7,7 @@ import React, { useState, useMemo } from 'react';
 import { Button, Input, ColorPicker, Slider, Checkbox, Select, Modal } from './ui';
 import { Navbar, MainMenu, MenuSection, MenuDivider, AdjacentPanel } from './layout';
 import { SelectionTools, SelectionActionsBar } from './map';
-import { LayersSection } from './menu';
+import { LayersSection, ProjectSection } from './menu';
 import { EntityList, StatsPanel, StyleEditor } from './panels';
 import useMapSelection from '../hooks/useMapSelection';
 import { colors } from '../constants/colors';
@@ -151,6 +151,40 @@ const DemoPage = () => {
     setAdjacentPanelOpen(false);
   };
 
+  // Project management state & handlers (Phase 7)
+  const [isDirty, setIsDirty] = useState(false);
+  const mockProjects = [
+    { name: 'Paris Centre', entityCount: 156, layerCount: 5 },
+    { name: 'Île-de-France', entityCount: 423, layerCount: 8 },
+    { name: 'Test Import', entityCount: 45, layerCount: 2 },
+  ];
+
+  const handleNewProject = (name) => {
+    console.log('New project:', name);
+    setProjectName(name);
+    setIsDirty(false);
+    alert(`Nouveau projet créé: "${name}"`);
+  };
+
+  const handleSaveProject = (name) => {
+    console.log('Save project:', name);
+    setProjectName(name);
+    setIsDirty(false);
+    alert(`Projet sauvegardé: "${name}"\nTable créée: GIS_Project_${name.replace(/\s+/g, '_')}`);
+  };
+
+  const handleLoadProject = (name) => {
+    console.log('Load project:', name);
+    setProjectName(name);
+    setIsDirty(false);
+    alert(`Projet chargé: "${name}"`);
+  };
+
+  const handleProjectExport = (format) => {
+    console.log('Export project:', format);
+    alert(`Export du projet en ${format.toUpperCase()}\nFichier: ${projectName}.${format}`);
+  };
+
   return (
     <div style={styles.container}>
       {/* Navbar */}
@@ -170,6 +204,20 @@ const DemoPage = () => {
             isOpen={menuOpen}
             onClose={() => setMenuOpen(false)}
           >
+            {/* Project Section (Phase 7) */}
+            <ProjectSection
+              projectName={projectName}
+              onProjectNameChange={setProjectName}
+              onNewProject={handleNewProject}
+              onSaveProject={handleSaveProject}
+              onLoadProject={handleLoadProject}
+              onExport={handleProjectExport}
+              projects={mockProjects}
+              isDirty={isDirty}
+            />
+
+            <MenuDivider />
+
             {/* Search Section */}
             <MenuSection title="🔍 Recherche" icon="🔍" defaultExpanded={true}>
               <Input
