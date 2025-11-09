@@ -5,4 +5,5 @@
 
 export { default as Navbar } from './Navbar';
 export { default as MainMenu, MenuSection, MenuDivider } from './MainMenu';
+export { default as TabbedMenu } from './TabbedMenu';
 export { default as AdjacentPanel } from './AdjacentPanel';

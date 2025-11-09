@@ -3,14 +3,14 @@
  * Smart GIS Widget v3.0
  *
  * Displays and manages all layers in the project
+ * Redesigned with bulk actions, multi-select, and compact layout
  */
 
 import React, { useState, useMemo } from 'react';
-import { MenuSection } from '../layout';
 import LayerItem from './LayerItem';
-import { Button, Input } from '../ui';
+import { Input } from '../ui';
 import { colors } from '../../constants/colors';
-import { spacing, fontSize, fontWeight } from '../../constants/styles';
+import { spacing, fontSize, fontWeight, borderRadius, transitions } from '../../constants/styles';
 
 const LayersSection = ({
   records = [],
@@ -26,6 +26,7 @@ const LayersSection = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name'); // name | count | recent
+  const [selectedLayers, setSelectedLayers] = useState(new Set());
 
   // Group records by layer
   const layerGroups = useMemo(() => {
@@ -86,92 +87,175 @@ const LayersSection = ({
   const totalLayers = layerGroups.length;
   const visibleCount = Array.from(visibleLayers).length;
 
+  // Multi-select handlers
+  const handleToggleLayerSelection = (layerName) => {
+    setSelectedLayers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(layerName)) {
+        newSet.delete(layerName);
+      } else {
+        newSet.add(layerName);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedLayers(new Set(filteredLayers.map(l => l.name)));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedLayers(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLayers.size === 0) return;
+    if (!window.confirm(`Supprimer ${selectedLayers.size} couche(s) sélectionnée(s) ?`)) return;
+
+    for (const layerName of selectedLayers) {
+      await onLayerDelete?.(layerName);
+    }
+    setSelectedLayers(new Set());
+  };
+
+  const handleBulkVisibility = (visible) => {
+    for (const layerName of selectedLayers) {
+      const isCurrentlyVisible = visibleLayers.has(layerName);
+      if (visible !== isCurrentlyVisible) {
+        onLayerVisibilityToggle?.(layerName);
+      }
+    }
+  };
+
   return (
-    <MenuSection title="📍 Couches" icon="📍" defaultExpanded={true}>
-      <div style={styles.container}>
-        {/* Search & Stats */}
-        <div style={styles.header}>
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher une couche..."
-            icon="🔎"
-            fullWidth
-          />
+    <div style={styles.container}>
+      {/* Search Bar (Fixed) */}
+      <div style={styles.searchBar}>
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Rechercher une couche..."
+          icon="🔎"
+          fullWidth
+        />
+      </div>
 
-          <div style={styles.stats}>
-            <span style={styles.statItem}>
-              {totalLayers} couche{totalLayers > 1 ? 's' : ''}
-            </span>
-            <span style={styles.statSeparator}>•</span>
-            <span style={styles.statItem}>
-              {totalEntities} entité{totalEntities > 1 ? 's' : ''}
-            </span>
-            <span style={styles.statSeparator}>•</span>
-            <span style={styles.statItem}>
-              {visibleCount} visible{visibleCount > 1 ? 's' : ''}
-            </span>
-          </div>
+      {/* Compact Stats & Sort (Fixed, Single Line) */}
+      <div style={styles.statsAndSort}>
+        <div style={styles.stats}>
+          <span style={styles.statItem}>{totalLayers} couches</span>
+          <span style={styles.statSeparator}>•</span>
+          <span style={styles.statItem}>{totalEntities} entités</span>
+          <span style={styles.statSeparator}>•</span>
+          <span style={styles.statItem}>{visibleCount} visibles</span>
         </div>
-
-        {/* Sort Options */}
-        <div style={styles.sortBar}>
-          <span style={styles.sortLabel}>Trier par:</span>
+        <div style={styles.sortButtons}>
           <button
             style={{ ...styles.sortButton, ...(sortBy === 'name' ? styles.sortButtonActive : {}) }}
             onClick={() => setSortBy('name')}
+            title="Trier par nom"
           >
-            Nom
+            A-Z
           </button>
           <button
             style={{ ...styles.sortButton, ...(sortBy === 'count' ? styles.sortButtonActive : {}) }}
             onClick={() => setSortBy('count')}
+            title="Trier par nombre"
           >
-            Nombre
+            #
           </button>
         </div>
+      </div>
 
-        {/* Layers List */}
-        <div style={styles.layersList}>
-          {filteredLayers.length === 0 ? (
-            <div style={styles.emptyState}>
-              <p style={styles.emptyIcon}>📍</p>
-              <p style={styles.emptyText}>
-                {searchQuery ? 'Aucune couche trouvée' : 'Aucune couche'}
-              </p>
+      {/* Bulk Actions Toolbar (Fixed, shown when layers selected) */}
+      {selectedLayers.size > 0 && (
+        <div style={styles.bulkToolbar}>
+          <div style={styles.bulkInfo}>
+            <span style={styles.bulkCount}>{selectedLayers.size} sélectionnée(s)</span>
+            <button style={styles.bulkClearButton} onClick={handleDeselectAll}>
+              ✕
+            </button>
+          </div>
+          <div style={styles.bulkActions}>
+            <button
+              style={styles.bulkActionButton}
+              onClick={() => handleBulkVisibility(true)}
+              title="Afficher toutes"
+            >
+              👁️
+            </button>
+            <button
+              style={styles.bulkActionButton}
+              onClick={() => handleBulkVisibility(false)}
+              title="Masquer toutes"
+            >
+              🙈
+            </button>
+            <button
+              style={{ ...styles.bulkActionButton, ...styles.bulkActionButtonDanger }}
+              onClick={handleBulkDelete}
+              title="Supprimer"
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Layers List (Scrollable Only) */}
+      <div style={styles.layersList}>
+        {filteredLayers.length === 0 ? (
+          <div style={styles.emptyState}>
+            <p style={styles.emptyIcon}>📍</p>
+            <p style={styles.emptyText}>
+              {searchQuery ? 'Aucune couche trouvée' : 'Aucune couche'}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Select All Checkbox */}
+            <div style={styles.selectAllRow}>
+              <input
+                type="checkbox"
+                checked={selectedLayers.size === filteredLayers.length && filteredLayers.length > 0}
+                onChange={(e) => e.target.checked ? handleSelectAll() : handleDeselectAll()}
+                style={styles.checkbox}
+              />
+              <span style={styles.selectAllText}>
+                Tout sélectionner
+              </span>
             </div>
-          ) : (
-            filteredLayers.map(layer => (
+
+            {/* Layer Items */}
+            {filteredLayers.map(layer => (
               <LayerItem
                 key={layer.name}
                 layer={layer}
                 isActive={activeLayer === layer.name}
                 isVisible={visibleLayers.has(layer.name)}
+                isSelected={selectedLayers.has(layer.name)}
                 onActivate={() => onActiveLayerChange?.(layer.name)}
                 onToggleVisibility={() => onLayerVisibilityToggle?.(layer.name)}
-                onEdit={() => onLayerEdit?.(layer.name)}
-                onDelete={() => onLayerDelete?.(layer.name)}
+                onToggleSelection={() => handleToggleLayerSelection(layer.name)}
                 onRename={(newName) => onLayerRename?.(layer.name, newName)}
                 onShowEntities={() => onEntityListOpen?.(layer.name)}
-                onShowStats={() => onStatsOpen?.(layer.name)}
               />
-            ))
-          )}
-        </div>
-
-        {/* Actions */}
-        <div style={styles.actions}>
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={() => onActiveLayerChange?.(null)}
-            fullWidth
-          >
-            Désélectionner la couche
-          </Button>
-        </div>
+            ))}
+          </>
+        )}
       </div>
-    </MenuSection>
+
+      {/* Bottom Actions (Fixed) */}
+      <div style={styles.bottomActions}>
+        <button
+          style={styles.bottomButton}
+          onClick={() => onActiveLayerChange?.(null)}
+          disabled={!activeLayer}
+        >
+          Désélectionner la couche
+        </button>
+      </div>
+    </div>
   );
 };
 
@@ -189,18 +273,26 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.md,
+    height: '100%',
+    overflow: 'hidden',
   },
-  header: {
+  searchBar: {
+    padding: spacing.md,
+    paddingBottom: spacing.sm,
+    flexShrink: 0,
+  },
+  statsAndSort: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: `0 ${spacing.md} ${spacing.sm} ${spacing.md}`,
+    flexShrink: 0,
   },
   stats: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing.xs,
-    fontSize: fontSize.xs,
+    fontSize: '11px',
     color: colors.textSecondary,
   },
   statItem: {
@@ -209,27 +301,24 @@ const styles = {
   statSeparator: {
     color: colors.border,
   },
-  sortBar: {
+  sortButtons: {
     display: 'flex',
-    alignItems: 'center',
-    gap: spacing.xs,
-    padding: `${spacing.xs} 0`,
-  },
-  sortLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.medium,
-    color: colors.textSecondary,
+    gap: '4px',
   },
   sortButton: {
-    padding: `${spacing.xs} ${spacing.sm}`,
+    width: '32px',
+    height: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'transparent',
     border: `1px solid ${colors.border}`,
-    borderRadius: '4px',
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.medium,
+    borderRadius: borderRadius.sm,
+    fontSize: '11px',
+    fontWeight: fontWeight.bold,
     color: colors.textSecondary,
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: `all ${transitions.fast}`,
     outline: 'none',
   },
   sortButtonActive: {
@@ -237,13 +326,88 @@ const styles = {
     borderColor: colors.primary,
     color: colors.primary,
   },
-  layersList: {
+  bulkToolbar: {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.xs,
-    maxHeight: '400px',
+    padding: spacing.sm,
+    margin: `0 ${spacing.md} ${spacing.sm} ${spacing.md}`,
+    backgroundColor: colors.primaryVeryLight,
+    border: `1px solid ${colors.primary}`,
+    borderRadius: borderRadius.md,
+    flexShrink: 0,
+  },
+  bulkInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bulkCount: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.primary,
+  },
+  bulkClearButton: {
+    width: '20px',
+    height: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderRadius: borderRadius.sm,
+    fontSize: '12px',
+    color: colors.textSecondary,
+    cursor: 'pointer',
+    transition: `all ${transitions.fast}`,
+  },
+  bulkActions: {
+    display: 'flex',
+    gap: spacing.xs,
+  },
+  bulkActionButton: {
+    flex: 1,
+    padding: spacing.xs,
+    backgroundColor: colors.white,
+    border: `1px solid ${colors.border}`,
+    borderRadius: borderRadius.sm,
+    fontSize: fontSize.md,
+    cursor: 'pointer',
+    transition: `all ${transitions.fast}`,
+  },
+  bulkActionButtonDanger: {
+    borderColor: colors.danger,
+    color: colors.danger,
+  },
+  layersList: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.xs,
+    padding: `0 ${spacing.md}`,
     overflowY: 'auto',
-    padding: `${spacing.xs} 0`,
+    overflowX: 'hidden',
+  },
+  selectAllRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.grayVeryLight,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.xs,
+  },
+  checkbox: {
+    width: '16px',
+    height: '16px',
+    cursor: 'pointer',
+  },
+  selectAllText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
   },
   emptyState: {
     padding: spacing.xl,
@@ -259,12 +423,24 @@ const styles = {
     color: colors.textSecondary,
     margin: 0,
   },
-  actions: {
+  bottomActions: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.xs,
-    paddingTop: spacing.xs,
+    padding: spacing.md,
+    paddingTop: spacing.sm,
     borderTop: `1px solid ${colors.border}`,
+    flexShrink: 0,
+  },
+  bottomButton: {
+    flex: 1,
+    padding: spacing.sm,
+    backgroundColor: colors.grayLight,
+    border: `1px solid ${colors.border}`,
+    borderRadius: borderRadius.md,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.textPrimary,
+    cursor: 'pointer',
+    transition: `all ${transitions.fast}`,
   },
 };
 
