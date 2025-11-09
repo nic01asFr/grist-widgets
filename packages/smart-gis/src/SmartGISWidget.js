@@ -65,13 +65,14 @@ const SmartGISWidget = () => {
         });
 
         // @ts-ignore
-        const doc = window.grist.docApi;
+        const grist = window.grist;
+        const doc = grist.docApi;
 
         setDocApi(doc);
 
         // Setup system tables
         console.log('🏗️ Setting up system infrastructure...');
-        const setupResult = await setupSystemInfrastructure(doc);
+        const setupResult = await setupSystemInfrastructure(grist);
 
         if (setupResult.success) {
           console.log('✅ System ready');
