@@ -11,6 +11,7 @@ import { EntityPanel, AdjacentPanel } from './components/panels';
 import MenuContent from './components/layout/MenuContent';
 import useMapSelection from './hooks/useMapSelection';
 import { colors } from './constants/colors';
+import { calculateBounds, getGeometryCenter } from './utils/geometryUtils';
 
 // Import Grist API
 import { setupSystemInfrastructure } from './systemInfrastructure';
@@ -27,7 +28,7 @@ const SmartGISWidget = () => {
   const [isDirty, setIsDirty] = useState(false);
 
   // UI state
-  const [menuOpen, setMenuOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false); // Closed by default
   const [menuWidth, setMenuWidth] = useState(320);
   const [fullscreen, setFullscreen] = useState(false);
   const [entityPanelOpen, setEntityPanelOpen] = useState(false);
@@ -54,6 +55,8 @@ const SmartGISWidget = () => {
 
   // Map control state
   const [zoomCommand, setZoomCommand] = useState(null); // 'in', 'out', 'reset'
+  const [mapBoundsCommand, setMapBoundsCommand] = useState(null); // { bounds: [[lat, lng], [lat, lng]] }
+  const [mapCenterCommand, setMapCenterCommand] = useState(null); // { center: [lat, lng], zoom: number }
 
   // Initialize Grist connection
   useEffect(() => {
@@ -157,6 +160,29 @@ const SmartGISWidget = () => {
     setIsDirty(true);
   };
 
+  // Map interaction handlers
+  const handleZoomToLayer = (layerName) => {
+    const layerEntities = workspaceData.filter(r => r.layer_name === layerName);
+    if (layerEntities.length === 0) return;
+
+    const geometries = layerEntities.map(e => e.geometry).filter(Boolean);
+    const bounds = calculateBounds(geometries);
+
+    if (bounds) {
+      setMapBoundsCommand({ bounds });
+    }
+  };
+
+  const handleCenterOnEntity = (entityId) => {
+    const entity = workspaceData.find(e => e.id === entityId);
+    if (!entity || !entity.geometry) return;
+
+    const center = getGeometryCenter(entity.geometry);
+    if (center) {
+      setMapCenterCommand({ center, zoom: 15, panOffset: 0.55 }); // 55% horizontal
+    }
+  };
+
   // Project management
   const handleNewProject = async (name) => {
     if (!docApi) return;
@@ -249,6 +275,8 @@ const SmartGISWidget = () => {
                   onEntityListOpen={(layerName) => {
                     // Open AdjacentPanel to show layer options and entities
                     setAdjacentPanelLayer(layerName);
+                    // Zoom to layer bounds
+                    handleZoomToLayer(layerName);
                   }}
                   visibleLayers={visibleLayers}
                 />
@@ -288,6 +316,7 @@ const SmartGISWidget = () => {
             onEntitySelect={(id) => {
               selectEntity(id);
               setEntityPanelOpen(true);
+              handleCenterOnEntity(id);
             }}
             onClose={() => setAdjacentPanelLayer(null)}
             initialWidth={adjacentPanelWidth}
@@ -341,6 +370,19 @@ const SmartGISWidget = () => {
               entities={workspaceData}
               selectedEntityIds={selection}
               onClose={() => setEntityPanelOpen(false)}
+              onPrevious={() => {
+                // Center on the new current entity after navigation
+                if (selection.length > 0) {
+                  // EntityPanel handles index internally, we just center on first selection
+                  handleCenterOnEntity(selection[0]);
+                }
+              }}
+              onNext={() => {
+                // Center on the new current entity after navigation
+                if (selection.length > 0) {
+                  handleCenterOnEntity(selection[0]);
+                }
+              }}
               onSave={async (data) => {
                 if (!docApi) return;
                 await updateInWorkspace(docApi, data.id, {
@@ -367,9 +409,14 @@ const SmartGISWidget = () => {
             selectedIds={selection}
             zoomCommand={zoomCommand}
             onZoomExecuted={() => setZoomCommand(null)}
+            boundsCommand={mapBoundsCommand}
+            onBoundsExecuted={() => setMapBoundsCommand(null)}
+            centerCommand={mapCenterCommand}
+            onCenterExecuted={() => setMapCenterCommand(null)}
             onEntityClick={(id) => {
               selectEntity(id);
               setEntityPanelOpen(true);
+              handleCenterOnEntity(id);
             }}
           />
         </div>

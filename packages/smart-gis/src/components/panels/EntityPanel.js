@@ -346,9 +346,9 @@ const EntityPanel = ({
 const styles = {
   container: {
     position: 'absolute',
-    top: '70px', // Below EditionToolbar
+    bottom: '12px', // Start from bottom
     right: '1%', // RIGHT side like EditionToolbar
-    bottom: '12px',
+    maxHeight: 'calc(100% - 150px)', // Stop before EditionToolbar (leave space at top)
     width: '300px',
     backgroundColor: colors.white,
     border: `1px solid ${colors.border}`,
