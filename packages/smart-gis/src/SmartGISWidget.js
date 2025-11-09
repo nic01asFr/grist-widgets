@@ -1,13 +1,14 @@
 /**
  * SmartGISWidget - Main Component v3.0
- * Complete rewrite with new UX architecture
+ * Complete UX refactoring with tabbed menu
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Navbar, MainMenu, MenuDivider, AdjacentPanel } from './components/layout';
-import { SelectionTools, SelectionActionsBar, EditionToolbar, MapView } from './components/map';
+import React, { useState, useEffect } from 'react';
+import { Navbar, TabbedMenu } from './components/layout';
+import { SelectionTools, SelectionActionsBar, EditionToolbar, MapView, ZoomControls } from './components/map';
 import { LayersSection, ProjectSection, SearchSection } from './components/menu';
-import { EntityList, StatsPanel, StyleEditor } from './components/panels';
+import { EntityPanel } from './components/panels';
+import MenuContent from './components/layout/MenuContent';
 import useMapSelection from './hooks/useMapSelection';
 import { colors } from './constants/colors';
 
@@ -27,10 +28,9 @@ const SmartGISWidget = () => {
 
   // UI state
   const [menuOpen, setMenuOpen] = useState(true);
+  const [menuWidth, setMenuWidth] = useState(320);
   const [fullscreen, setFullscreen] = useState(false);
-  const [adjacentPanelOpen, setAdjacentPanelOpen] = useState(false);
-  const [panelType, setPanelType] = useState(null); // 'entities' | 'stats' | 'style'
-  const [panelLayerName, setPanelLayerName] = useState(null);
+  const [entityPanelOpen, setEntityPanelOpen] = useState(false);
 
   // Layer state
   const [activeLayer, setActiveLayer] = useState(null);
@@ -130,12 +130,6 @@ const SmartGISWidget = () => {
     });
   };
 
-  const handleLayerEdit = (layerName) => {
-    setPanelType('style');
-    setPanelLayerName(layerName);
-    setAdjacentPanelOpen(true);
-  };
-
   const handleLayerDelete = async (layerName) => {
     if (!docApi) return;
 
@@ -157,26 +151,6 @@ const SmartGISWidget = () => {
       await updateInWorkspace(docApi, entity.id, { layer_name: newName });
     }
     await refreshWorkspace();
-    setIsDirty(true);
-  };
-
-  const handleEntityListOpen = (layerName) => {
-    setPanelType('entities');
-    setPanelLayerName(layerName);
-    setAdjacentPanelOpen(true);
-  };
-
-  const handleStatsOpen = (layerName) => {
-    setPanelType('stats');
-    setPanelLayerName(layerName);
-    setAdjacentPanelOpen(true);
-  };
-
-  // Style editor
-  const handleStyleApply = async (style) => {
-    console.log('Apply style:', style, 'to', panelLayerName);
-    // TODO: Save style to GIS_Styles table
-    setAdjacentPanelOpen(false);
     setIsDirty(true);
   };
 
@@ -229,12 +203,6 @@ const SmartGISWidget = () => {
     setIsEditing(false);
   };
 
-  // Get entities for panel
-  const panelEntities = useMemo(() => {
-    if (!panelLayerName) return [];
-    return workspaceData.filter(r => r.layer_name === panelLayerName);
-  }, [panelLayerName, workspaceData]);
-
   // Loading state
   if (!isReady) {
     return (
@@ -258,108 +226,66 @@ const SmartGISWidget = () => {
 
       {/* Main content */}
       <div style={styles.content}>
-        {/* Main Menu */}
-        {!fullscreen && (
-          <MainMenu isOpen={menuOpen} onClose={() => setMenuOpen(false)}>
-            {/* Project Section */}
-            <ProjectSection
-              projectName={projectName}
-              onProjectNameChange={setProjectName}
-              onNewProject={handleNewProject}
-              onSaveProject={handleSaveProject}
-              onLoadProject={handleLoadProject}
-              onExport={handleProjectExport}
-              projects={[]} // TODO: Load from Grist
-              isDirty={isDirty}
-            />
-
-            <MenuDivider />
-
-            {/* Search Section */}
-            <SearchSection
-              records={workspaceData}
-              onEntitySelect={selectEntity}
-              onZoomTo={(ids) => {
-                // TODO: Zoom map to bounds
-                console.log('Zoom to:', ids);
-              }}
-              onSemanticSearch={(query) => {
-                // TODO: Call VECTOR_SEARCH
-                console.log('Semantic search:', query);
-              }}
-            />
-
-            <MenuDivider />
-
-            {/* Layers Section */}
-            <LayersSection
-              records={workspaceData}
-              activeLayer={activeLayer}
-              onActiveLayerChange={setActiveLayer}
-              onLayerVisibilityToggle={handleLayerVisibilityToggle}
-              onLayerEdit={handleLayerEdit}
-              onLayerDelete={handleLayerDelete}
-              onLayerRename={handleLayerRename}
-              onEntityListOpen={handleEntityListOpen}
-              onStatsOpen={handleStatsOpen}
-              visibleLayers={visibleLayers}
-            />
-          </MainMenu>
-        )}
-
-        {/* Adjacent Panel */}
-        {!fullscreen && (
-          <AdjacentPanel
-            isOpen={adjacentPanelOpen}
-            onClose={() => {
-              setAdjacentPanelOpen(false);
-              setPanelType(null);
-              setPanelLayerName(null);
-            }}
-            title={
-              panelType === 'entities' ? `📋 Entités - ${panelLayerName}` :
-              panelType === 'stats' ? `📊 Statistiques - ${panelLayerName}` :
-              `🎨 Style - ${panelLayerName}`
-            }
+        {/* Tabbed Menu */}
+        {!fullscreen && menuOpen && (
+          <TabbedMenu
+            isOpen={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            initialWidth={menuWidth}
+            onWidthChange={setMenuWidth}
           >
-            {panelType === 'entities' ? (
-              <EntityList
-                entities={panelEntities}
-                layerName={panelLayerName}
-                selection={selection}
-                onEntityClick={selectEntity}
-                onEntitySelect={selectEntity}
-                onZoomTo={(ids) => console.log('Zoom to:', ids)}
-                onEdit={(ids) => console.log('Edit:', ids)}
-                onDelete={async (ids) => {
-                  if (!docApi) return;
-                  const idList = Array.isArray(ids) ? ids : [ids];
-                  if (window.confirm(`Supprimer ${idList.length} entité(s) ?`)) {
-                    for (const id of idList) {
-                      await deleteFromWorkspace(docApi, id);
-                    }
-                    await refreshWorkspace();
-                    setIsDirty(true);
-                  }
-                }}
-                onSelectAll={selectByIds}
-                onClearSelection={clearSelection}
-              />
-            ) : panelType === 'stats' ? (
-              <StatsPanel layerName={panelLayerName} entities={panelEntities} />
-            ) : (
-              <StyleEditor
-                targetName={panelLayerName}
-                targetType="layer"
-                onApply={handleStyleApply}
-                onCancel={() => setAdjacentPanelOpen(false)}
-              />
-            )}
-          </AdjacentPanel>
+            <MenuContent
+              layersContent={
+                <LayersSection
+                  records={workspaceData}
+                  activeLayer={activeLayer}
+                  onActiveLayerChange={setActiveLayer}
+                  onLayerVisibilityToggle={handleLayerVisibilityToggle}
+                  onLayerDelete={handleLayerDelete}
+                  onLayerRename={handleLayerRename}
+                  onEntityListOpen={(layerName) => {
+                    const layerEntities = workspaceData.filter(r => r.layer_name === layerName);
+                    selectByIds(layerEntities.map(r => r.id));
+                    setEntityPanelOpen(true);
+                  }}
+                  visibleLayers={visibleLayers}
+                />
+              }
+              projectContent={
+                <ProjectSection
+                  onNewProject={handleNewProject}
+                  onSaveProject={handleSaveProject}
+                  onLoadProject={handleLoadProject}
+                  onExport={handleProjectExport}
+                  projects={[]}
+                  isDirty={isDirty}
+                />
+              }
+              searchContent={
+                <SearchSection
+                  records={workspaceData}
+                  onEntitySelect={(id) => {
+                    selectEntity(id);
+                    setEntityPanelOpen(true);
+                  }}
+                  onZoomTo={(ids) => console.log('Zoom to:', ids)}
+                  onSemanticSearch={(query) => console.log('Semantic search:', query)}
+                />
+              }
+            />
+          </TabbedMenu>
         )}
 
         {/* Map area */}
         <div style={styles.mapArea}>
+          {/* Zoom Controls */}
+          <ZoomControls
+            menuWidth={(menuOpen && !fullscreen) ? menuWidth : 0}
+            onZoomIn={() => console.log('Zoom in')}
+            onZoomOut={() => console.log('Zoom out')}
+            onResetZoom={() => console.log('Reset zoom')}
+          />
+
           {/* Edition Toolbar */}
           <EditionToolbar
             editionMode={editionMode}
@@ -381,12 +307,25 @@ const SmartGISWidget = () => {
             onClear={clearSelection}
           />
 
+          {/* Entity Panel */}
+          {entityPanelOpen && selection.length > 0 && (
+            <EntityPanel
+              entities={workspaceData}
+              selectedEntityIds={selection}
+              onClose={() => setEntityPanelOpen(false)}
+              onEdit={(id) => console.log('Edit entity:', id)}
+            />
+          )}
+
           {/* Leaflet Map */}
           <MapView
             records={workspaceData}
             visibleLayers={visibleLayers}
             selectedIds={selection}
-            onEntityClick={selectEntity}
+            onEntityClick={(id) => {
+              selectEntity(id);
+              setEntityPanelOpen(true);
+            }}
           />
 
           {/* Selection Actions Bar */}
@@ -406,10 +345,7 @@ const SmartGISWidget = () => {
               }
             }}
             onExport={() => console.log('Export:', selection)}
-            onEditStyle={() => {
-              setPanelType('style');
-              setAdjacentPanelOpen(true);
-            }}
+            onEditStyle={() => console.log('Edit style')}
             onZoomTo={() => console.log('Zoom to:', selection)}
             onEditGeometry={() => console.log('Edit geometry:', selection[0])}
             onClear={clearSelection}
@@ -431,15 +367,10 @@ const styles = {
   content: {
     flex: 1,
     display: 'flex',
-    position: 'relative',
     overflow: 'hidden',
   },
   mapArea: {
     flex: 1,
-    backgroundColor: colors.grayVeryLight,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     position: 'relative',
   },
   loading: {

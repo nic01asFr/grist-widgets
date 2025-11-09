@@ -2,7 +2,8 @@
  * LayerItem Component
  * Smart GIS Widget v3.0
  *
- * Individual layer display with actions
+ * Compact layer display with checkbox and essential info
+ * Redesigned: No hover actions, simple click to activate, double-click to show entities
  */
 
 import React, { useState } from 'react';
@@ -14,17 +15,15 @@ const LayerItem = ({
   layer,
   isActive = false,
   isVisible = true,
+  isSelected = false,
   onActivate,
   onToggleVisibility,
-  onEdit,
-  onDelete,
+  onToggleSelection,
   onRename,
   onShowEntities,
-  onShowStats,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(layer.name);
-  const [showActions, setShowActions] = useState(false);
 
   const handleRename = () => {
     if (editName.trim() && editName !== layer.name) {
@@ -39,6 +38,23 @@ const LayerItem = ({
     } else if (e.key === 'Escape') {
       setEditName(layer.name);
       setIsEditing(false);
+    }
+  };
+
+  const handleDoubleClick = (e) => {
+    e.stopPropagation();
+    if (!isEditing) {
+      onShowEntities?.();
+    }
+  };
+
+  const handleClick = (e) => {
+    // If clicking checkbox area, don't activate
+    const target = e.target;
+    if (target.type === 'checkbox') return;
+
+    if (!isEditing) {
+      onActivate?.();
     }
   };
 
@@ -65,14 +81,25 @@ const LayerItem = ({
       style={{
         ...styles.container,
         ...(isActive ? styles.containerActive : {}),
-        ...(showActions ? styles.containerHover : {}),
+        ...(isSelected ? styles.containerSelected : {}),
       }}
-      onClick={onActivate}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      title="Double-clic pour voir les entités"
     >
-      {/* Main Row */}
-      <div style={styles.mainRow}>
+      <div style={styles.row}>
+        {/* Checkbox for multi-select */}
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => {
+            e.stopPropagation();
+            onToggleSelection?.();
+          }}
+          style={styles.checkbox}
+          onClick={(e) => e.stopPropagation()}
+        />
+
         {/* Visibility Toggle */}
         <button
           style={styles.visibilityButton}
@@ -106,7 +133,7 @@ const LayerItem = ({
             <span style={styles.layerName}>
               {layer.name}
             </span>
-            {isActive && <span style={styles.activeBadge}>ACTIF</span>}
+            {isActive && <span style={styles.activeBadge}>✓</span>}
           </div>
         )}
 
@@ -115,64 +142,6 @@ const LayerItem = ({
           <span style={styles.countText}>{layer.count}</span>
         </div>
       </div>
-
-      {/* Actions Row (shown on hover or active) */}
-      {(showActions || isActive) && !isEditing && (
-        <div style={styles.actionsRow}>
-          <button
-            style={styles.actionButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              onShowEntities?.();
-            }}
-            title="Voir les entités"
-          >
-            📋 Liste
-          </button>
-          <button
-            style={styles.actionButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              onShowStats?.();
-            }}
-            title="Voir les statistiques"
-          >
-            📊 Stats
-          </button>
-          <button
-            style={styles.actionButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit?.();
-            }}
-            title="Éditer le style"
-          >
-            🎨 Style
-          </button>
-          <button
-            style={styles.actionButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}
-            title="Renommer la couche"
-          >
-            ✏️
-          </button>
-          <button
-            style={{ ...styles.actionButton, ...styles.actionButtonDanger }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (window.confirm(`Supprimer la couche "${layer.name}" (${layer.count} entités) ?`)) {
-                onDelete?.();
-              }
-            }}
-            title="Supprimer la couche"
-          >
-            🗑️
-          </button>
-        </div>
-      )}
     </div>
   );
 };
@@ -180,47 +149,52 @@ const LayerItem = ({
 const styles = {
   container: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.xs,
-    padding: spacing.sm,
+    padding: `${spacing.xs} ${spacing.sm}`,
     backgroundColor: colors.white,
     border: `1px solid ${colors.border}`,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.sm,
     cursor: 'pointer',
     transition: `all ${transitions.fast}`,
   },
   containerActive: {
     backgroundColor: colors.primaryVeryLight,
     borderColor: colors.primary,
-    boxShadow: `0 0 0 2px ${colors.primaryLight}`,
   },
-  containerHover: {
-    borderColor: colors.primary,
-    transform: 'translateX(2px)',
+  containerSelected: {
+    backgroundColor: colors.grayVeryLight,
+    borderColor: colors.textSecondary,
   },
-  mainRow: {
+  row: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing.sm,
+    width: '100%',
+  },
+  checkbox: {
+    width: '16px',
+    height: '16px',
+    cursor: 'pointer',
+    flexShrink: 0,
   },
   visibilityButton: {
-    width: '24px',
-    height: '24px',
+    width: '20px',
+    height: '20px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
     border: 'none',
-    borderRadius: borderRadius.sm,
     cursor: 'pointer',
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     transition: `all ${transitions.fast}`,
     outline: 'none',
+    flexShrink: 0,
   },
   geometryIcon: {
-    fontSize: fontSize.md,
-    width: '20px',
+    fontSize: fontSize.sm,
+    width: '18px',
     textAlign: 'center',
+    flexShrink: 0,
   },
   nameContainer: {
     flex: 1,
@@ -238,13 +212,10 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   activeBadge: {
-    padding: `2px ${spacing.xs}`,
-    backgroundColor: colors.primary,
-    color: colors.white,
-    fontSize: '10px',
+    fontSize: fontSize.sm,
+    color: colors.primary,
     fontWeight: fontWeight.bold,
-    borderRadius: borderRadius.sm,
-    whiteSpace: 'nowrap',
+    flexShrink: 0,
   },
   nameInput: {
     flex: 1,
@@ -255,41 +226,17 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: '32px',
-    height: '24px',
+    minWidth: '28px',
+    height: '20px',
     padding: `0 ${spacing.xs}`,
-    backgroundColor: colors.grayVeryLight,
+    backgroundColor: colors.grayLight,
     borderRadius: borderRadius.sm,
+    flexShrink: 0,
   },
   countText: {
-    fontSize: fontSize.xs,
+    fontSize: '11px',
     fontWeight: fontWeight.semibold,
     color: colors.textSecondary,
-  },
-  actionsRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingTop: spacing.xs,
-    borderTop: `1px solid ${colors.border}`,
-  },
-  actionButton: {
-    flex: 1,
-    padding: `${spacing.xs} ${spacing.sm}`,
-    backgroundColor: colors.grayVeryLight,
-    border: `1px solid ${colors.border}`,
-    borderRadius: borderRadius.sm,
-    fontSize: '11px',
-    fontWeight: fontWeight.medium,
-    color: colors.textPrimary,
-    cursor: 'pointer',
-    transition: `all ${transitions.fast}`,
-    outline: 'none',
-    whiteSpace: 'nowrap',
-  },
-  actionButtonDanger: {
-    color: colors.danger,
-    flex: '0 0 auto', // Don't grow/shrink
   },
 };
 

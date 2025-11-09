@@ -6,7 +6,6 @@
  */
 
 import React, { useState } from 'react';
-import { MenuSection } from '../layout';
 import { Button, Input, Select, Modal } from '../ui';
 import { colors } from '../../constants/colors';
 import { spacing, fontSize, fontWeight, borderRadius } from '../../constants/styles';
@@ -88,63 +87,55 @@ const ProjectSection = ({
 
   return (
     <>
-      <MenuSection title="📊 Projet" icon="📊" defaultExpanded={true}>
-        <div style={styles.container}>
-          {/* Project Info */}
-          <div style={styles.info}>
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Nom:</span>
-              <span style={styles.infoValue}>{projectName}</span>
-            </div>
-            {isDirty && (
-              <div style={styles.dirtyBadge}>
-                <span style={styles.dirtyIcon}>●</span>
-                <span style={styles.dirtyText}>Modifications non sauvegardées</span>
-              </div>
-            )}
+      <div style={styles.container}>
+        {/* Unsaved Changes Indicator */}
+        {isDirty && (
+          <div style={styles.dirtyBadge}>
+            <span style={styles.dirtyIcon}>●</span>
+            <span style={styles.dirtyText}>Modifications non sauvegardées</span>
           </div>
+        )}
 
-          {/* Actions */}
-          <div style={styles.actions}>
-            <Button
-              variant="primary"
-              icon="📄"
-              onClick={handleNewProject}
-              fullWidth
-            >
-              Nouveau projet
-            </Button>
+        {/* Action Buttons */}
+        <div style={styles.actions}>
+          <Button
+            variant="primary"
+            icon="📄"
+            onClick={handleNewProject}
+            fullWidth
+          >
+            Nouveau projet
+          </Button>
 
-            <Button
-              variant="success"
-              icon="💾"
-              onClick={handleSaveProject}
-              fullWidth
-              disabled={!isDirty}
-            >
-              Sauvegarder
-            </Button>
+          <Button
+            variant="success"
+            icon="💾"
+            onClick={handleSaveProject}
+            fullWidth
+            disabled={!isDirty}
+          >
+            Sauvegarder
+          </Button>
 
-            <Button
-              variant="secondary"
-              icon="📂"
-              onClick={handleLoadProject}
-              fullWidth
-            >
-              Charger projet
-            </Button>
+          <Button
+            variant="secondary"
+            icon="📂"
+            onClick={handleLoadProject}
+            fullWidth
+          >
+            Charger projet
+          </Button>
 
-            <Button
-              variant="secondary"
-              icon="📥"
-              onClick={handleExport}
-              fullWidth
-            >
-              Exporter
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            icon="📥"
+            onClick={handleExport}
+            fullWidth
+          >
+            Exporter
+          </Button>
         </div>
-      </MenuSection>
+      </div>
 
       {/* New Project Modal */}
       <Modal
@@ -332,36 +323,15 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.md,
-  },
-  info: {
     padding: spacing.md,
-    backgroundColor: colors.grayVeryLight,
-    borderRadius: borderRadius.md,
-    border: `1px solid ${colors.border}`,
-  },
-  infoRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-    color: colors.textSecondary,
-  },
-  infoValue: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold,
-    color: colors.textPrimary,
   },
   dirtyBadge: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing.xs,
-    marginTop: spacing.sm,
-    padding: `${spacing.xs} ${spacing.sm}`,
+    padding: spacing.sm,
     backgroundColor: colors.warningLight,
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.md,
     border: `1px solid ${colors.warning}`,
   },
   dirtyIcon: {
