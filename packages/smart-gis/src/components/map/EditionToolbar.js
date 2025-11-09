@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { Button, Select } from '../ui';
 import { colors } from '../../constants/colors';
-import { spacing, fontSize, fontWeight, borderRadius, transitions } from '../../constants/styles';
+import { spacing, fontSize, fontWeight, borderRadius, transitions, shadows } from '../../constants/styles';
 
 const EditionToolbar = ({
   editionMode = null, // null | 'draw' | 'edit' | 'delete'
