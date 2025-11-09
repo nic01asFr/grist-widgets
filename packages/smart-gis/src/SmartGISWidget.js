@@ -15,7 +15,7 @@ import { calculateBounds, getGeometryCenter } from './utils/geometryUtils';
 
 // Import Grist API
 import { setupSystemInfrastructure } from './systemInfrastructure';
-import { fetchWorkspaceData, updateInWorkspace, deleteFromWorkspace } from './workspaceManager';
+import { fetchWorkspaceData, updateInWorkspace, deleteFromWorkspace, initializeWorkspace } from './workspaceManager';
 
 const SmartGISWidget = () => {
   // Grist state
@@ -81,12 +81,22 @@ const SmartGISWidget = () => {
         const setupResult = await setupSystemInfrastructure(grist);
 
         if (setupResult.success) {
-          console.log('✅ System ready');
+          console.log('✅ System tables ready');
 
-          // Load workspace data
-          await loadWorkspace(doc);
+          // Initialize workspace table
+          console.log('🗂️ Initializing workspace...');
+          const workspaceResult = await initializeWorkspace(doc);
 
-          setIsReady(true);
+          if (workspaceResult.success) {
+            console.log('✅ Workspace ready');
+
+            // Load workspace data
+            await loadWorkspace(doc);
+
+            setIsReady(true);
+          } else {
+            console.error('❌ Workspace setup failed:', workspaceResult.error);
+          }
         } else {
           console.error('❌ Setup failed:', setupResult.error);
         }
