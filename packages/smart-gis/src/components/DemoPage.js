@@ -6,7 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import { Button, Input, ColorPicker, Slider, Checkbox, Select, Modal } from './ui';
 import { Navbar, MainMenu, MenuSection, MenuDivider, AdjacentPanel } from './layout';
-import { SelectionTools, SelectionActionsBar } from './map';
+import { SelectionTools, SelectionActionsBar, EditionToolbar } from './map';
 import { LayersSection, ProjectSection, FileImportWizard } from './menu';
 import { EntityList, StatsPanel, StyleEditor } from './panels';
 import useMapSelection from '../hooks/useMapSelection';
@@ -193,6 +193,35 @@ const DemoPage = () => {
     setShowImportWizard(false);
     setIsDirty(true);
     alert(`Import réussi!\n\nCouche: "${importData.layerName}"\nEntités: ${importData.preview?.featureCount}\nProjection: ${importData.projection}`);
+  };
+
+  // Geometry edition state & handlers (Phase 9)
+  const [editionMode, setEditionMode] = useState(null); // null | 'draw' | 'edit' | 'delete'
+  const [drawMode, setDrawMode] = useState('marker'); // 'marker' | 'line' | 'polygon' | 'rectangle' | 'circle'
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleEditionModeChange = (mode) => {
+    setEditionMode(mode);
+    if (mode) {
+      setIsEditing(true);
+    } else {
+      setIsEditing(false);
+    }
+  };
+
+  const handleEditionSave = () => {
+    console.log('Save edition:', { editionMode, drawMode, activeLayer });
+    setEditionMode(null);
+    setIsEditing(false);
+    setIsDirty(true);
+    alert(`Modifications sauvegardées!\n\nMode: ${editionMode}\nCouche: ${activeLayer || 'Aucune'}`);
+  };
+
+  const handleEditionCancel = () => {
+    console.log('Cancel edition');
+    setEditionMode(null);
+    setIsEditing(false);
+    alert('Modifications annulées');
   };
 
   return (
@@ -542,6 +571,18 @@ const DemoPage = () => {
 
         {/* Map area */}
         <div style={styles.mapArea}>
+          {/* Edition Toolbar (Phase 9) */}
+          <EditionToolbar
+            editionMode={editionMode}
+            drawMode={drawMode}
+            activeLayer={activeLayer}
+            onModeChange={handleEditionModeChange}
+            onDrawModeChange={setDrawMode}
+            onSave={handleEditionSave}
+            onCancel={handleEditionCancel}
+            isEditing={isEditing}
+          />
+
           {/* Selection Tools (Phase 3) */}
           <SelectionTools
             selectionMode={selectionMode}
