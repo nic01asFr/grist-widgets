@@ -2,11 +2,11 @@
  * SelectionTools Component
  * Smart GIS Widget v3.0
  *
- * Floating toolbar for map selection modes
- * Displays above the map when selection is active
+ * Compact floating toolbar for map selection modes
+ * Displays above the map center - only shows active mode with dropdown
  */
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { colors } from '../../constants/colors';
 import { spacing, fontSize, fontWeight, borderRadius, shadows, transitions } from '../../constants/styles';
 
@@ -18,6 +18,9 @@ const SelectionTools = ({
   onClear,
   disabled = false,
 }) => {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
   const modes = [
     { id: 'pointer', icon: '👆', label: 'Pointeur', tooltip: 'Sélection par clic (Échap)' },
     { id: 'rectangle', icon: '▢', label: 'Rectangle', tooltip: 'Sélection rectangulaire (R)' },
@@ -25,79 +28,125 @@ const SelectionTools = ({
     { id: 'lasso', icon: '✏️', label: 'Lasso', tooltip: 'Sélection libre (L)' },
   ];
 
-  const handleModeClick = (modeId) => {
+  const currentMode = modes.find(m => m.id === selectionMode) || modes[0];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  const handleModeSelect = (modeId) => {
     if (!disabled && onModeChange) {
       onModeChange(modeId);
+      setIsDropdownOpen(false);
     }
   };
 
-  const handleClear = () => {
-    if (!disabled && onClear) {
-      onClear();
+  const handleToggleActive = () => {
+    // Click on the mode button itself = toggle active/inactive
+    // For now, just ensure it's active
+    if (!disabled && onModeChange) {
+      onModeChange(selectionMode);
     }
+  };
+
+  const handleDropdownToggle = (e) => {
+    e.stopPropagation();
+    setIsDropdownOpen(!isDropdownOpen);
   };
 
   return (
-    <div style={styles.container}>
-      {/* Mode Buttons */}
-      <div style={styles.modesGroup}>
-        {modes.map(mode => (
-          <button
-            key={mode.id}
-            style={{
-              ...styles.modeButton,
-              ...(selectionMode === mode.id ? styles.modeButtonActive : {}),
-              ...(disabled ? styles.modeButtonDisabled : {}),
-            }}
-            onClick={() => handleModeClick(mode.id)}
-            disabled={disabled}
-            title={mode.tooltip}
-            onMouseEnter={(e) => {
-              if (!disabled && selectionMode !== mode.id) {
-                e.currentTarget.style.backgroundColor = colors.grayLight;
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!disabled && selectionMode !== mode.id) {
-                e.currentTarget.style.backgroundColor = colors.white;
-                e.currentTarget.style.transform = 'translateY(0)';
-              }
-            }}
-          >
-            <span style={styles.modeIcon}>{mode.icon}</span>
-            <span style={styles.modeLabel}>{mode.label}</span>
-          </button>
-        ))}
+    <div style={styles.container} ref={dropdownRef}>
+      {/* Current Mode Display + Dropdown */}
+      <div style={styles.modeSelector}>
+        <button
+          style={{
+            ...styles.currentModeButton,
+            ...(disabled ? styles.buttonDisabled : {}),
+          }}
+          onClick={handleToggleActive}
+          disabled={disabled}
+          title={currentMode.tooltip}
+        >
+          <span style={styles.modeIcon}>{currentMode.icon}</span>
+          <span style={styles.modeLabel}>{currentMode.label}</span>
+        </button>
+
+        {/* Dropdown Toggle Arrow */}
+        <button
+          style={{
+            ...styles.dropdownButton,
+            ...(disabled ? styles.buttonDisabled : {}),
+          }}
+          onClick={handleDropdownToggle}
+          disabled={disabled}
+          title="Changer le mode de sélection"
+        >
+          <span style={styles.dropdownArrow}>{isDropdownOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {/* Dropdown Menu */}
+        {isDropdownOpen && (
+          <div style={styles.dropdownMenu}>
+            {modes
+              .filter(m => m.id !== selectionMode)
+              .map(mode => (
+                <button
+                  key={mode.id}
+                  style={styles.dropdownItem}
+                  onClick={() => handleModeSelect(mode.id)}
+                  title={mode.tooltip}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.grayLight;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.white;
+                  }}
+                >
+                  <span style={styles.modeIcon}>{mode.icon}</span>
+                  <span style={styles.modeLabel}>{mode.label}</span>
+                </button>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Divider */}
       <div style={styles.divider} />
 
-      {/* Context & Stats */}
-      <div style={styles.contextGroup}>
-        {/* Active Layer Context */}
-        <div style={styles.context}>
-          <span style={styles.contextIcon}>🎯</span>
-          <span style={styles.contextText}>
-            {activeLayer ? activeLayer : 'Toutes couches'}
-          </span>
-        </div>
+      {/* Active Layer */}
+      <div style={styles.context}>
+        <span style={styles.contextIcon}>🎯</span>
+        <span style={styles.contextText}>
+          {activeLayer || 'Toutes'}
+        </span>
+      </div>
 
-        {/* Selection Count Badge */}
-        {selectionCount > 0 && (
+      {/* Selection Count Badge */}
+      {selectionCount > 0 && (
+        <>
           <div style={styles.badge}>
             <span style={styles.badgeText}>
-              {selectionCount} sélectionnée{selectionCount > 1 ? 's' : ''}
+              {selectionCount}
             </span>
           </div>
-        )}
 
-        {/* Clear Button */}
-        {selectionCount > 0 && (
+          {/* Clear Button */}
           <button
             style={styles.clearButton}
-            onClick={handleClear}
+            onClick={onClear}
             disabled={disabled}
             title="Effacer la sélection (Échap)"
             onMouseEnter={(e) => {
@@ -115,8 +164,8 @@ const SelectionTools = ({
           >
             ×
           </button>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 };
@@ -139,53 +188,88 @@ const styles = {
     backdropFilter: 'blur(10px)',
     transition: `all ${transitions.normal}`,
   },
-  modesGroup: {
+  modeSelector: {
+    position: 'relative',
     display: 'flex',
-    gap: spacing.xs,
+    alignItems: 'center',
+    gap: 0,
   },
-  modeButton: {
+  currentModeButton: {
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     gap: spacing.xs,
-    padding: `${spacing.sm} ${spacing.md}`,
-    backgroundColor: colors.white,
-    border: `1px solid ${colors.border}`,
-    borderRadius: borderRadius.md,
+    padding: `${spacing.xs} ${spacing.sm}`,
+    backgroundColor: colors.primaryLight,
+    border: `1px solid ${colors.primary}`,
+    borderRight: 'none',
+    borderRadius: `${borderRadius.md} 0 0 ${borderRadius.md}`,
     cursor: 'pointer',
     transition: `all ${transitions.fast}`,
     outline: 'none',
-    minWidth: '70px',
   },
-  modeButtonActive: {
+  dropdownButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: `${spacing.xs} ${spacing.sm}`,
     backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
-    boxShadow: `0 0 0 3px ${colors.primaryVeryLight}`,
+    border: `1px solid ${colors.primary}`,
+    borderLeft: `1px solid ${colors.primary}80`,
+    borderRadius: `0 ${borderRadius.md} ${borderRadius.md} 0`,
+    cursor: 'pointer',
+    transition: `all ${transitions.fast}`,
+    outline: 'none',
+    minWidth: '24px',
   },
-  modeButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.5,
     cursor: 'not-allowed',
   },
+  dropdownArrow: {
+    fontSize: fontSize.xs,
+    color: colors.primary,
+    fontWeight: fontWeight.bold,
+  },
   modeIcon: {
-    fontSize: fontSize.xl,
+    fontSize: fontSize.lg,
     lineHeight: '1',
   },
   modeLabel: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
     color: colors.textPrimary,
   },
-  divider: {
-    width: '1px',
-    height: '50px',
-    backgroundColor: colors.border,
-    margin: `0 ${spacing.xs}`,
+  dropdownMenu: {
+    position: 'absolute',
+    top: 'calc(100% + 4px)',
+    left: 0,
+    minWidth: '100%',
+    backgroundColor: colors.white,
+    border: `1px solid ${colors.border}`,
+    borderRadius: borderRadius.md,
+    boxShadow: shadows.lg,
+    overflow: 'hidden',
+    zIndex: 1001,
   },
-  contextGroup: {
+  dropdownItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingLeft: spacing.xs,
+    gap: spacing.xs,
+    width: '100%',
+    padding: `${spacing.sm} ${spacing.md}`,
+    backgroundColor: colors.white,
+    border: 'none',
+    borderBottom: `1px solid ${colors.borderLight}`,
+    cursor: 'pointer',
+    transition: `all ${transitions.fast}`,
+    outline: 'none',
+    textAlign: 'left',
+  },
+  divider: {
+    width: '1px',
+    height: '28px',
+    backgroundColor: colors.border,
+    margin: `0 ${spacing.xs}`,
   },
   context: {
     display: 'flex',
@@ -208,10 +292,12 @@ const styles = {
     backgroundColor: colors.selectedLight,
     borderRadius: borderRadius.md,
     border: `1px solid ${colors.selected}`,
+    minWidth: '32px',
+    textAlign: 'center',
   },
   badgeText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.semibold,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
     color: colors.selected,
   },
   clearButton: {

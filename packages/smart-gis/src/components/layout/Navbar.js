@@ -47,13 +47,28 @@ const Navbar = ({
       <div style={styles.left}>
         {/* Menu toggle button */}
         <button
-          onClick={onToggleMenu}
-          style={styles.menuButton}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onToggleMenu?.();
+          }}
+          style={{
+            ...styles.menuButton,
+            ...(menuOpen ? { backgroundColor: colors.darkHover } : {}),
+          }}
           title={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.darkHover}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          onMouseEnter={(e) => {
+            if (!menuOpen) {
+              e.currentTarget.style.backgroundColor = colors.darkHover;
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!menuOpen) {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }
+          }}
         >
-          ☰
+          {menuOpen ? '✕' : '☰'}
         </button>
 
         {/* Project name (editable) */}
