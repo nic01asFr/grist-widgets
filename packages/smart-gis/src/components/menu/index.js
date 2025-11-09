@@ -6,3 +6,4 @@
 export { default as LayersSection } from './LayersSection';
 export { default as LayerItem } from './LayerItem';
 export { default as ProjectSection } from './ProjectSection';
+export { default as FileImportWizard } from './FileImportWizard';

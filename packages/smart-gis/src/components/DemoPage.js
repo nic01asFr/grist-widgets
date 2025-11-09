@@ -7,7 +7,7 @@ import React, { useState, useMemo } from 'react';
 import { Button, Input, ColorPicker, Slider, Checkbox, Select, Modal } from './ui';
 import { Navbar, MainMenu, MenuSection, MenuDivider, AdjacentPanel } from './layout';
 import { SelectionTools, SelectionActionsBar } from './map';
-import { LayersSection, ProjectSection } from './menu';
+import { LayersSection, ProjectSection, FileImportWizard } from './menu';
 import { EntityList, StatsPanel, StyleEditor } from './panels';
 import useMapSelection from '../hooks/useMapSelection';
 import { colors } from '../constants/colors';
@@ -183,6 +183,16 @@ const DemoPage = () => {
   const handleProjectExport = (format) => {
     console.log('Export project:', format);
     alert(`Export du projet en ${format.toUpperCase()}\nFichier: ${projectName}.${format}`);
+  };
+
+  // File import wizard state & handler (Phase 8)
+  const [showImportWizard, setShowImportWizard] = useState(false);
+
+  const handleFileImport = (importData) => {
+    console.log('File import:', importData);
+    setShowImportWizard(false);
+    setIsDirty(true);
+    alert(`Import réussi!\n\nCouche: "${importData.layerName}"\nEntités: ${importData.preview?.featureCount}\nProjection: ${importData.projection}`);
   };
 
   return (
@@ -417,6 +427,21 @@ const DemoPage = () => {
                 >
                   {adjacentPanelOpen ? 'Fermer' : 'Ouvrir'} Adjacent Panel
                 </Button>
+                <Button
+                  onClick={() => setShowImportWizard(true)}
+                  variant="primary"
+                  icon="📥"
+                  fullWidth
+                >
+                  Importer un fichier
+                </Button>
+                <Button
+                  onClick={() => setIsDirty(!isDirty)}
+                  variant={isDirty ? 'success' : 'ghost'}
+                  fullWidth
+                >
+                  {isDirty ? '✓ Projet modifié' : 'Marquer comme modifié'}
+                </Button>
               </div>
             </MenuSection>
           </MainMenu>
@@ -587,6 +612,19 @@ const DemoPage = () => {
             fullWidth
           />
         </div>
+      </Modal>
+
+      {/* File Import Wizard Modal (Phase 8) */}
+      <Modal
+        isOpen={showImportWizard}
+        onClose={() => setShowImportWizard(false)}
+        title="Assistant d'import de fichier"
+        size="large"
+      >
+        <FileImportWizard
+          onImport={handleFileImport}
+          onCancel={() => setShowImportWizard(false)}
+        />
       </Modal>
     </div>
   );
