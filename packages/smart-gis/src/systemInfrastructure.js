@@ -504,13 +504,15 @@ async function initializeConfig(docApi) {
 /**
  * Main setup function - ensures all system infrastructure is ready
  */
-export async function setupSystemInfrastructure(docApi) {
+export async function setupSystemInfrastructure(grist) {
   console.log('🚀 Setting up Smart GIS system infrastructure...');
 
-  if (!docApi) {
+  if (!grist || !grist.docApi) {
     console.warn('⚠️ Grist API not available, skipping infrastructure setup');
     return { success: false, error: 'Grist API not available' };
   }
+
+  const docApi = grist.docApi;
 
   try {
     const systemTables = ['GIS_Catalogs', 'GIS_Styles', 'GIS_Config', 'GIS_SearchQueries'];
