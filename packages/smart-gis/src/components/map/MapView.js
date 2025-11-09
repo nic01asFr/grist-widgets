@@ -104,12 +104,60 @@ const ZoomController = ({ zoomCommand, onExecuted }) => {
   return null;
 };
 
+// Bounds Controller Component
+const BoundsController = ({ boundsCommand, onExecuted }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!boundsCommand || !map || !boundsCommand.bounds) return;
+
+    const { bounds } = boundsCommand;
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+
+    onExecuted?.();
+  }, [boundsCommand, map, onExecuted]);
+
+  return null;
+};
+
+// Center Controller Component
+const CenterController = ({ centerCommand, onExecuted }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!centerCommand || !map || !centerCommand.center) return;
+
+    const { center, zoom = 15, panOffset = 0.55 } = centerCommand;
+
+    // Calculate offset based on panOffset (0.55 means 55% from left)
+    // Get map size
+    const mapSize = map.getSize();
+    const targetPoint = map.project(center, zoom);
+
+    // Apply horizontal offset (shift center to account for panels on left)
+    const offsetX = mapSize.x * (panOffset - 0.5);
+    targetPoint.x -= offsetX;
+
+    const offsetCenter = map.unproject(targetPoint, zoom);
+
+    map.setView(offsetCenter, zoom, { animate: true });
+
+    onExecuted?.();
+  }, [centerCommand, map, onExecuted]);
+
+  return null;
+};
+
 const MapView = ({
   records = [],
   visibleLayers = new Set(),
   selectedIds = [],
   zoomCommand,
   onZoomExecuted,
+  boundsCommand,
+  onBoundsExecuted,
+  centerCommand,
+  onCenterExecuted,
   onEntityClick,
   center = [46.603354, 1.888334], // Center of France
   zoom = 6,
@@ -225,6 +273,12 @@ const MapView = ({
 
         {/* Zoom Controller */}
         <ZoomController zoomCommand={zoomCommand} onExecuted={onZoomExecuted} />
+
+        {/* Bounds Controller */}
+        <BoundsController boundsCommand={boundsCommand} onExecuted={onBoundsExecuted} />
+
+        {/* Center Controller */}
+        <CenterController centerCommand={centerCommand} onExecuted={onCenterExecuted} />
       </MapContainer>
 
       {/* Empty state */}

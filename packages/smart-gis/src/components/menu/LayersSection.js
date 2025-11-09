@@ -167,41 +167,6 @@ const LayersSection = ({
         </div>
       </div>
 
-      {/* Bulk Actions Toolbar (Fixed, shown when layers selected) */}
-      {selectedLayers.size > 0 && (
-        <div style={styles.bulkToolbar}>
-          <div style={styles.bulkInfo}>
-            <span style={styles.bulkCount}>{selectedLayers.size} sélectionnée(s)</span>
-            <button style={styles.bulkClearButton} onClick={handleDeselectAll}>
-              ✕
-            </button>
-          </div>
-          <div style={styles.bulkActions}>
-            <button
-              style={styles.bulkActionButton}
-              onClick={() => handleBulkVisibility(true)}
-              title="Afficher toutes"
-            >
-              👁️
-            </button>
-            <button
-              style={styles.bulkActionButton}
-              onClick={() => handleBulkVisibility(false)}
-              title="Masquer toutes"
-            >
-              🙈
-            </button>
-            <button
-              style={{ ...styles.bulkActionButton, ...styles.bulkActionButtonDanger }}
-              onClick={handleBulkDelete}
-              title="Supprimer"
-            >
-              🗑️
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Layers List (Scrollable Only) */}
       <div style={styles.layersList}>
         {filteredLayers.length === 0 ? (
@@ -244,6 +209,41 @@ const LayersSection = ({
           </>
         )}
       </div>
+
+      {/* Bulk Actions Toolbar (Fixed at bottom, shown when layers selected) */}
+      {selectedLayers.size > 0 && (
+        <div style={styles.bulkToolbar}>
+          <div style={styles.bulkInfo}>
+            <span style={styles.bulkCount}>{selectedLayers.size} sélectionnée(s)</span>
+            <button style={styles.bulkClearButton} onClick={handleDeselectAll}>
+              ✕
+            </button>
+          </div>
+          <div style={styles.bulkActions}>
+            <button
+              style={styles.bulkActionButton}
+              onClick={() => handleBulkVisibility(true)}
+              title="Afficher toutes"
+            >
+              👁️
+            </button>
+            <button
+              style={styles.bulkActionButton}
+              onClick={() => handleBulkVisibility(false)}
+              title="Masquer toutes"
+            >
+              🙈
+            </button>
+            <button
+              style={{ ...styles.bulkActionButton, ...styles.bulkActionButtonDanger }}
+              onClick={handleBulkDelete}
+              title="Supprimer"
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Actions (Fixed) */}
       <div style={styles.bottomActions}>
