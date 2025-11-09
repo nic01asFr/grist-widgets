@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar, TabbedMenu } from './components/layout';
 import { SelectionTools, SelectionActionsBar, EditionToolbar, MapView, ZoomControls } from './components/map';
 import { LayersSection, ProjectSection, SearchSection } from './components/menu';
-import { EntityPanel } from './components/panels';
+import { EntityPanel, EntityListPanel } from './components/panels';
 import MenuContent from './components/layout/MenuContent';
 import useMapSelection from './hooks/useMapSelection';
 import { colors } from './constants/colors';
@@ -31,6 +31,7 @@ const SmartGISWidget = () => {
   const [menuWidth, setMenuWidth] = useState(320);
   const [fullscreen, setFullscreen] = useState(false);
   const [entityPanelOpen, setEntityPanelOpen] = useState(false);
+  const [entityListLayer, setEntityListLayer] = useState(null); // Layer for EntityListPanel
 
   // Layer state
   const [activeLayer, setActiveLayer] = useState(null);
@@ -244,9 +245,8 @@ const SmartGISWidget = () => {
                   onLayerDelete={handleLayerDelete}
                   onLayerRename={handleLayerRename}
                   onEntityListOpen={(layerName) => {
-                    const layerEntities = workspaceData.filter(r => r.layer_name === layerName);
-                    selectByIds(layerEntities.map(r => r.id));
-                    setEntityPanelOpen(true);
+                    // Open EntityListPanel to show entities of this layer
+                    setEntityListLayer(layerName);
                   }}
                   visibleLayers={visibleLayers}
                 />
@@ -286,26 +286,30 @@ const SmartGISWidget = () => {
             onResetZoom={() => console.log('Reset zoom')}
           />
 
-          {/* Edition Toolbar */}
-          <EditionToolbar
-            editionMode={editionMode}
-            drawMode={drawMode}
-            activeLayer={activeLayer}
-            onModeChange={handleEditionModeChange}
-            onDrawModeChange={setDrawMode}
-            onSave={handleEditionSave}
-            onCancel={handleEditionCancel}
-            isEditing={isEditing}
-          />
+          {/* Edition Toolbar - Only shown when layer is selected */}
+          {activeLayer && (
+            <EditionToolbar
+              editionMode={editionMode}
+              drawMode={drawMode}
+              activeLayer={activeLayer}
+              onModeChange={handleEditionModeChange}
+              onDrawModeChange={setDrawMode}
+              onSave={handleEditionSave}
+              onCancel={handleEditionCancel}
+              isEditing={isEditing}
+            />
+          )}
 
-          {/* Selection Tools */}
-          <SelectionTools
-            selectionMode={selectionMode}
-            onModeChange={setSelectionMode}
-            activeLayer={activeLayer}
-            selectionCount={selection.length}
-            onClear={clearSelection}
-          />
+          {/* Selection Tools - Only shown when layer is selected */}
+          {activeLayer && (
+            <SelectionTools
+              selectionMode={selectionMode}
+              onModeChange={setSelectionMode}
+              activeLayer={activeLayer}
+              selectionCount={selection.length}
+              onClear={clearSelection}
+            />
+          )}
 
           {/* Entity Panel */}
           {entityPanelOpen && selection.length > 0 && (
@@ -352,6 +356,23 @@ const SmartGISWidget = () => {
           />
         </div>
       </div>
+
+      {/* Entity List Panel - Shows entities of selected layer */}
+      {entityListLayer && (
+        <EntityListPanel
+          layerName={entityListLayer}
+          entities={workspaceData.filter(r => r.layer_name === entityListLayer)}
+          selectedEntityIds={selection}
+          onEntityClick={(id) => {
+            selectEntity(id);
+            setEntityPanelOpen(true);
+            setEntityListLayer(null); // Close list panel when entity is selected
+          }}
+          onClose={() => setEntityListLayer(null)}
+          onSelectAll={(ids) => selectByIds(ids)}
+          onDeselectAll={clearSelection}
+        />
+      )}
     </div>
   );
 };

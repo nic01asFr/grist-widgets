@@ -167,6 +167,7 @@ const MapView = ({
         zoom={zoom}
         style={styles.map}
         scrollWheelZoom={true}
+        zoomControl={false}
         attributionControl={true}
       >
         {/* Base tile layer */}

@@ -2,8 +2,8 @@
  * EntityPanel Component
  * Smart GIS Widget v3.0
  *
- * Detailed entity view panel (left side, below EditionToolbar)
- * Shows entity details, navigation for multi-selection, popup config
+ * Detailed entity view panel (RIGHT side, below EditionToolbar)
+ * Shows entity details, navigation for multi-selection, edit options
  */
 
 import React, { useState } from 'react';
@@ -152,7 +152,7 @@ const styles = {
   container: {
     position: 'absolute',
     top: '70px', // Below EditionToolbar
-    left: '12px',
+    right: '1%', // RIGHT side like EditionToolbar
     bottom: '12px',
     width: '300px',
     backgroundColor: colors.white,
