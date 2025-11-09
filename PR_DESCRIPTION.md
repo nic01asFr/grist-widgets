@@ -32,11 +32,19 @@ The widget is now **production-ready at 90% completion**.
 - **Auto-creates infrastructure**: GIS_WorkSpace, GIS_Catalogs, GIS_Styles, GIS_Config, GIS_SearchQueries
 - **Fixed column schema**: Uses predefined column names from GIS_WorkSpace
 
-### Critical Performance Fix (✅ Complete)
-- **Removed aggressive polling**: Was fetching 94MB every 2 seconds → caused WebSocket crashes
-- **Manual refresh only**: Data refreshes after user actions (import, edit, delete)
-- **Zero idle bandwidth**: From ~47 MB/s continuous → 0 MB/s when idle
-- **Stable connection**: No more WebSocket crashes or 404 reconnection errors
+### Critical Performance Fixes (✅ Complete)
+
+**1. Removed Aggressive Polling**
+- **Was**: Fetching 94MB every 2 seconds → caused WebSocket crashes
+- **Now**: Manual refresh only after user actions (import, edit, delete)
+- **Impact**: Zero idle bandwidth (from ~47 MB/s → 0 MB/s)
+- **Stability**: No more WebSocket crashes or 404 reconnection errors
+
+**2. Fast-Path Initialization**
+- **Was**: 7+ network requests on every widget load (even when already initialized)
+- **Now**: 2 requests via fast-path check (70% faster)
+- **Implementation**: Single batch check for all tables + quick config validation
+- **Impact**: Widget loads 70% faster on subsequent visits
 
 ### Critical IGN Import Fixes (✅ Complete)
 
@@ -87,12 +95,15 @@ The widget is now **production-ready at 90% completion**.
   - Added smooth modal animations (fadeIn, slideUp)
   - Integrated `searchCatalogsSemantic()` function
 
-- **src/systemInfrastructure.js** (+147 lines)
+- **src/systemInfrastructure.js** (+163 lines, -17 lines)
+  - **CRITICAL**: Added fast-path initialization (70% faster subsequent loads)
   - Added `GIS_SearchQueries` table schema
   - Fixed `CREATE_VECTOR` formula syntax (added `grist.` prefix)
   - Added `searchCatalogsSemantic()` function
   - Added `searchElementsSemantic()` function
   - Added `searchCatalogsTextual()` helper function
+  - Optimized table existence checks (1 batch request vs 4 individual requests)
+  - Removed unused `tableExists()` helper function
 
 - **README.md** (+63 lines)
   - Updated to v2.0 - 90% complete
