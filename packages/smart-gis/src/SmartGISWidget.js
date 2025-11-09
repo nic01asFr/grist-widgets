@@ -6,18 +6,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar, MainMenu, MenuDivider, AdjacentPanel } from './components/layout';
 import { SelectionTools, SelectionActionsBar, EditionToolbar } from './components/map';
-import { LayersSection, ProjectSection, FileImportWizard, SearchSection } from './components/menu';
+import { LayersSection, ProjectSection, SearchSection } from './components/menu';
 import { EntityList, StatsPanel, StyleEditor } from './components/panels';
 import useMapSelection from './hooks/useMapSelection';
 import { colors } from './constants/colors';
 
 // Import Grist API
 import { setupSystemInfrastructure } from './systemInfrastructure';
-import { fetchWorkspaceData, bulkAddToWorkspace, updateInWorkspace, deleteFromWorkspace } from './workspaceManager';
+import { fetchWorkspaceData, updateInWorkspace, deleteFromWorkspace } from './workspaceManager';
 
 const SmartGISWidget = () => {
   // Grist state
-  const [gristApi, setGristApi] = useState(null);
   const [docApi, setDocApi] = useState(null);
   const [isReady, setIsReady] = useState(false);
 
@@ -40,23 +39,18 @@ const SmartGISWidget = () => {
   // Selection state
   const {
     selection,
-    selectedRecords,
     selectionInfo,
     selectionMode,
     setSelectionMode,
     selectEntity,
     selectByIds,
     clearSelection,
-    selectAll,
   } = useMapSelection(workspaceData, activeLayer);
 
   // Edition state
   const [editionMode, setEditionMode] = useState(null);
   const [drawMode, setDrawMode] = useState('marker');
   const [isEditing, setIsEditing] = useState(false);
-
-  // Import state
-  const [showImportWizard, setShowImportWizard] = useState(false);
 
   // Initialize Grist connection
   useEffect(() => {
@@ -71,11 +65,8 @@ const SmartGISWidget = () => {
         });
 
         // @ts-ignore
-        const api = window.grist;
-        // @ts-ignore
         const doc = window.grist.docApi;
 
-        setGristApi(api);
         setDocApi(doc);
 
         // Setup system tables
@@ -217,16 +208,6 @@ const SmartGISWidget = () => {
   const handleProjectExport = async (format) => {
     // TODO: Export to format
     console.log('Export to', format);
-  };
-
-  // File import
-  const handleFileImport = async (importData) => {
-    if (!docApi) return;
-
-    // TODO: Parse file and import entities
-    console.log('Import:', importData);
-    setShowImportWizard(false);
-    setIsDirty(true);
   };
 
   // Edition handlers

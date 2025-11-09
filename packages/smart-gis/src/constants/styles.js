@@ -140,7 +140,7 @@ export const customScrollbar = {
   },
 };
 
-export default {
+const styles = {
   spacing,
   fontSize,
   fontWeight,
@@ -154,3 +154,5 @@ export default {
   truncate,
   customScrollbar,
 };
+
+export default styles;
