@@ -7,7 +7,7 @@ import React, { useState, useMemo } from 'react';
 import { Button, Input, ColorPicker, Slider, Checkbox, Select, Modal } from './ui';
 import { Navbar, MainMenu, MenuSection, MenuDivider, AdjacentPanel } from './layout';
 import { SelectionTools, SelectionActionsBar, EditionToolbar } from './map';
-import { LayersSection, ProjectSection, FileImportWizard } from './menu';
+import { LayersSection, ProjectSection, FileImportWizard, SearchSection } from './menu';
 import { EntityList, StatsPanel, StyleEditor } from './panels';
 import useMapSelection from '../hooks/useMapSelection';
 import { colors } from '../constants/colors';
@@ -257,16 +257,22 @@ const DemoPage = () => {
 
             <MenuDivider />
 
-            {/* Search Section */}
-            <MenuSection title="🔍 Recherche" icon="🔍" defaultExpanded={true}>
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Rechercher dans le projet..."
-                icon="🔎"
-                fullWidth
-              />
-            </MenuSection>
+            {/* Search Section (Phase 6) */}
+            <SearchSection
+              records={mockRecords}
+              onEntitySelect={(id) => {
+                selectEntity(id);
+                console.log('Search: Selected entity', id);
+              }}
+              onZoomTo={(ids) => {
+                console.log('Search: Zoom to', ids);
+                alert(`Recentrer sur ${Array.isArray(ids) ? ids.length : 1} entité(s)`);
+              }}
+              onSemanticSearch={(query) => {
+                console.log('Semantic search:', query);
+                // Real implementation would call Grist VECTOR_SEARCH
+              }}
+            />
 
             <MenuDivider />
 
