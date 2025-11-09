@@ -355,20 +355,6 @@ const DEFAULT_CONFIG = [
 ];
 
 /**
- * Check if a table exists in the document
- */
-async function tableExists(docApi, tableName) {
-  try {
-    const tables = await docApi.fetchTable('_grist_Tables');
-    const tableNames = tables.tableId || [];
-    return tableNames.includes(tableName);
-  } catch (error) {
-    console.error(`Error checking table ${tableName}:`, error);
-    return false;
-  }
-}
-
-/**
  * Create a system table with its schema
  */
 async function createSystemTable(docApi, tableName) {
@@ -529,12 +515,42 @@ export async function setupSystemInfrastructure(gristApi) {
   const docApi = gristApi.docApi;
 
   try {
-    // Step 1: Check and create system tables
-    console.log('\n📋 Step 1/4: Checking system tables...');
     const systemTables = ['GIS_Catalogs', 'GIS_Styles', 'GIS_Config', 'GIS_SearchQueries'];
 
+    // OPTIMIZATION: Fast-path check - verify all tables exist in ONE request
+    console.log('⚡ Fast-checking infrastructure...');
+    const tablesData = await docApi.fetchTable('_grist_Tables');
+    const existingTables = new Set(tablesData.tableId);
+    const allTablesExist = systemTables.every(t => existingTables.has(t));
+
+    if (allTablesExist) {
+      // All tables exist - check if already initialized via quick config check
+      try {
+        const configData = await docApi.fetchTable('GIS_Config');
+        const isInitialized = configData.id && configData.id.length > 0;
+
+        if (isInitialized) {
+          console.log('✅ Infrastructure already initialized (fast-path)');
+          return {
+            success: true,
+            tables: systemTables,
+            catalogCount: IGN_CATALOGS.length + OSM_CATALOGS.length,
+            styleCount: SYSTEM_STYLES.length,
+            configCount: DEFAULT_CONFIG.length,
+            fastPath: true
+          };
+        }
+      } catch (e) {
+        // Config table exists but might be empty, continue with full init
+        console.log('⚠️ Config table empty, continuing initialization...');
+      }
+    }
+
+    // SLOW PATH: Full initialization needed
+    console.log('\n📋 Step 1/4: Checking system tables...');
+
     for (const tableName of systemTables) {
-      const exists = await tableExists(docApi, tableName);
+      const exists = existingTables.has(tableName);
       if (!exists) {
         await createSystemTable(docApi, tableName);
       } else {
