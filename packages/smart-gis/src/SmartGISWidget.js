@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navbar, TabbedMenu } from './components/layout';
-import { SelectionTools, SelectionActionsBar, EditionToolbar, MapView, ZoomControls } from './components/map';
+import { SelectionTools, EditionToolbar, MapView, ZoomControls } from './components/map';
 import { LayersSection, ProjectSection, SearchSection } from './components/menu';
 import { EntityPanel, EntityListPanel } from './components/panels';
 import MenuContent from './components/layout/MenuContent';
@@ -40,7 +40,6 @@ const SmartGISWidget = () => {
   // Selection state
   const {
     selection,
-    selectionInfo,
     selectionMode,
     setSelectionMode,
     selectEntity,
@@ -52,6 +51,9 @@ const SmartGISWidget = () => {
   const [editionMode, setEditionMode] = useState(null);
   const [drawMode, setDrawMode] = useState('marker');
   const [isEditing, setIsEditing] = useState(false);
+
+  // Map control state
+  const [zoomCommand, setZoomCommand] = useState(null); // 'in', 'out', 'reset'
 
   // Initialize Grist connection
   useEffect(() => {
@@ -281,9 +283,9 @@ const SmartGISWidget = () => {
           {/* Zoom Controls */}
           <ZoomControls
             menuWidth={(menuOpen && !fullscreen) ? menuWidth : 0}
-            onZoomIn={() => console.log('Zoom in')}
-            onZoomOut={() => console.log('Zoom out')}
-            onResetZoom={() => console.log('Reset zoom')}
+            onZoomIn={() => setZoomCommand('in')}
+            onZoomOut={() => setZoomCommand('out')}
+            onResetZoom={() => setZoomCommand('reset')}
           />
 
           {/* Edition Toolbar - Only shown when layer is selected */}
@@ -317,7 +319,22 @@ const SmartGISWidget = () => {
               entities={workspaceData}
               selectedEntityIds={selection}
               onClose={() => setEntityPanelOpen(false)}
-              onEdit={(id) => console.log('Edit entity:', id)}
+              onSave={async (data) => {
+                if (!docApi) return;
+                await updateInWorkspace(docApi, data.id, {
+                  name: data.name,
+                  description: data.description,
+                });
+                await refreshWorkspace();
+                setIsDirty(true);
+              }}
+              onDelete={async (id) => {
+                if (!docApi) return;
+                await deleteFromWorkspace(docApi, id);
+                await refreshWorkspace();
+                clearSelection();
+                setIsDirty(true);
+              }}
             />
           )}
 
@@ -326,33 +343,12 @@ const SmartGISWidget = () => {
             records={workspaceData}
             visibleLayers={visibleLayers}
             selectedIds={selection}
+            zoomCommand={zoomCommand}
+            onZoomExecuted={() => setZoomCommand(null)}
             onEntityClick={(id) => {
               selectEntity(id);
               setEntityPanelOpen(true);
             }}
-          />
-
-          {/* Selection Actions Bar */}
-          <SelectionActionsBar
-            selectionCount={selection.length}
-            selectionInfo={selectionInfo}
-            onCopy={() => console.log('Copy:', selection)}
-            onDelete={async () => {
-              if (!docApi) return;
-              if (window.confirm(`Supprimer ${selection.length} entité(s) ?`)) {
-                for (const id of selection) {
-                  await deleteFromWorkspace(docApi, id);
-                }
-                await refreshWorkspace();
-                clearSelection();
-                setIsDirty(true);
-              }
-            }}
-            onExport={() => console.log('Export:', selection)}
-            onEditStyle={() => console.log('Edit style')}
-            onZoomTo={() => console.log('Zoom to:', selection)}
-            onEditGeometry={() => console.log('Edit geometry:', selection[0])}
-            onClear={clearSelection}
           />
         </div>
       </div>

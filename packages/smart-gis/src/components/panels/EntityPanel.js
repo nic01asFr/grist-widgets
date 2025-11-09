@@ -17,8 +17,13 @@ const EntityPanel = ({
   onPrevious,
   onNext,
   onEdit,
+  onSave,
+  onDelete,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
 
   if (selectedEntityIds.length === 0) {
     return null;
@@ -36,6 +41,34 @@ const EntityPanel = ({
   const handleNext = () => {
     setCurrentIndex((prev) => (prev < selectedEntities.length - 1 ? prev + 1 : 0));
     onNext?.();
+  };
+
+  const handleEditToggle = () => {
+    if (!isEditing) {
+      // Enter edit mode
+      setEditedName(currentEntity.name || '');
+      setEditedDescription(currentEntity.description || '');
+      setIsEditing(true);
+    } else {
+      // Cancel edit mode
+      setIsEditing(false);
+    }
+  };
+
+  const handleSave = () => {
+    onSave?.({
+      id: currentEntity.id,
+      name: editedName,
+      description: editedDescription,
+    });
+    setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Supprimer l'entité "${currentEntity.name || currentEntity.id}" ?`)) {
+      onDelete?.(currentEntity.id);
+      onClose?.();
+    }
   };
 
   return (
@@ -85,64 +118,130 @@ const EntityPanel = ({
 
       {/* Entity Content */}
       <div style={styles.content}>
-        {/* Name */}
-        {currentEntity.name && (
-          <div style={styles.field}>
-            <div style={styles.fieldLabel}>Nom</div>
-            <div style={styles.fieldValue}>{currentEntity.name}</div>
-          </div>
-        )}
-
-        {/* Layer */}
-        {currentEntity.layer_name && (
-          <div style={styles.field}>
-            <div style={styles.fieldLabel}>Couche</div>
-            <div style={styles.fieldValue}>{currentEntity.layer_name}</div>
-          </div>
-        )}
-
-        {/* Description */}
-        {currentEntity.description && (
-          <div style={styles.field}>
-            <div style={styles.fieldLabel}>Description</div>
-            <div style={styles.fieldValue}>{currentEntity.description}</div>
-          </div>
-        )}
-
-        {/* Geometry */}
-        {currentEntity.geometry && (
-          <div style={styles.field}>
-            <div style={styles.fieldLabel}>Géométrie</div>
-            <div style={{...styles.fieldValue, ...styles.geometryValue}}>
-              {currentEntity.geometry.substring(0, 100)}
-              {currentEntity.geometry.length > 100 && '...'}
+        {!isEditing ? (
+          /* View Mode */
+          <>
+            {/* Name */}
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Nom</div>
+              <div style={styles.fieldValue}>{currentEntity.name || 'Sans nom'}</div>
             </div>
-          </div>
-        )}
 
-        {/* TODO: Add photo if exists */}
-        {/* TODO: Add custom fields */}
-        {/* TODO: Add popup configuration */}
+            {/* Layer */}
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Couche</div>
+              <div style={styles.fieldValue}>{currentEntity.layer_name || 'Aucune'}</div>
+            </div>
+
+            {/* Description */}
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Description</div>
+              <div style={styles.fieldValue}>
+                {currentEntity.description || 'Aucune description'}
+              </div>
+            </div>
+
+            {/* Geometry */}
+            {currentEntity.geometry && (
+              <div style={styles.field}>
+                <div style={styles.fieldLabel}>Géométrie</div>
+                <div style={{...styles.fieldValue, ...styles.geometryValue}}>
+                  {currentEntity.geometry.substring(0, 80)}
+                  {currentEntity.geometry.length > 80 && '...'}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Edit Mode */
+          <>
+            {/* Name Input */}
+            <div style={styles.field}>
+              <label style={styles.fieldLabel}>Nom</label>
+              <input
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                style={styles.input}
+                placeholder="Nom de l'entité"
+              />
+            </div>
+
+            {/* Layer (read-only in edit) */}
+            <div style={styles.field}>
+              <div style={styles.fieldLabel}>Couche</div>
+              <div style={styles.fieldValue}>{currentEntity.layer_name || 'Aucune'}</div>
+            </div>
+
+            {/* Description Textarea */}
+            <div style={styles.field}>
+              <label style={styles.fieldLabel}>Description</label>
+              <textarea
+                value={editedDescription}
+                onChange={(e) => setEditedDescription(e.target.value)}
+                style={styles.textarea}
+                placeholder="Description de l'entité"
+                rows={4}
+              />
+            </div>
+
+            {/* Geometry (read-only) */}
+            {currentEntity.geometry && (
+              <div style={styles.field}>
+                <div style={styles.fieldLabel}>Géométrie</div>
+                <div style={{...styles.fieldValue, ...styles.geometryValue}}>
+                  {currentEntity.geometry.substring(0, 80)}
+                  {currentEntity.geometry.length > 80 && '...'}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Actions */}
       <div style={styles.actions}>
-        <button
-          style={styles.actionButton}
-          onClick={() => onEdit?.(currentEntity.id)}
-          title="Éditer l'entité"
-        >
-          <span>✏️</span>
-          <span>Éditer</span>
-        </button>
-        <button
-          style={{...styles.actionButton, ...styles.actionButtonDanger}}
-          onClick={() => console.log('Delete', currentEntity.id)}
-          title="Supprimer l'entité"
-        >
-          <span>🗑️</span>
-          <span>Supprimer</span>
-        </button>
+        {!isEditing ? (
+          /* View Mode Actions */
+          <>
+            <button
+              style={styles.actionButton}
+              onClick={handleEditToggle}
+              title="Éditer l'entité"
+            >
+              <span>✏️</span>
+              <span>Éditer</span>
+            </button>
+            <button
+              style={{...styles.actionButton, ...styles.actionButtonDanger}}
+              onClick={handleDelete}
+              title="Supprimer l'entité"
+            >
+              <span>🗑️</span>
+              <span>Supprimer</span>
+            </button>
+          </>
+        ) : (
+          /* Edit Mode Actions */
+          <>
+            <button
+              style={{...styles.actionButton, ...styles.actionButtonSecondary}}
+              onClick={handleEditToggle}
+              title="Annuler les modifications"
+            >
+              <span>✕</span>
+              <span>Annuler</span>
+            </button>
+            <button
+              style={{...styles.actionButton, ...styles.actionButtonPrimary}}
+              onClick={handleSave}
+              title="Sauvegarder les modifications"
+            >
+              <span>✓</span>
+              <span>Sauvegarder</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -298,6 +397,34 @@ const styles = {
   actionButtonDanger: {
     borderColor: colors.danger,
     color: colors.danger,
+  },
+  actionButtonPrimary: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    color: colors.white,
+  },
+  actionButtonSecondary: {
+    backgroundColor: colors.grayLight,
+  },
+  input: {
+    width: '100%',
+    padding: spacing.sm,
+    fontSize: fontSize.sm,
+    border: `1px solid ${colors.border}`,
+    borderRadius: borderRadius.md,
+    outline: 'none',
+    transition: `all ${transitions.fast}`,
+  },
+  textarea: {
+    width: '100%',
+    padding: spacing.sm,
+    fontSize: fontSize.sm,
+    border: `1px solid ${colors.border}`,
+    borderRadius: borderRadius.md,
+    outline: 'none',
+    resize: 'vertical',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    transition: `all ${transitions.fast}`,
   },
 };
 
