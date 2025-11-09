@@ -5,7 +5,7 @@
  * Unified text + semantic search with suggestions
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MenuSection } from '../layout';
 import { Input, Checkbox, Select } from '../ui';
 import { colors } from '../../constants/colors';
@@ -59,7 +59,6 @@ const SearchSection = ({
     if (searchMode !== 'both') return [];
 
     const textIds = new Set(textResults.map(r => r.id));
-    const semanticIds = new Set(semanticResults.map(r => r.id));
 
     return [
       ...textResults.map(r => ({ ...r, matchType: 'text' })),

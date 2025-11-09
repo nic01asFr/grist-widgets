@@ -27,7 +27,7 @@ const SelectionActionsBar = ({
     return null;
   }
 
-  const { isSingle, isMultiple, layerCount, layers } = selectionInfo;
+  const { isSingle, layerCount, layers } = selectionInfo;
 
   const actions = [
     {

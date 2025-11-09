@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, ColorPicker, Slider, Checkbox } from '../ui';
 import { colors } from '../../constants/colors';
-import { spacing, fontSize, fontWeight, borderRadius, shadows } from '../../constants/styles';
+import { spacing, fontSize, fontWeight, borderRadius } from '../../constants/styles';
 
 const StyleEditor = ({
   targetName = '',
