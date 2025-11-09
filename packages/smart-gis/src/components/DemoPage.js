@@ -1,6 +1,6 @@
 /**
  * DemoPage Component
- * Test page for Phase 1, 2, 3 & 4 components
+ * Test page for Phase 1, 2, 3, 4 & 5 components
  */
 
 import React, { useState, useMemo } from 'react';
@@ -8,7 +8,7 @@ import { Button, Input, ColorPicker, Slider, Checkbox, Select, Modal } from './u
 import { Navbar, MainMenu, MenuSection, MenuDivider, AdjacentPanel } from './layout';
 import { SelectionTools, SelectionActionsBar } from './map';
 import { LayersSection } from './menu';
-import { EntityList, StatsPanel } from './panels';
+import { EntityList, StatsPanel, StyleEditor } from './panels';
 import useMapSelection from '../hooks/useMapSelection';
 import { colors } from '../constants/colors';
 
@@ -142,6 +142,13 @@ const DemoPage = () => {
     setPanelType('stats');
     setPanelLayerName(layerName);
     setAdjacentPanelOpen(true);
+  };
+
+  // Style editor handler (Phase 5)
+  const handleStyleApply = (style) => {
+    console.log('Apply style:', style, 'to', panelLayerName);
+    alert(`Style appliqué à "${panelLayerName}":\n${JSON.stringify(style, null, 2)}`);
+    setAdjacentPanelOpen(false);
   };
 
   return (
@@ -409,42 +416,16 @@ const DemoPage = () => {
                 entities={panelEntities}
               />
             ) : panelType === 'style' ? (
-              <div style={{ padding: '16px' }}>
-                <h4>Éditeur de Style</h4>
-                <p>Édition du style pour la couche: <strong>{panelLayerName}</strong></p>
-
-                <ColorPicker
-                  value={colorValue}
-                  onChange={setColorValue}
-                  label="Couleur de remplissage"
-                />
-
-                <div style={{ marginTop: '16px' }}>
-                  <Slider
-                    value={sliderValue}
-                    onChange={setSliderValue}
-                    label="Opacité"
-                    unit="%"
-                  />
-                </div>
-
-                <div style={{ marginTop: '16px' }}>
-                  <Checkbox
-                    checked={checkboxValue}
-                    onChange={setCheckboxValue}
-                    label="Afficher les bordures"
-                  />
-                </div>
-
-                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                  <Button variant="secondary" onClick={() => setAdjacentPanelOpen(false)} fullWidth>
-                    Annuler
-                  </Button>
-                  <Button variant="primary" fullWidth>
-                    Appliquer
-                  </Button>
-                </div>
-              </div>
+              <StyleEditor
+                targetName={panelLayerName}
+                targetType="layer"
+                initialStyle={{
+                  fillColor: colorValue,
+                  fillOpacity: sliderValue,
+                }}
+                onApply={handleStyleApply}
+                onCancel={() => setAdjacentPanelOpen(false)}
+              />
             ) : (
               <div style={{ padding: '16px' }}>
                 <h4>Exemple de contenu</h4>

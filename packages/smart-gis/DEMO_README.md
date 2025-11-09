@@ -1,8 +1,8 @@
 # Smart GIS Widget v3.0 - Demo Mode
 
-## Testing Phase 1, 2, 3 & 4 Components
+## Testing Phase 1, 2, 3, 4 & 5 Components
 
-To visually test the new UI components, layout, selection system, and layer management:
+To visually test the new UI components, layout, selection system, layer management, and style editor:
 
 ### Method 1: Temporary Switch
 ```bash
@@ -58,6 +58,17 @@ import { Navbar, MainMenu, AdjacentPanel } from './components/layout';
 - **Layer Visibility**: Toggle individual layers on/off
 - **Active Layer Context**: Selection and operations respect active layer
 
+### Phase 5: Visual Style Editor (✅ Complete)
+- **StyleEditor Panel**: Complete visual style editor with real-time preview
+- **Fill Style**: Color picker + opacity slider with enable/disable toggle
+- **Stroke Style**: Color picker + opacity slider + width slider with enable/disable toggle
+- **Point Style**: Radius slider (2-20px)
+- **Live Preview**: SVG preview for Point, Line, and Polygon geometries
+- **Style Presets**: 6 color presets (🔵 Bleu, 🟢 Vert, 🔴 Rouge, 🟡 Jaune, 🟣 Violet, ⚪ Gris)
+- **Actions**: Reset to defaults, Cancel, Apply
+- **Target Types**: Support for layer, entity, or selection styling
+- **RGBA Conversion**: Automatic hex to rgba with opacity
+
 ## Demo Page Features
 
 The demo page (`src/components/DemoPage.js`) showcases:
@@ -108,11 +119,17 @@ The demo page (`src/components/DemoPage.js`) showcases:
    - EntityList panel: search, filter by geometry type, sort, checkbox selection, batch actions
    - StatsPanel: entity count, geometry type distribution with bars, bounding box
 
-## Next Steps
-
-### Phase 5: Style Editor (Pending)
-- `components/panels/StyleEditor.js`
-- Visual pickers for colors, opacity, borders
+7. **Visual Style Editor (Phase 5)**
+   - Click "🎨 Style" button on any layer to open StyleEditor
+   - Live SVG preview showing Point, Line, and Polygon
+   - Click preset buttons (🔵🟢🔴🟡🟣⚪) for quick colors
+   - Toggle fill/stroke with checkboxes
+   - Adjust colors with color pickers
+   - Adjust opacity with sliders (0-100%)
+   - Adjust stroke width (1-10px) and point radius (2-20px)
+   - Click "Réinitialiser" to reset to defaults
+   - Click "Appliquer" to apply style (shows alert with JSON)
+   - Preview updates in real-time as you edit
 
 ## Architecture
 
@@ -123,12 +140,41 @@ src/
 │   ├── layout/       ✅ Phase 2 (3 components: Navbar, MainMenu+MenuSection, AdjacentPanel)
 │   ├── map/          ✅ Phase 3 (2 components: SelectionTools, SelectionActionsBar)
 │   ├── menu/         ✅ Phase 4 (2 components: LayersSection, LayerItem)
-│   ├── panels/       ✅ Phase 4 (2 components: EntityList, StatsPanel)
-│   └── DemoPage.js   ✅ Test page (updated for Phases 1-4)
+│   ├── panels/       ✅ Phases 4-5 (3 components: EntityList, StatsPanel, StyleEditor)
+│   └── DemoPage.js   ✅ Test page (updated for Phases 1-5)
 ├── constants/        ✅ Phase 1 (colors.js, styles.js)
 ├── hooks/            ✅ Phase 3 (useMapSelection.js)
 └── utils/            ⏳ Future phases
 ```
+
+## Next Steps
+
+### Phase 6: Smart Search (Pending)
+- `components/menu/SearchSection.js`
+- Unified text + semantic search
+- Contextual suggestions
+- Auto-recenter on selection
+
+### Phase 7: Project Management (Pending)
+- `components/menu/ProjectSection.js`
+- New/Save/Load project functions
+- Export functionality (GeoJSON, KML, CSV)
+
+### Phase 8: File Import Wizard (Pending)
+- `components/menu/FileImportWizard.js`
+- Support: GeoJSON, Shapefile, KML, GPX, CSV, Excel
+- Projection detection and conversion
+- Dependencies: shpjs, @tmcw/togeojson, papaparse, xlsx, proj4
+
+### Phase 9: Geometry Edition (Pending)
+- `components/map/EditionToolbar.js`
+- Leaflet.pm integration
+- Layer context for new geometries
+
+### Phase 10: Integration & Testing (Pending)
+- Replace GeoSemanticMapWidget.js with v3.0 architecture
+- End-to-end testing
+- Documentation updates
 
 ## Keyboard Shortcuts (Planned)
 
