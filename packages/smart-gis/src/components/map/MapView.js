@@ -5,7 +5,7 @@
  * Main Leaflet map component with WKT geometry rendering
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -83,10 +83,33 @@ const MapBoundsSetter = ({ bounds }) => {
   return null;
 };
 
+// Zoom Controller Component
+const ZoomController = ({ zoomCommand, onExecuted }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!zoomCommand || !map) return;
+
+    if (zoomCommand === 'in') {
+      map.zoomIn();
+    } else if (zoomCommand === 'out') {
+      map.zoomOut();
+    } else if (zoomCommand === 'reset') {
+      map.setView([46.603354, 1.888334], 6);
+    }
+
+    onExecuted?.();
+  }, [zoomCommand, map, onExecuted]);
+
+  return null;
+};
+
 const MapView = ({
   records = [],
   visibleLayers = new Set(),
   selectedIds = [],
+  zoomCommand,
+  onZoomExecuted,
   onEntityClick,
   center = [46.603354, 1.888334], // Center of France
   zoom = 6,
@@ -167,6 +190,7 @@ const MapView = ({
         zoom={zoom}
         style={styles.map}
         scrollWheelZoom={true}
+        zoomControl={false}
         attributionControl={true}
       >
         {/* Base tile layer */}
@@ -198,6 +222,9 @@ const MapView = ({
 
         {/* Fit bounds to visible features */}
         {bounds && <MapBoundsSetter bounds={bounds} />}
+
+        {/* Zoom Controller */}
+        <ZoomController zoomCommand={zoomCommand} onExecuted={onZoomExecuted} />
       </MapContainer>
 
       {/* Empty state */}

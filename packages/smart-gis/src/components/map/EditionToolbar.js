@@ -71,7 +71,6 @@ const EditionToolbar = ({
           }}
         >
           <span style={styles.modeIcon}>✏️</span>
-          <span style={styles.modeLabel}>Dessiner</span>
         </button>
 
         <button
@@ -93,7 +92,6 @@ const EditionToolbar = ({
           }}
         >
           <span style={styles.modeIcon}>✂️</span>
-          <span style={styles.modeLabel}>Éditer</span>
         </button>
 
         <button
@@ -115,7 +113,6 @@ const EditionToolbar = ({
           }}
         >
           <span style={styles.modeIcon}>🗑️</span>
-          <span style={styles.modeLabel}>Supprimer</span>
         </button>
       </div>
 
@@ -177,14 +174,14 @@ const EditionToolbar = ({
               onClick={onCancel}
               title="Annuler les modifications (Échap)"
             >
-              ✕ Annuler
+              ✕
             </button>
             <button
               style={styles.saveButton}
               onClick={onSave}
               title="Sauvegarder les modifications (Entrée)"
             >
-              ✓ Sauvegarder
+              ✓
             </button>
           </div>
         </>

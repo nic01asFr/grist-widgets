@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navbar, TabbedMenu } from './components/layout';
-import { SelectionTools, SelectionActionsBar, EditionToolbar, MapView, ZoomControls } from './components/map';
+import { SelectionTools, EditionToolbar, MapView, ZoomControls } from './components/map';
 import { LayersSection, ProjectSection, SearchSection } from './components/menu';
-import { EntityPanel } from './components/panels';
+import { EntityPanel, EntityListPanel } from './components/panels';
 import MenuContent from './components/layout/MenuContent';
 import useMapSelection from './hooks/useMapSelection';
 import { colors } from './constants/colors';
@@ -31,6 +31,7 @@ const SmartGISWidget = () => {
   const [menuWidth, setMenuWidth] = useState(320);
   const [fullscreen, setFullscreen] = useState(false);
   const [entityPanelOpen, setEntityPanelOpen] = useState(false);
+  const [entityListLayer, setEntityListLayer] = useState(null); // Layer for EntityListPanel
 
   // Layer state
   const [activeLayer, setActiveLayer] = useState(null);
@@ -39,7 +40,6 @@ const SmartGISWidget = () => {
   // Selection state
   const {
     selection,
-    selectionInfo,
     selectionMode,
     setSelectionMode,
     selectEntity,
@@ -51,6 +51,9 @@ const SmartGISWidget = () => {
   const [editionMode, setEditionMode] = useState(null);
   const [drawMode, setDrawMode] = useState('marker');
   const [isEditing, setIsEditing] = useState(false);
+
+  // Map control state
+  const [zoomCommand, setZoomCommand] = useState(null); // 'in', 'out', 'reset'
 
   // Initialize Grist connection
   useEffect(() => {
@@ -244,9 +247,8 @@ const SmartGISWidget = () => {
                   onLayerDelete={handleLayerDelete}
                   onLayerRename={handleLayerRename}
                   onEntityListOpen={(layerName) => {
-                    const layerEntities = workspaceData.filter(r => r.layer_name === layerName);
-                    selectByIds(layerEntities.map(r => r.id));
-                    setEntityPanelOpen(true);
+                    // Open EntityListPanel to show entities of this layer
+                    setEntityListLayer(layerName);
                   }}
                   visibleLayers={visibleLayers}
                 />
@@ -281,31 +283,35 @@ const SmartGISWidget = () => {
           {/* Zoom Controls */}
           <ZoomControls
             menuWidth={(menuOpen && !fullscreen) ? menuWidth : 0}
-            onZoomIn={() => console.log('Zoom in')}
-            onZoomOut={() => console.log('Zoom out')}
-            onResetZoom={() => console.log('Reset zoom')}
+            onZoomIn={() => setZoomCommand('in')}
+            onZoomOut={() => setZoomCommand('out')}
+            onResetZoom={() => setZoomCommand('reset')}
           />
 
-          {/* Edition Toolbar */}
-          <EditionToolbar
-            editionMode={editionMode}
-            drawMode={drawMode}
-            activeLayer={activeLayer}
-            onModeChange={handleEditionModeChange}
-            onDrawModeChange={setDrawMode}
-            onSave={handleEditionSave}
-            onCancel={handleEditionCancel}
-            isEditing={isEditing}
-          />
+          {/* Edition Toolbar - Only shown when layer is selected */}
+          {activeLayer && (
+            <EditionToolbar
+              editionMode={editionMode}
+              drawMode={drawMode}
+              activeLayer={activeLayer}
+              onModeChange={handleEditionModeChange}
+              onDrawModeChange={setDrawMode}
+              onSave={handleEditionSave}
+              onCancel={handleEditionCancel}
+              isEditing={isEditing}
+            />
+          )}
 
-          {/* Selection Tools */}
-          <SelectionTools
-            selectionMode={selectionMode}
-            onModeChange={setSelectionMode}
-            activeLayer={activeLayer}
-            selectionCount={selection.length}
-            onClear={clearSelection}
-          />
+          {/* Selection Tools - Only shown when layer is selected */}
+          {activeLayer && (
+            <SelectionTools
+              selectionMode={selectionMode}
+              onModeChange={setSelectionMode}
+              activeLayer={activeLayer}
+              selectionCount={selection.length}
+              onClear={clearSelection}
+            />
+          )}
 
           {/* Entity Panel */}
           {entityPanelOpen && selection.length > 0 && (
@@ -313,7 +319,22 @@ const SmartGISWidget = () => {
               entities={workspaceData}
               selectedEntityIds={selection}
               onClose={() => setEntityPanelOpen(false)}
-              onEdit={(id) => console.log('Edit entity:', id)}
+              onSave={async (data) => {
+                if (!docApi) return;
+                await updateInWorkspace(docApi, data.id, {
+                  name: data.name,
+                  description: data.description,
+                });
+                await refreshWorkspace();
+                setIsDirty(true);
+              }}
+              onDelete={async (id) => {
+                if (!docApi) return;
+                await deleteFromWorkspace(docApi, id);
+                await refreshWorkspace();
+                clearSelection();
+                setIsDirty(true);
+              }}
             />
           )}
 
@@ -322,36 +343,32 @@ const SmartGISWidget = () => {
             records={workspaceData}
             visibleLayers={visibleLayers}
             selectedIds={selection}
+            zoomCommand={zoomCommand}
+            onZoomExecuted={() => setZoomCommand(null)}
             onEntityClick={(id) => {
               selectEntity(id);
               setEntityPanelOpen(true);
             }}
           />
-
-          {/* Selection Actions Bar */}
-          <SelectionActionsBar
-            selectionCount={selection.length}
-            selectionInfo={selectionInfo}
-            onCopy={() => console.log('Copy:', selection)}
-            onDelete={async () => {
-              if (!docApi) return;
-              if (window.confirm(`Supprimer ${selection.length} entité(s) ?`)) {
-                for (const id of selection) {
-                  await deleteFromWorkspace(docApi, id);
-                }
-                await refreshWorkspace();
-                clearSelection();
-                setIsDirty(true);
-              }
-            }}
-            onExport={() => console.log('Export:', selection)}
-            onEditStyle={() => console.log('Edit style')}
-            onZoomTo={() => console.log('Zoom to:', selection)}
-            onEditGeometry={() => console.log('Edit geometry:', selection[0])}
-            onClear={clearSelection}
-          />
         </div>
       </div>
+
+      {/* Entity List Panel - Shows entities of selected layer */}
+      {entityListLayer && (
+        <EntityListPanel
+          layerName={entityListLayer}
+          entities={workspaceData.filter(r => r.layer_name === entityListLayer)}
+          selectedEntityIds={selection}
+          onEntityClick={(id) => {
+            selectEntity(id);
+            setEntityPanelOpen(true);
+            setEntityListLayer(null); // Close list panel when entity is selected
+          }}
+          onClose={() => setEntityListLayer(null)}
+          onSelectAll={(ids) => selectByIds(ids)}
+          onDeselectAll={clearSelection}
+        />
+      )}
     </div>
   );
 };
