@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar, TabbedMenu } from './components/layout';
 import { SelectionTools, EditionToolbar, MapView, ZoomControls } from './components/map';
 import { LayersSection, ProjectSection, SearchSection } from './components/menu';
-import { EntityPanel, EntityListPanel } from './components/panels';
+import { EntityPanel, AdjacentPanel } from './components/panels';
 import MenuContent from './components/layout/MenuContent';
 import useMapSelection from './hooks/useMapSelection';
 import { colors } from './constants/colors';
@@ -31,7 +31,8 @@ const SmartGISWidget = () => {
   const [menuWidth, setMenuWidth] = useState(320);
   const [fullscreen, setFullscreen] = useState(false);
   const [entityPanelOpen, setEntityPanelOpen] = useState(false);
-  const [entityListLayer, setEntityListLayer] = useState(null); // Layer for EntityListPanel
+  const [adjacentPanelLayer, setAdjacentPanelLayer] = useState(null); // Layer for AdjacentPanel
+  const [adjacentPanelWidth, setAdjacentPanelWidth] = useState(300);
 
   // Layer state
   const [activeLayer, setActiveLayer] = useState(null);
@@ -43,7 +44,6 @@ const SmartGISWidget = () => {
     selectionMode,
     setSelectionMode,
     selectEntity,
-    selectByIds,
     clearSelection,
   } = useMapSelection(workspaceData, activeLayer);
 
@@ -247,8 +247,8 @@ const SmartGISWidget = () => {
                   onLayerDelete={handleLayerDelete}
                   onLayerRename={handleLayerRename}
                   onEntityListOpen={(layerName) => {
-                    // Open EntityListPanel to show entities of this layer
-                    setEntityListLayer(layerName);
+                    // Open AdjacentPanel to show layer options and entities
+                    setAdjacentPanelLayer(layerName);
                   }}
                   visibleLayers={visibleLayers}
                 />
@@ -278,11 +278,33 @@ const SmartGISWidget = () => {
           </TabbedMenu>
         )}
 
+        {/* Adjacent Panel - Shows layer options and entities */}
+        {!fullscreen && adjacentPanelLayer && (
+          <AdjacentPanel
+            isOpen={!!adjacentPanelLayer}
+            layerName={adjacentPanelLayer}
+            entities={workspaceData.filter(r => r.layer_name === adjacentPanelLayer)}
+            selectedEntityIds={selection}
+            onEntitySelect={(id) => {
+              selectEntity(id);
+              setEntityPanelOpen(true);
+            }}
+            onClose={() => setAdjacentPanelLayer(null)}
+            initialWidth={adjacentPanelWidth}
+            onWidthChange={setAdjacentPanelWidth}
+            onStyleChange={(styleData) => {
+              console.log('Style change for layer:', adjacentPanelLayer, styleData);
+              // TODO: Apply style changes to layer
+            }}
+          />
+        )}
+
         {/* Map area */}
         <div style={styles.mapArea}>
           {/* Zoom Controls */}
           <ZoomControls
             menuWidth={(menuOpen && !fullscreen) ? menuWidth : 0}
+            adjacentPanelWidth={(adjacentPanelLayer && !fullscreen) ? adjacentPanelWidth : 0}
             onZoomIn={() => setZoomCommand('in')}
             onZoomOut={() => setZoomCommand('out')}
             onResetZoom={() => setZoomCommand('reset')}
@@ -352,23 +374,6 @@ const SmartGISWidget = () => {
           />
         </div>
       </div>
-
-      {/* Entity List Panel - Shows entities of selected layer */}
-      {entityListLayer && (
-        <EntityListPanel
-          layerName={entityListLayer}
-          entities={workspaceData.filter(r => r.layer_name === entityListLayer)}
-          selectedEntityIds={selection}
-          onEntityClick={(id) => {
-            selectEntity(id);
-            setEntityPanelOpen(true);
-            setEntityListLayer(null); // Close list panel when entity is selected
-          }}
-          onClose={() => setEntityListLayer(null)}
-          onSelectAll={(ids) => selectByIds(ids)}
-          onDeselectAll={clearSelection}
-        />
-      )}
     </div>
   );
 };

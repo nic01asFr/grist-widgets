@@ -13,12 +13,15 @@ const ZoomControls = ({
   onZoomIn,
   onZoomOut,
   onResetZoom,
-  menuWidth = 300,
+  menuWidth = 0,
+  adjacentPanelWidth = 0,
 }) => {
+  const totalOffset = menuWidth + adjacentPanelWidth;
+
   return (
     <div style={{
       ...styles.container,
-      left: `calc(${menuWidth}px + ${spacing.md})`,
+      left: `calc(${totalOffset}px + ${spacing.md})`,
     }}>
       {/* Zoom In */}
       <button
