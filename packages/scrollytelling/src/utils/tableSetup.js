@@ -38,24 +38,29 @@ export const TABLE_DEFINITIONS = {
 
 export async function ensureTablesExist(docApi) {
   try {
-    const tables = await docApi.fetchTable('_grist_Tables');
-    console.log('Fetched _grist_Tables structure:', tables);
+    console.log('📋 Checking for Scrollytelling tables...');
 
-    // Get table names from the tableId column
-    // fetchTable returns [rowIds, columnIds, recordIds, columnData]
-    // columnData.tableId contains the array of table names
-    const tableNames = tables[3]?.tableId || [];
+    // Check if tables exist
+    const tables = await docApi.fetchTable('_grist_Tables');
+    const tableNames = tables.tableId || [];
     console.log('Existing tables:', tableNames);
 
     const actions = [];
 
     // Create Scenes table if it doesn't exist
     if (!tableNames.includes(TABLE_DEFINITIONS.SCENES.name)) {
-      console.log('Creating Scrollytelling_Scenes table...');
+      console.log('📝 Creating Scrollytelling_Scenes table...');
+
+      // Format columns for AddTable (only id and type)
+      const sceneColumns = TABLE_DEFINITIONS.SCENES.columns.map(col => ({
+        id: col.id,
+        type: col.type
+      }));
+
       actions.push([
         'AddTable',
         TABLE_DEFINITIONS.SCENES.name,
-        TABLE_DEFINITIONS.SCENES.columns
+        sceneColumns
       ]);
 
       // Add sample data
@@ -89,11 +94,18 @@ export async function ensureTablesExist(docApi) {
 
     // Create Config table if it doesn't exist
     if (!tableNames.includes(TABLE_DEFINITIONS.CONFIG.name)) {
-      console.log('Creating Scrollytelling_Config table...');
+      console.log('📝 Creating Scrollytelling_Config table...');
+
+      // Format columns for AddTable (only id and type)
+      const configColumns = TABLE_DEFINITIONS.CONFIG.columns.map(col => ({
+        id: col.id,
+        type: col.type
+      }));
+
       actions.push([
         'AddTable',
         TABLE_DEFINITIONS.CONFIG.name,
-        TABLE_DEFINITIONS.CONFIG.columns
+        configColumns
       ]);
 
       // Add default config
@@ -112,15 +124,17 @@ export async function ensureTablesExist(docApi) {
     }
 
     if (actions.length > 0) {
+      console.log(`🔨 Applying ${actions.length} actions to create tables...`);
       await docApi.applyUserActions(actions);
-      console.log('Tables created successfully');
+      console.log('✅ Tables created successfully!');
       return true;
+    } else {
+      console.log('✓ All tables already exist');
+      return false;
     }
-
-    return false;
   } catch (error) {
-    console.error('Error creating tables:', error);
-    return false;
+    console.error('❌ Error creating tables:', error);
+    throw error;
   }
 }
 
