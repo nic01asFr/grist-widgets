@@ -51,6 +51,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Panoramax Explorer',
+    description: 'Explorateur interactif d\'images Panoramax avec carte Leaflet. Mode exploration pour découvrir des panoramas et mode visualisation pour afficher les vues sauvegardées. Création automatique de table pour sauvegarder les vues favorites.',
+    path: 'panoramax-explorer',
+    widgetId: '@nic01asFr/panoramax-explorer',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 

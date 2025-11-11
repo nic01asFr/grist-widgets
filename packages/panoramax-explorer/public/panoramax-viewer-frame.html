@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panoramax Viewer Frame</title>
+
+    <!-- Panoramax Web Viewer via CDN (loaded in clean, non-Grist context) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@panoramax/web-viewer@4.1.0/build/index.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@panoramax/web-viewer@4.1.0/build/index.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+        }
+
+        pnx-photo-viewer {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: sans-serif;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div>Chargement du viewer Panoramax...</div>
+    </div>
+
+    <pnx-photo-viewer
+        id="viewer"
+        endpoint="https://api.panoramax.xyz/api"
+        style="display: none;">
+    </pnx-photo-viewer>
+
+    <script>
+        // Wait for Panoramax to load
+        async function waitForPanoramax() {
+            return new Promise((resolve) => {
+                const checkInterval = setInterval(() => {
+                    if (customElements.get('pnx-photo-viewer')) {
+                        clearInterval(checkInterval);
+                        console.log('✅ Panoramax loaded in iframe');
+                        resolve(true);
+                    }
+                }, 100);
+
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    console.warn('⚠️ Panoramax timeout');
+                    resolve(false);
+                }, 10000);
+            });
+        }
+
+        let currentCollection = null;
+        let currentPicture = null;
+
+        // Listen for messages from parent
+        window.addEventListener('message', async (event) => {
+            const { action, data } = event.data;
+
+            console.log('📨 Received message:', action, data);
+
+            switch (action) {
+                case 'LOAD_PANORAMA':
+                    await loadPanorama(data.collection, data.picture);
+                    break;
+                case 'PING':
+                    window.parent.postMessage({ action: 'PONG' }, '*');
+                    break;
+            }
+        });
+
+        async function loadPanorama(collection, picture) {
+            const viewer = document.getElementById('viewer');
+            const loading = document.getElementById('loading');
+
+            console.log('🖼️ Loading:', collection, picture);
+
+            try {
+                // Force reset if collection changes
+                if (currentCollection && currentCollection !== collection) {
+                    console.log('🔄 Collection change detected, resetting viewer');
+                    viewer.removeAttribute('collection');
+                    viewer.removeAttribute('picture');
+
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                viewer.setAttribute('collection', collection);
+                viewer.setAttribute('picture', picture);
+
+                currentCollection = collection;
+                currentPicture = picture;
+
+                // Show viewer
+                loading.style.display = 'none';
+                viewer.style.display = 'block';
+
+                // Notify parent
+                window.parent.postMessage({
+                    action: 'PANORAMA_LOADED',
+                    data: { collection, picture }
+                }, '*');
+
+            } catch (error) {
+                console.error('❌ Error loading panorama:', error);
+                window.parent.postMessage({
+                    action: 'PANORAMA_ERROR',
+                    data: { error: error.message }
+                }, '*');
+            }
+        }
+
+        // Initialize
+        (async function() {
+            const loaded = await waitForPanoramax();
+
+            window.parent.postMessage({
+                action: 'VIEWER_READY',
+                data: { loaded }
+            }, '*');
+        })();
+    </script>
+</body>
+</html>
