@@ -39,7 +39,13 @@ export const TABLE_DEFINITIONS = {
 export async function ensureTablesExist(docApi) {
   try {
     const tables = await docApi.fetchTable('_grist_Tables');
-    const tableNames = tables[2].map(id => tables[3][tables[2].indexOf(id)]);
+    console.log('Fetched _grist_Tables structure:', tables);
+
+    // Get table names from the tableId column
+    // fetchTable returns [rowIds, columnIds, recordIds, columnData]
+    // columnData.tableId contains the array of table names
+    const tableNames = tables[3]?.tableId || [];
+    console.log('Existing tables:', tableNames);
 
     const actions = [];
 
