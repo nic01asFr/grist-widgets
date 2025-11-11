@@ -29,66 +29,6 @@ export function ScrollytellingWidget() {
   const gristWidgetRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
-  // Initialize Grist widget
-  useEffect(() => {
-    if (initialized) return;
-
-    const initWidget = async () => {
-      try {
-        console.log('Initializing Scrollytelling Widget...');
-        const widget = new GristWidgetBase();
-        gristWidgetRef.current = widget;
-
-        // Initialize with default mappings
-        const success = await widget.initialize({
-          mappings: getDefaultMappings(),
-          onRecords: handleRecordsUpdate,
-          onMappings: handleMappingsUpdate,
-          onInit: async () => {
-            // Ensure tables exist
-            await ensureTablesExist(widget.docApi);
-            // Load config
-            await loadConfig(widget.docApi);
-          }
-        });
-
-        if (success) {
-          setInitialized(true);
-          setLoading(false);
-        } else {
-          throw new Error('Failed to initialize widget');
-        }
-      } catch (err) {
-        console.error('Initialization error:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-
-    initWidget();
-  }, [initialized]);
-
-  // Load configuration from Grist
-  const loadConfig = async (docApi) => {
-    try {
-      const configTable = await docApi.fetchTable('Scrollytelling_Config');
-      if (configTable && configTable[2]?.length > 0) {
-        const firstRecordId = configTable[2][0];
-        const configData = {};
-        Object.keys(configTable[3]).forEach((key) => {
-          const values = configTable[3][key];
-          const index = configTable[2].indexOf(firstRecordId);
-          if (index !== -1) {
-            configData[key] = values[index];
-          }
-        });
-        setConfig(prevConfig => ({ ...prevConfig, ...configData }));
-      }
-    } catch (err) {
-      console.error('Error loading config:', err);
-    }
-  };
-
   // Handle records update from Grist
   const handleRecordsUpdate = useCallback((records) => {
     if (!records || records.length === 0) {
@@ -139,6 +79,66 @@ export function ScrollytellingWidget() {
     columnHelperRef.current.updateMappings(mappings);
   }, []);
 
+  // Load configuration from Grist
+  const loadConfig = useCallback(async (docApi) => {
+    try {
+      const configTable = await docApi.fetchTable('Scrollytelling_Config');
+      if (configTable && configTable[2]?.length > 0) {
+        const firstRecordId = configTable[2][0];
+        const configData = {};
+        Object.keys(configTable[3]).forEach((key) => {
+          const values = configTable[3][key];
+          const index = configTable[2].indexOf(firstRecordId);
+          if (index !== -1) {
+            configData[key] = values[index];
+          }
+        });
+        setConfig(prevConfig => ({ ...prevConfig, ...configData }));
+      }
+    } catch (err) {
+      console.error('Error loading config:', err);
+    }
+  }, []);
+
+  // Initialize Grist widget
+  useEffect(() => {
+    if (initialized) return;
+
+    const initWidget = async () => {
+      try {
+        console.log('Initializing Scrollytelling Widget...');
+        const widget = new GristWidgetBase();
+        gristWidgetRef.current = widget;
+
+        // Initialize with default mappings
+        const success = await widget.initialize({
+          mappings: getDefaultMappings(),
+          onRecords: handleRecordsUpdate,
+          onMappings: handleMappingsUpdate,
+          onInit: async () => {
+            // Ensure tables exist
+            await ensureTablesExist(widget.docApi);
+            // Load config
+            await loadConfig(widget.docApi);
+          }
+        });
+
+        if (success) {
+          setInitialized(true);
+          setLoading(false);
+        } else {
+          throw new Error('Failed to initialize widget');
+        }
+      } catch (err) {
+        console.error('Initialization error:', err);
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+
+    initWidget();
+  }, [initialized, handleRecordsUpdate, handleMappingsUpdate, loadConfig]);
+
   // Handle scroll event
   const handleScroll = useCallback((e) => {
     if (!scrollContainerRef.current || scenes.length === 0) return;
@@ -162,6 +162,20 @@ export function ScrollytellingWidget() {
     }
   }, [scenes.length, activeSceneIndex]);
 
+  // Go to specific scene
+  const goToScene = useCallback((index) => {
+    if (!scrollContainerRef.current || index < 0 || index >= scenes.length) return;
+
+    const container = scrollContainerRef.current;
+    const scrollHeight = container.scrollHeight - container.clientHeight;
+    const targetScroll = (index / scenes.length) * scrollHeight;
+
+    container.scrollTo({
+      top: targetScroll,
+      behavior: 'smooth'
+    });
+  }, [scenes.length]);
+
   // Handle keyboard navigation
   useEffect(() => {
     if (!config.keyboard_nav) return;
@@ -178,21 +192,7 @@ export function ScrollytellingWidget() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [config.keyboard_nav, activeSceneIndex, scenes.length]);
-
-  // Go to specific scene
-  const goToScene = (index) => {
-    if (!scrollContainerRef.current || index < 0 || index >= scenes.length) return;
-
-    const container = scrollContainerRef.current;
-    const scrollHeight = container.scrollHeight - container.clientHeight;
-    const targetScroll = (index / scenes.length) * scrollHeight;
-
-    container.scrollTo({
-      top: targetScroll,
-      behavior: 'smooth'
-    });
-  };
+  }, [config.keyboard_nav, activeSceneIndex, scenes.length, goToScene]);
 
   // Render loading state
   if (loading) {
