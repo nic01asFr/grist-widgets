@@ -63,6 +63,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Scrollytelling',
+    description: 'Widget de storytelling visuel avec transitions fluides entre images et texte superposé. Supporte Markdown, 9 positions de texte, 6 types de transitions (fade, slide, zoom, crossfade), navigation par scroll/clavier, et auto-configuration des tables. Parfait pour créer des récits visuels immersifs et professionnels.',
+    path: 'scrollytelling',
+    widgetId: '@nic01asFr/scrollytelling',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 
