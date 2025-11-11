@@ -2,7 +2,7 @@
 
 A custom Grist widget for exploring and viewing [Panoramax](https://panoramax.fr) street-level imagery directly within Grist documents.
 
-[65658840-bbed-4d32-8c2f-535145b754a4.png](https://docs.numerique.gouv.fr/media/1da65c11-4519-44d8-9b2d-feae59159fc8/attachments/65658840-bbed-4d32-8c2f-535145b754a4.png)
+![65658840-bbed-4d32-8c2f-535145b754a4.png](https://docs.numerique.gouv.fr/media/1da65c11-4519-44d8-9b2d-feae59159fc8/attachments/65658840-bbed-4d32-8c2f-535145b754a4.png)
 
 ## Overview
 
