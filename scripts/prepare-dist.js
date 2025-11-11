@@ -8,7 +8,7 @@ console.log('🚀 Préparation du dossier dist...');
 fs.ensureDirSync(distDir);
 
 // Widgets avec build (React, etc.)
-const builtWidgets = ['geo-map', 'smart-gis'];
+const builtWidgets = ['geo-map', 'smart-gis', 'scrollytelling'];
 
 // Widgets statiques (HTML/CSS/JS direct)
 const staticWidgets = [

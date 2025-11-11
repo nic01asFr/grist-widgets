@@ -4,9 +4,11 @@
   "description": "Collection de widgets custom pour Grist",
   "scripts": {
     "build:geo-map": "cd packages/geo-map && npm install && npm run build",
-    "build:all": "npm run build:geo-map && npm run prepare-dist",
+    "build:scrollytelling": "cd packages/scrollytelling && npm install && npm run build",
+    "build:all": "npm run build:geo-map && npm run build:scrollytelling && npm run prepare-dist",
     "prepare-dist": "node scripts/prepare-dist.js",
     "dev:geo-map": "cd packages/geo-map && npm start",
+    "dev:scrollytelling": "cd packages/scrollytelling && npm start",
     "verify": "node scripts/verify-config.js"
   },
   "repository": {
