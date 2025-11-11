@@ -83,20 +83,26 @@ export function ScrollytellingWidget() {
   const loadConfig = useCallback(async (docApi) => {
     try {
       const configTable = await docApi.fetchTable('Scrollytelling_Config');
-      if (configTable && configTable[2]?.length > 0) {
-        const firstRecordId = configTable[2][0];
+
+      // Check if we have data
+      if (configTable && configTable.id && configTable.id.length > 0) {
+        // Get first record's data
+        const firstIndex = 0;
         const configData = {};
-        Object.keys(configTable[3]).forEach((key) => {
-          const values = configTable[3][key];
-          const index = configTable[2].indexOf(firstRecordId);
-          if (index !== -1) {
-            configData[key] = values[index];
+
+        // Extract values from each column
+        Object.keys(configTable).forEach((key) => {
+          if (key !== 'id' && Array.isArray(configTable[key]) && configTable[key].length > 0) {
+            configData[key] = configTable[key][firstIndex];
           }
         });
+
+        console.log('Loaded config:', configData);
         setConfig(prevConfig => ({ ...prevConfig, ...configData }));
       }
     } catch (err) {
-      console.error('Error loading config:', err);
+      console.warn('Config table not found or not ready, using defaults:', err.message);
+      // Use default config (already set in state)
     }
   }, []);
 
