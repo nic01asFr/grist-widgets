@@ -106,6 +106,37 @@ export function ScrollytellingWidget() {
     }
   }, []);
 
+  // Load scenes from Scrollytelling_Scenes table
+  const loadScenes = useCallback(async (docApi) => {
+    try {
+      console.log('📖 Loading scenes from Scrollytelling_Scenes table...');
+      const scenesTable = await docApi.fetchTable('Scrollytelling_Scenes');
+
+      if (!scenesTable || !scenesTable.id || scenesTable.id.length === 0) {
+        console.log('No scenes found in table');
+        setScenes([]);
+        return;
+      }
+
+      // Transform table data to records array
+      const records = scenesTable.id.map((id, index) => {
+        const record = { id };
+        Object.keys(scenesTable).forEach((key) => {
+          if (key !== 'id') {
+            record[key] = scenesTable[key][index];
+          }
+        });
+        return record;
+      });
+
+      console.log(`✅ Loaded ${records.length} scenes from table`);
+      handleRecordsUpdate(records);
+    } catch (err) {
+      console.error('Error loading scenes:', err);
+      setScenes([]);
+    }
+  }, [handleRecordsUpdate]);
+
   // Initialize Grist widget
   useEffect(() => {
     if (initialized) return;
@@ -126,6 +157,8 @@ export function ScrollytellingWidget() {
             await ensureTablesExist(widget.docApi);
             // Load config
             await loadConfig(widget.docApi);
+            // Load scenes from dedicated table
+            await loadScenes(widget.docApi);
           }
         });
 
@@ -143,7 +176,7 @@ export function ScrollytellingWidget() {
     };
 
     initWidget();
-  }, [initialized, handleRecordsUpdate, handleMappingsUpdate, loadConfig]);
+  }, [initialized, handleRecordsUpdate, handleMappingsUpdate, loadConfig, loadScenes]);
 
   // Handle scroll event
   const handleScroll = useCallback((e) => {
