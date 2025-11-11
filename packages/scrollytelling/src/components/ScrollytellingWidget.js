@@ -43,6 +43,7 @@ export function ScrollytellingWidget() {
         scene_order: columnHelper.getValue(record, 'scene_order', 0),
         title: columnHelper.getValue(record, 'title', ''),
         image_url: columnHelper.getValue(record, 'image_url', ''),
+        image_attachment: columnHelper.getValue(record, 'image_attachment', null),
         text_content: columnHelper.getValue(record, 'text_content', ''),
         text_position: DataValidator.validatePosition(
           columnHelper.getValue(record, 'text_position', 'center')

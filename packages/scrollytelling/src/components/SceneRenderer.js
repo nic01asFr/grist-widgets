@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 export function SceneRenderer({ scene, isActive, scrollProgress, index, config }) {
   const {
     image_url,
+    image_attachment,
     text_content,
     text_position = 'center',
     text_alignment = 'center',
@@ -16,6 +17,24 @@ export function SceneRenderer({ scene, isActive, scrollProgress, index, config }
     text_color = '#ffffff',
     text_bg_color = 'rgba(0,0,0,0.6)'
   } = scene;
+
+  // Get image URL - prefer attachment if available
+  const getImageUrl = () => {
+    // If attachment exists, use Grist attachment URL
+    if (image_attachment && Array.isArray(image_attachment) && image_attachment.length > 0) {
+      // Grist attachments are arrays of objects with [filename, url]
+      return image_attachment[0]; // Use first attachment URL
+    }
+    // Otherwise use image_url field
+    return image_url || '';
+  };
+
+  const finalImageUrl = getImageUrl();
+
+  // Debug log
+  if (!finalImageUrl) {
+    console.warn(`Scene ${index}: No image URL found`, scene);
+  }
 
   // Calculate opacity based on scroll progress for smooth transitions
   const opacity = isActive ? 1 : Math.max(0, 1 - Math.abs(scrollProgress) * 2);
@@ -112,24 +131,56 @@ export function SceneRenderer({ scene, isActive, scrollProgress, index, config }
       overflow: 'hidden'
     }}>
       {/* Background Image */}
-      <motion.div
-        key={`image-${index}`}
-        variants={getImageVariants()}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundImage: `url(${image_url})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-      />
+      {finalImageUrl ? (
+        <motion.img
+          key={`image-${index}`}
+          src={finalImageUrl}
+          alt={scene.title || `Scene ${index + 1}`}
+          variants={getImageVariants()}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center'
+          }}
+          onError={(e) => {
+            console.error(`Failed to load image for scene ${index}:`, finalImageUrl);
+            e.target.style.backgroundColor = '#1a1a1a';
+          }}
+          onLoad={() => {
+            console.log(`Image loaded successfully for scene ${index}:`, finalImageUrl);
+          }}
+        />
+      ) : (
+        <motion.div
+          key={`placeholder-${index}`}
+          variants={getImageVariants()}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: '#1a1a1a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#666',
+            fontSize: '1.5rem'
+          }}
+        >
+          No Image
+        </motion.div>
+      )}
 
       {/* Text Overlay */}
       <motion.div
