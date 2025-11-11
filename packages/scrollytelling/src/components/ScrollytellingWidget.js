@@ -122,25 +122,35 @@ export function ScrollytellingWidget() {
         return;
       }
 
-      // Transform table data to records array
-      const records = scenesTable.id.map((id, index) => {
-        const record = { id };
-        Object.keys(scenesTable).forEach((key) => {
-          if (key !== 'id') {
-            record[key] = scenesTable[key][index];
-          }
-        });
-        return record;
-      });
+      // Transform and validate table data directly (no ColumnHelper/mappings needed)
+      const processedScenes = scenesTable.id.map((id, index) => ({
+        id,
+        scene_order: DataValidator.validate(scenesTable.scene_order?.[index], 'number', 0),
+        title: DataValidator.validate(scenesTable.title?.[index], 'string', ''),
+        image_url: DataValidator.validate(scenesTable.image_url?.[index], 'string', ''),
+        image_attachment: scenesTable.image_attachment?.[index] || null,
+        text_content: DataValidator.validate(scenesTable.text_content?.[index], 'string', ''),
+        text_position: DataValidator.validatePosition(scenesTable.text_position?.[index] || 'center'),
+        text_alignment: DataValidator.validate(scenesTable.text_alignment?.[index], 'string', 'center'),
+        transition_type: DataValidator.validateTransition(scenesTable.transition_type?.[index] || 'fade'),
+        transition_duration: DataValidator.validate(scenesTable.transition_duration?.[index], 'number', 800),
+        text_color: DataValidator.validate(scenesTable.text_color?.[index], 'color', '#ffffff'),
+        text_bg_color: DataValidator.validate(scenesTable.text_bg_color?.[index], 'color', 'rgba(0,0,0,0.6)'),
+        enabled: scenesTable.enabled?.[index] !== false
+      }))
+        .filter(scene => scene.enabled)
+        .sort((a, b) => a.scene_order - b.scene_order);
 
-      console.log(`✅ Loaded ${records.length} scenes from table`);
-      console.log('First record sample:', records[0]);
-      handleRecordsUpdate(records);
+      console.log(`✅ Loaded ${processedScenes.length} scenes from table`);
+      console.log('First processed scene:', processedScenes[0]);
+
+      // Set scenes directly, bypassing handleRecordsUpdate which uses ColumnHelper
+      setScenes(processedScenes);
     } catch (err) {
       console.error('Error loading scenes:', err);
       setScenes([]);
     }
-  }, [handleRecordsUpdate]);
+  }, []);
 
   // Initialize Grist widget
   useEffect(() => {
