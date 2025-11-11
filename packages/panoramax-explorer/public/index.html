@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panoramax Explorer Widget - Grist</title>
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <!-- Leaflet for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Panoramax loaded in separate iframe to avoid UMD issues in Grist iframe context -->
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f0f0;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Left panel: Map for exploration */
+        #map-panel {
+            flex: 3;
+            position: relative;
+            background: #fff;
+            border-right: 2px solid #ccc;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Right panel: Panorama viewer */
+        #viewer-panel {
+            flex: 7;
+            position: relative;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #panorama-viewer {
+            flex: 1;
+            position: relative;
+        }
+
+        /* Mode Icons */
+        #mode-icons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mode-icon-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .mode-icon-btn.active {
+            background: #4a90e2;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+        }
+
+        .mode-icon-btn:hover:not(.active) {
+            background: white;
+            transform: scale(1.05);
+        }
+
+        /* Map Header */
+        #map-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #4a90e2;
+            color: white;
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #map-content {
+            position: absolute;
+            top: 45px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        /* Action Panel (save button, etc.) */
+        #action-panel {
+            padding: 15px;
+            background: #fff;
+            border-top: 2px solid #ccc;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #action-panel.hidden {
+            display: none;
+        }
+
+        .btn {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #357abd;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        /* Info box */
+        #info-box {
+            flex: 1;
+            font-size: 13px;
+            color: #666;
+        }
+
+        #info-box strong {
+            color: #333;
+        }
+
+
+        /* Loading state */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px 40px;
+            border-radius: 10px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #4a90e2;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Welcome screen */
+        #welcome {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            z-index: 20;
+            max-width: 500px;
+            padding: 40px;
+        }
+
+        #welcome h2 {
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        #welcome p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+
+        .welcome-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        /* Success/error messages */
+        .message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.3s ease;
+            max-width: 400px;
+        }
+
+        .message-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .message-error {
+            background: #dc3545;
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Panoramax viewer */
+        pnx-photo-viewer {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Leaflet custom popup */
+        .panoramax-popup .leaflet-popup-content {
+            margin: 10px;
+            min-width: 200px;
+        }
+
+        .popup-btn {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        .popup-btn:hover {
+            background: #357abd;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            #container {
+                flex-direction: column;
+            }
+
+            #map-panel {
+                flex: 4;
+                border-right: none;
+                border-bottom: 2px solid #ccc;
+            }
+
+            #viewer-panel {
+                flex: 6;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- Left: Interactive Map -->
+        <div id="map-panel">
+            <div id="map-header">
+                <span>🗺️ Carte Panoramax</span>
+                <div id="mode-icons">
+                    <button class="mode-icon-btn active" data-mode="explore" title="Mode Explorer">🔍</button>
+                    <button class="mode-icon-btn" data-mode="view" title="Mode Voir">👁️</button>
+                </div>
+            </div>
+            <div id="map-content">
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <!-- Right: Panorama Viewer -->
+        <div id="viewer-panel">
+            <div id="panorama-viewer">
+                <div id="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <div>Chargement du panorama...</div>
+                </div>
+
+                <div id="welcome">
+                    <div class="welcome-icon">🌍</div>
+                    <h2>Explorateur Panoramax</h2>
+                    <p>
+                        <strong>Mode Explorer :</strong> Cliquez sur la carte pour voir les panoramas disponibles.
+                    </p>
+                    <p>
+                        <strong>Mode Voir :</strong> Sélectionnez une ligne dans Grist pour afficher le panorama correspondant.
+                    </p>
+                </div>
+
+                <!-- Panoramax loaded in separate iframe to avoid UMD compatibility issues -->
+                <iframe
+                    id="viewer"
+                    src="panoramax-viewer-frame.html"
+                    style="display: none; width: 100%; height: 100%; border: none;"
+                    allow="fullscreen">
+                </iframe>
+            </div>
+
+            <div id="action-panel" class="hidden">
+                <div id="info-box">
+                    <div id="current-info">
+                        Aucune vue sélectionnée
+                    </div>
+                </div>
+                <button class="btn btn-success" id="btn-save" disabled>
+                    💾 Sauvegarder cette vue
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const CONFIG = {
+            API_ENDPOINT: 'https://api.panoramax.xyz/api',
+            DEFAULT_CENTER: [48.8566, 2.3522], // Paris
+            DEFAULT_ZOOM: 13,
+            SEARCH_RADIUS: 0.01, // ~1km
+        };
+
+        // ==================== STATE ====================
+        let state = {
+            mode: 'explore', // 'explore' or 'view'
+            gristApi: null,
+            map: null,
+            viewer: null,
+            currentPanorama: null,
+            currentRecord: null,
+            tableName: 'Panoramax_Views', // Auto-created table
+            tableReady: false,
+            panoramaMarkers: [],
+            coverageLayer: null
+        };
+
+        // Table schema for auto-creation
+        const TABLE_SCHEMA = {
+            tableName: 'Panoramax_Views',
+            columns: [
+                { id: 'lat', type: 'Numeric' },
+                { id: 'lon', type: 'Numeric' },
+                { id: 'sequence_id', type: 'Text' },
+                { id: 'picture_id', type: 'Text' },
+                { id: 'heading', type: 'Numeric' },
+                { id: 'capture_date', type: 'DateTime' },
+                { id: 'description', type: 'Text' },
+                { id: 'saved_at', type: 'DateTime' }
+            ]
+        };
+
+        // ==================== INITIALIZATION ====================
+
+        // Wait for Panoramax iframe to be ready
+        async function waitForPanoramax() {
+            return new Promise((resolve) => {
+                const messageHandler = (event) => {
+                    if (event.data.action === 'VIEWER_READY') {
+                        window.removeEventListener('message', messageHandler);
+                        console.log('✅ Panoramax viewer iframe ready');
+                        resolve(true);
+                    }
+                };
+
+                window.addEventListener('message', messageHandler);
+
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    window.removeEventListener('message', messageHandler);
+                    console.warn('⚠️ Panoramax viewer timeout');
+                    resolve(false);
+                }, 10000);
+            });
+        }
+
+        initializeWidget();
+
+        async function initializeWidget() {
+            console.log('🚀 Initializing Panoramax Explorer Widget');
+
+            // Wait for Panoramax iframe to be ready
+            await waitForPanoramax();
+
+            // Initialize Grist API
+            try {
+                state.gristApi = window.grist;
+
+                // Ready without column specification - we'll create our own table
+                await state.gristApi.ready({
+                    requiredAccess: 'full',
+                    allowSelectBy: true
+                });
+
+                console.log('✅ Grist API initialized');
+
+                // Ensure our table exists
+                await ensurePanoramaxTable();
+
+                // Listen for record changes (View mode)
+                state.gristApi.onRecord(handleRecordChange);
+
+                // Load saved panoramas only after table is ready
+                // Add small delay to ensure Grist connection is fully established
+                if (state.tableReady) {
+                    setTimeout(() => loadSavedPanoramas(), 200);
+                }
+
+                console.log('✅ Widget fully initialized');
+
+            } catch (err) {
+                console.error('❌ Failed to initialize Grist API:', err);
+                showMessage(`Erreur d'initialisation: ${err.message}`, 'error');
+            }
+
+            // Initialize map
+            initializeMap();
+
+            // Initialize mode toggle
+            initializeModeToggle();
+
+            // Initialize controls
+            initializeControls();
+        }
+
+        /**
+         * Ensure Panoramax_Views table exists, create if not
+         */
+        async function ensurePanoramaxTable() {
+            try {
+                console.log('📋 Checking for Panoramax_Views table...');
+
+                // Check if table exists
+                const tables = await state.gristApi.docApi.fetchTable('_grist_Tables');
+                const tableExists = tables.tableId.includes(state.tableName);
+
+                if (tableExists) {
+                    console.log(`✓ Table ${state.tableName} already exists`);
+                    state.tableReady = true;
+                    return { success: true, created: false };
+                }
+
+                // Create table
+                console.log(`📝 Creating table ${state.tableName}...`);
+
+                const columns = TABLE_SCHEMA.columns.map(col => ({
+                    id: col.id,
+                    type: col.type
+                }));
+
+                await state.gristApi.docApi.applyUserActions([
+                    ['AddTable', state.tableName, columns]
+                ]);
+
+                console.log(`✅ Table ${state.tableName} created successfully`);
+                state.tableReady = true;
+
+                // Show success message
+                showMessage('Table Panoramax_Views créée automatiquement !', 'success');
+
+                return { success: true, created: true };
+
+            } catch (error) {
+                console.error('❌ Error ensuring table:', error);
+                showMessage(`Erreur lors de la création de la table: ${error.message}`, 'error');
+                return { success: false, error: error.message };
+            }
+        }
+
+        // ==================== MAP ====================
+        function initializeMap() {
+            state.map = L.map('map').setView(CONFIG.DEFAULT_CENTER, CONFIG.DEFAULT_ZOOM);
+
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(state.map);
+
+            // Click handler for exploration mode
+            state.map.on('click', handleMapClick);
+
+            console.log('✅ Map initialized');
+        }
+
+        async function handleMapClick(e) {
+            if (state.mode !== 'explore') return;
+
+            const { lat, lng } = e.latlng;
+            console.log('🗺️ Map clicked:', lat, lng);
+
+            // Search for panoramas near click
+            showLoading();
+            try {
+                const panoramas = await searchNearbyPanoramas(lat, lng);
+                hideLoading();
+
+                if (panoramas.length === 0) {
+                    showMessage('Aucun panorama trouvé à proximité', 'error');
+                    return;
+                }
+
+                // Display panorama markers
+                displayPanoramaMarkers(panoramas);
+
+                // Load the closest one
+                loadPanorama(panoramas[0]);
+
+            } catch (err) {
+                hideLoading();
+                showMessage(`Erreur: ${err.message}`, 'error');
+            }
+        }
+
+        async function searchNearbyPanoramas(lat, lon, radius = CONFIG.SEARCH_RADIUS) {
+            const bbox = [
+                lon - radius,
+                lat - radius,
+                lon + radius,
+                lat + radius
+            ].join(',');
+
+            const url = `${CONFIG.API_ENDPOINT}/search?bbox=${bbox}&limit=50`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+                const data = await response.json();
+                if (!data.features || data.features.length === 0) {
+                    return [];
+                }
+
+                // Convert to our format and sort by distance
+                const panoramas = data.features.map(f => {
+                    const [pLon, pLat] = f.geometry.coordinates;
+                    const distance = Math.sqrt(
+                        Math.pow(lat - pLat, 2) + Math.pow(lon - pLon, 2)
+                    );
+
+                    return {
+                        id: f.id,
+                        collection: f.collection,
+                        lat: pLat,
+                        lon: pLon,
+                        distance: distance,
+                        properties: f.properties || {}
+                    };
+                });
+
+                panoramas.sort((a, b) => a.distance - b.distance);
+                return panoramas;
+
+            } catch (error) {
+                console.error('❌ API Error:', error);
+                throw error;
+            }
+        }
+
+        function displayPanoramaMarkers(panoramas) {
+            // Clear existing markers
+            state.panoramaMarkers.forEach(m => state.map.removeLayer(m));
+            state.panoramaMarkers = [];
+
+            // Add new markers
+            panoramas.forEach((pano, idx) => {
+                const marker = L.marker([pano.lat, pano.lon], {
+                    icon: L.divIcon({
+                        className: 'panorama-marker',
+                        html: `<div style="background: ${idx === 0 ? '#4a90e2' : '#666'}; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${idx + 1}</div>`,
+                        iconSize: [24, 24]
+                    })
+                });
+
+                // Store panorama data for click handler
+                marker.panoramaData = pano;
+
+                marker.bindPopup(`
+                    <div class="panoramax-popup">
+                        <strong>Panorama ${idx + 1}</strong><br>
+                        <small>Lat: ${pano.lat.toFixed(6)}, Lon: ${pano.lon.toFixed(6)}</small><br>
+                        ${pano.properties.datetime ? `<small>Date: ${new Date(pano.properties.datetime).toLocaleDateString()}</small><br>` : ''}
+                        <button class="popup-btn" data-marker-idx="${idx}">
+                            👁️ Voir ce panorama
+                        </button>
+                    </div>
+                `, { className: 'panoramax-popup' });
+
+                // Add click handler to popup button
+                marker.on('popupopen', () => {
+                    const btn = document.querySelector(`[data-marker-idx="${idx}"]`);
+                    if (btn) {
+                        btn.onclick = () => {
+                            loadPanorama(pano);
+                        };
+                    }
+                });
+
+                marker.addTo(state.map);
+                state.panoramaMarkers.push(marker);
+            });
+
+            // Fit bounds to markers
+            const bounds = L.latLngBounds(panoramas.map(p => [p.lat, p.lon]));
+            state.map.fitBounds(bounds, { padding: [50, 50] });
+        }
+
+        // ==================== PANORAMA VIEWER ====================
+        function loadPanorama(panorama) {
+            console.log('📸 Loading panorama:', panorama);
+
+            const viewer = document.getElementById('viewer');
+
+            // Send message to iframe to load panorama
+            viewer.contentWindow.postMessage({
+                action: 'LOAD_PANORAMA',
+                data: {
+                    collection: panorama.collection,
+                    picture: panorama.id
+                }
+            }, '*');
+
+            // Show viewer, hide welcome
+            document.getElementById('welcome').style.display = 'none';
+            viewer.style.display = 'block';
+
+            // Update state
+            state.currentPanorama = panorama;
+
+            // Show action panel in explore mode
+            if (state.mode === 'explore') {
+                updateActionPanel(panorama);
+            }
+
+            state.viewer = viewer;
+        }
+
+        function updateActionPanel(panorama) {
+            const panel = document.getElementById('action-panel');
+            const infoBox = document.getElementById('current-info');
+            const saveBtn = document.getElementById('btn-save');
+
+            infoBox.innerHTML = `
+                <strong>Vue actuelle:</strong><br>
+                Lat: ${panorama.lat.toFixed(6)}, Lon: ${panorama.lon.toFixed(6)}<br>
+                <small>ID: ${panorama.id}</small>
+            `;
+
+            saveBtn.disabled = false;
+            panel.classList.remove('hidden');
+        }
+
+        // ==================== GRIST INTEGRATION ====================
+
+        /**
+         * Load all saved panoramas from Panoramax_Views table
+         */
+        async function loadSavedPanoramas() {
+            if (!state.tableReady || !state.gristApi) return;
+
+            try {
+                const data = await state.gristApi.docApi.fetchTable(state.tableName);
+
+                if (!data || !data.id || data.id.length === 0) {
+                    console.log('📋 No saved panoramas yet');
+                    return;
+                }
+
+                // Convert to panorama objects
+                const savedPanoramas = data.id.map((id, idx) => ({
+                    id: data.picture_id[idx],
+                    collection: data.sequence_id[idx],
+                    lat: data.lat[idx],
+                    lon: data.lon[idx],
+                    heading: data.heading[idx],
+                    description: data.description[idx],
+                    recordId: id,
+                    isSaved: true
+                })).filter(p => p.lat && p.lon && p.id && p.collection);
+
+                console.log(`📍 Loaded ${savedPanoramas.length} saved panoramas`);
+
+                // Display markers on map in View mode
+                if (state.mode === 'view' && savedPanoramas.length > 0) {
+                    displaySavedPanoramaMarkers(savedPanoramas);
+
+                    // Fit map to show all saved panoramas
+                    const bounds = L.latLngBounds(savedPanoramas.map(p => [p.lat, p.lon]));
+                    state.map.fitBounds(bounds, { padding: [50, 50] });
+                }
+
+            } catch (error) {
+                console.error('❌ Error loading saved panoramas:', error);
+            }
+        }
+
+        /**
+         * Display markers for saved panoramas
+         */
+        function displaySavedPanoramaMarkers(panoramas) {
+            // Clear existing markers
+            state.panoramaMarkers.forEach(m => state.map.removeLayer(m));
+            state.panoramaMarkers = [];
+
+            panoramas.forEach((pano, idx) => {
+                const marker = L.marker([pano.lat, pano.lon], {
+                    icon: L.divIcon({
+                        className: 'panorama-marker saved',
+                        html: `<div style="background: #28a745; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">✓</div>`,
+                        iconSize: [28, 28]
+                    })
+                });
+
+                // Store panorama data for click handler
+                marker.panoramaData = pano;
+
+                const desc = pano.description || 'Panorama sauvegardé';
+                marker.bindPopup(`
+                    <div class="panoramax-popup">
+                        <strong>${desc}</strong><br>
+                        <small>Lat: ${pano.lat.toFixed(6)}, Lon: ${pano.lon.toFixed(6)}</small><br>
+                        <button class="popup-btn" data-saved-marker-idx="${idx}">
+                            👁️ Voir ce panorama
+                        </button>
+                    </div>
+                `, { className: 'panoramax-popup' });
+
+                // Add click handler to popup button
+                marker.on('popupopen', () => {
+                    const btn = document.querySelector(`[data-saved-marker-idx="${idx}"]`);
+                    if (btn) {
+                        btn.onclick = () => {
+                            loadPanorama(pano);
+                        };
+                    }
+                });
+
+                marker.addTo(state.map);
+                state.panoramaMarkers.push(marker);
+            });
+        }
+
+        async function handleRecordChange(record) {
+            if (state.mode !== 'view' || !record) return;
+
+            console.log('📝 Record changed:', record);
+
+            const lat = parseFloat(record.lat);
+            const lon = parseFloat(record.lon);
+            const sequenceId = record.sequence_id;
+            const pictureId = record.picture_id;
+
+            if (!lat || !lon) {
+                console.warn('⚠️ Record missing lat/lon');
+                return;
+            }
+
+            state.currentRecord = record;
+
+            // If we have IDs, load directly
+            if (sequenceId && pictureId) {
+                loadPanorama({
+                    id: pictureId,
+                    collection: sequenceId,
+                    lat: lat,
+                    lon: lon
+                });
+
+                // Center map on location
+                state.map.setView([lat, lon], 16);
+
+            } else {
+                // Search for nearest panorama
+                showLoading();
+                try {
+                    const panoramas = await searchNearbyPanoramas(lat, lon);
+                    hideLoading();
+
+                    if (panoramas.length > 0) {
+                        loadPanorama(panoramas[0]);
+                        state.map.setView([lat, lon], 16);
+                        displayPanoramaMarkers(panoramas);
+                    } else {
+                        showMessage('Aucun panorama trouvé près de ces coordonnées', 'error');
+                    }
+                } catch (err) {
+                    hideLoading();
+                    showMessage(`Erreur: ${err.message}`, 'error');
+                }
+            }
+        }
+
+        async function saveCurrentView() {
+            if (!state.currentPanorama || !state.gristApi) {
+                showMessage('Aucune vue à sauvegarder', 'error');
+                return;
+            }
+
+            if (!state.tableReady) {
+                showMessage('Table en cours de création, veuillez patienter...', 'error');
+                return;
+            }
+
+            const saveBtn = document.getElementById('btn-save');
+            saveBtn.disabled = true;
+            saveBtn.textContent = '💾 Sauvegarde...';
+
+            try {
+                const pano = state.currentPanorama;
+
+                const recordData = {
+                    lat: pano.lat,
+                    lon: pano.lon,
+                    sequence_id: pano.collection,
+                    picture_id: pano.id,
+                    heading: pano.heading || null,
+                    description: `Panorama capturé le ${new Date().toLocaleString('fr-FR')}`,
+                    saved_at: new Date().toISOString()
+                };
+
+                if (pano.properties?.datetime) {
+                    recordData.capture_date = pano.properties.datetime;
+                }
+
+                await state.gristApi.docApi.applyUserActions([
+                    ['AddRecord', state.tableName, null, recordData]
+                ]);
+
+                showMessage('✅ Vue sauvegardée dans Panoramax_Views !', 'success');
+                saveBtn.textContent = '💾 Sauvegarder cette vue';
+                saveBtn.disabled = false;
+
+            } catch (err) {
+                console.error('❌ Error saving:', err);
+                showMessage(`❌ Erreur: ${err.message}`, 'error');
+                saveBtn.textContent = '💾 Sauvegarder cette vue';
+                saveBtn.disabled = false;
+            }
+        }
+
+        // ==================== MODE TOGGLE ====================
+        function initializeModeToggle() {
+            const buttons = document.querySelectorAll('.mode-icon-btn');
+
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const mode = btn.dataset.mode;
+                    switchMode(mode);
+
+                    // Update button states
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                });
+            });
+        }
+
+        async function switchMode(mode) {
+            state.mode = mode;
+            console.log('🔄 Mode switched to:', mode);
+
+            const actionPanel = document.getElementById('action-panel');
+
+            if (mode === 'explore') {
+                // Show action panel
+                if (state.currentPanorama) {
+                    actionPanel.classList.remove('hidden');
+                }
+
+                // Clear saved panorama markers
+                state.panoramaMarkers.forEach(m => state.map.removeLayer(m));
+                state.panoramaMarkers = [];
+
+            } else {
+                // View mode: hide action panel
+                actionPanel.classList.add('hidden');
+
+                // Load and display saved panoramas (only if table is ready)
+                // Add delay to ensure Grist is ready
+                if (state.tableReady) {
+                    setTimeout(() => loadSavedPanoramas(), 100);
+                }
+            }
+        }
+
+        // ==================== CONTROLS ====================
+        function initializeControls() {
+            // Only initialize save button
+            document.getElementById('btn-save')?.addEventListener('click', saveCurrentView);
+        }
+
+        // ==================== UI HELPERS ====================
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showMessage(text, type = 'success') {
+            const message = document.createElement('div');
+            message.className = `message message-${type}`;
+            message.textContent = text;
+            document.body.appendChild(message);
+
+            setTimeout(() => {
+                message.remove();
+            }, 4000);
+        }
+
+        console.log('✅ Panoramax Explorer Widget loaded');
+    </script>
+</body>
+</html>
