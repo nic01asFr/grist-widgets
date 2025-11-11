@@ -406,6 +406,7 @@
             tableName: 'Panoramax_Views', // Auto-created table
             tableReady: false,
             panoramaMarkers: [],
+            sequenceLayer: null, // For trajectory display
             coverageLayer: null
         };
 
@@ -611,12 +612,19 @@
                         Math.pow(lat - pLat, 2) + Math.pow(lon - pLon, 2)
                     );
 
+                    // Extract heading from properties (try multiple fields)
+                    const heading = f.properties?.['eph:heading'] ||
+                                  f.properties?.heading ||
+                                  f.properties?.direction ||
+                                  null;
+
                     return {
                         id: f.id,
                         collection: f.collection,
                         lat: pLat,
                         lon: pLon,
                         distance: distance,
+                        heading: heading,
                         properties: f.properties || {}
                     };
                 });
@@ -628,6 +636,105 @@
                 console.error('❌ API Error:', error);
                 throw error;
             }
+        }
+
+        /**
+         * Fetch complete sequence (trajectory) from Panoramax API
+         */
+        async function fetchSequence(collectionId) {
+            try {
+                const url = `${CONFIG.API_ENDPOINT}/collections/${collectionId}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    console.warn(`Could not fetch sequence ${collectionId}`);
+                    return null;
+                }
+
+                const data = await response.json();
+
+                // Extract features with coordinates and heading
+                if (!data.features || data.features.length === 0) {
+                    return null;
+                }
+
+                const points = data.features.map(f => {
+                    const [lon, lat] = f.geometry.coordinates;
+                    const heading = f.properties?.['eph:heading'] ||
+                                  f.properties?.heading ||
+                                  f.properties?.direction ||
+                                  null;
+
+                    return {
+                        id: f.id,
+                        lat,
+                        lon,
+                        heading,
+                        properties: f.properties || {}
+                    };
+                }).filter(p => p.lat && p.lon);
+
+                return {
+                    id: collectionId,
+                    points,
+                    title: data.title || `Sequence ${collectionId}`
+                };
+
+            } catch (error) {
+                console.error('Error fetching sequence:', error);
+                return null;
+            }
+        }
+
+        /**
+         * Display sequence trajectory on map with directional arrows
+         */
+        function displaySequenceTrajectory(sequence) {
+            // Clear previous sequence layer
+            if (state.sequenceLayer) {
+                state.map.removeLayer(state.sequenceLayer);
+                state.sequenceLayer = null;
+            }
+
+            if (!sequence || !sequence.points || sequence.points.length === 0) {
+                return;
+            }
+
+            // Create polyline from points
+            const latLngs = sequence.points.map(p => [p.lat, p.lon]);
+
+            const polyline = L.polyline(latLngs, {
+                color: '#4a90e2',
+                weight: 4,
+                opacity: 0.7
+            });
+
+            // Add directional arrows using decorators (Leaflet.PolylineDecorator if available)
+            // Since we don't have the plugin, we'll use markers for key points
+            const arrows = [];
+
+            // Place arrow markers every ~5 points to show direction
+            for (let i = 0; i < sequence.points.length; i += Math.max(1, Math.floor(sequence.points.length / 10))) {
+                const point = sequence.points[i];
+
+                if (point.heading !== null && point.heading !== undefined) {
+                    const arrowMarker = L.marker([point.lat, point.lon], {
+                        icon: L.divIcon({
+                            className: 'direction-arrow',
+                            html: `<div style="transform: rotate(${point.heading}deg); font-size: 20px; color: #4a90e2;">➤</div>`,
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    });
+                    arrows.push(arrowMarker);
+                }
+            }
+
+            // Group polyline and arrows into a layer group
+            state.sequenceLayer = L.layerGroup([polyline, ...arrows]);
+            state.sequenceLayer.addTo(state.map);
+
+            console.log(`✅ Displayed trajectory with ${sequence.points.length} points`);
         }
 
         function displayPanoramaMarkers(panoramas) {
@@ -679,7 +786,7 @@
         }
 
         // ==================== PANORAMA VIEWER ====================
-        function loadPanorama(panorama) {
+        async function loadPanorama(panorama) {
             console.log('📸 Loading panorama:', panorama);
 
             const viewer = document.getElementById('viewer');
@@ -699,6 +806,14 @@
 
             // Update state
             state.currentPanorama = panorama;
+
+            // Load and display sequence trajectory
+            if (panorama.collection) {
+                const sequence = await fetchSequence(panorama.collection);
+                if (sequence) {
+                    displaySequenceTrajectory(sequence);
+                }
+            }
 
             // Show action panel in explore mode
             if (state.mode === 'explore') {
@@ -933,24 +1048,36 @@
 
             const actionPanel = document.getElementById('action-panel');
 
+            // Clear all markers and layers
+            state.panoramaMarkers.forEach(m => state.map.removeLayer(m));
+            state.panoramaMarkers = [];
+
+            if (state.sequenceLayer) {
+                state.map.removeLayer(state.sequenceLayer);
+                state.sequenceLayer = null;
+            }
+
             if (mode === 'explore') {
-                // Show action panel
+                // Explorer mode: show action panel if panorama loaded
                 if (state.currentPanorama) {
                     actionPanel.classList.remove('hidden');
+                } else {
+                    actionPanel.classList.add('hidden');
                 }
 
-                // Clear saved panorama markers
-                state.panoramaMarkers.forEach(m => state.map.removeLayer(m));
-                state.panoramaMarkers = [];
+                // Clear viewer if in view mode previously
+                document.getElementById('welcome').style.display = 'block';
+                document.getElementById('viewer').style.display = 'none';
 
             } else {
                 // View mode: hide action panel
                 actionPanel.classList.add('hidden');
 
                 // Load and display saved panoramas (only if table is ready)
-                // Add delay to ensure Grist is ready
                 if (state.tableReady) {
                     setTimeout(() => loadSavedPanoramas(), 100);
+                } else {
+                    console.warn('Table not ready yet in view mode');
                 }
             }
         }
