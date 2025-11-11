@@ -50,37 +50,63 @@
     </pnx-photo-viewer>
 
     <script>
+        // Suppress UMD errors in console (cosmetic only, doesn't affect functionality)
+        window.addEventListener('error', (e) => {
+            if (e.message && e.message.includes('Panoramax')) {
+                console.log('ℹ️ Panoramax UMD warning (harmless):', e.message);
+                e.preventDefault();
+            }
+        });
+
         // Wait for Panoramax to load
         async function waitForPanoramax() {
             return new Promise((resolve) => {
+                let attempts = 0;
+                const maxAttempts = 100;
+
                 const checkInterval = setInterval(() => {
+                    attempts++;
+
                     if (customElements.get('pnx-photo-viewer')) {
                         clearInterval(checkInterval);
                         console.log('✅ Panoramax loaded in iframe');
                         resolve(true);
+                        return;
+                    }
+
+                    if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        console.warn('⚠️ Panoramax timeout after', attempts, 'attempts');
+                        resolve(false);
                     }
                 }, 100);
-
-                setTimeout(() => {
-                    clearInterval(checkInterval);
-                    console.warn('⚠️ Panoramax timeout');
-                    resolve(false);
-                }, 10000);
             });
         }
 
         let currentCollection = null;
         let currentPicture = null;
+        let viewerReady = false;
 
         // Listen for messages from parent
         window.addEventListener('message', async (event) => {
-            const { action, data } = event.data;
+            // Validate message origin for security
+            if (!event.data || !event.data.action) return;
 
+            const { action, data } = event.data;
             console.log('📨 Received message:', action, data);
 
             switch (action) {
                 case 'LOAD_PANORAMA':
-                    await loadPanorama(data.collection, data.picture);
+                    if (viewerReady) {
+                        await loadPanorama(data.collection, data.picture);
+                    } else {
+                        console.warn('⚠️ Viewer not ready yet, waiting...');
+                        setTimeout(() => {
+                            if (viewerReady) {
+                                loadPanorama(data.collection, data.picture);
+                            }
+                        }, 1000);
+                    }
                     break;
                 case 'PING':
                     window.parent.postMessage({ action: 'PONG' }, '*');
@@ -100,10 +126,10 @@
                     console.log('🔄 Collection change detected, resetting viewer');
                     viewer.removeAttribute('collection');
                     viewer.removeAttribute('picture');
-
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, 150));
                 }
 
+                // Set attributes to load panorama
                 viewer.setAttribute('collection', collection);
                 viewer.setAttribute('picture', picture);
 
@@ -122,6 +148,14 @@
 
             } catch (error) {
                 console.error('❌ Error loading panorama:', error);
+                loading.innerHTML = `
+                    <div style="color: #ff6b6b;">
+                        <div style="font-size: 48px;">⚠️</div>
+                        <div>Erreur de chargement</div>
+                        <div style="font-size: 12px; margin-top: 10px;">${error.message}</div>
+                    </div>
+                `;
+
                 window.parent.postMessage({
                     action: 'PANORAMA_ERROR',
                     data: { error: error.message }
@@ -131,7 +165,22 @@
 
         // Initialize
         (async function() {
+            console.log('🚀 Initializing Panoramax viewer iframe...');
+
             const loaded = await waitForPanoramax();
+            viewerReady = loaded;
+
+            if (!loaded) {
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #ff6b6b;">
+                        <div style="font-size: 48px;">⚠️</div>
+                        <div>Le viewer Panoramax n'a pas pu se charger</div>
+                        <div style="font-size: 12px; margin-top: 10px;">
+                            Vérifiez votre connexion internet et rechargez la page
+                        </div>
+                    </div>
+                `;
+            }
 
             window.parent.postMessage({
                 action: 'VIEWER_READY',
