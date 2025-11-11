@@ -113,6 +113,9 @@ export function ScrollytellingWidget() {
       console.log('📖 Loading scenes from Scrollytelling_Scenes table...');
       const scenesTable = await docApi.fetchTable('Scrollytelling_Scenes');
 
+      console.log('Raw scenesTable data:', scenesTable);
+      console.log('scenesTable keys:', Object.keys(scenesTable));
+
       if (!scenesTable || !scenesTable.id || scenesTable.id.length === 0) {
         console.log('No scenes found in table');
         setScenes([]);
@@ -131,6 +134,7 @@ export function ScrollytellingWidget() {
       });
 
       console.log(`✅ Loaded ${records.length} scenes from table`);
+      console.log('First record sample:', records[0]);
       handleRecordsUpdate(records);
     } catch (err) {
       console.error('Error loading scenes:', err);
