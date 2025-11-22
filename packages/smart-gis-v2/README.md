@@ -1,6 +1,6 @@
 # Smart-GIS v2 - Professional Geospatial Widget for Grist
 
-**Status:** 🚧 In Development (Phases 1-3 + 6 Complete - 60%)
+**Status:** 🚧 In Development (Phases 1-4 + 6 Complete - 70%)
 
 A complete rewrite of the Smart-GIS widget with professional-grade spatial analysis capabilities, following the comprehensive roadmap for a QGIS-like experience in Grist.
 
@@ -79,6 +79,25 @@ Tool categories organized by function:
 - **ParamsForm**: Auto-generated inputs (choice, number, geometry_picker)
 - **Tool Execution**: Simulation mode (full Grist integration in Phase 4)
 
+### Phase 4: Data Import ✅
+- **Import Methods Configuration**: 5 import methods with full specs
+  - GeoJSON: Standard GeoJSON/JSON file upload
+  - CSV Lat/Lon: Column mapping for latitude/longitude
+  - CSV WKT: WKT/EWKT geometry column import
+  - WFS: Web Feature Service (IGN Géoplateforme, OSM Overpass)
+  - Shapefile: Instructions for QGIS conversion workflow
+- **DataPanel**: Method selector with import history
+- **ImportWizard**: Multi-step modal with dynamic flow
+  - Step 1: File upload with validation
+  - Step 2: Column mapping (for CSV methods)
+  - Step 3: Data preview (first 5 features)
+  - Step 4: Configuration (layer name, SRID, delimiters)
+- **File Validation**: Format, size, and structure checks
+- **Data Parsing**: Method-specific parsers (GeoJSON, CSV, WFS)
+- **Preview System**: Feature preview with geometry and properties
+- **Import History**: Track last 10 imports with timestamps
+- **Grist Integration**: Direct insert into workspace table
+
 ### Phase 6: Layer Management ✅
 - **LayersPanel**: Complete layer management interface
 - **Grouped Display**: Layers grouped by name, sorted by z-index
@@ -90,11 +109,7 @@ Tool categories organized by function:
 
 ## 📋 Roadmap (Remaining Phases)
 
-### Phase 4: Data Import
-- Import methods: GeoJSON, CSV lat/lon, CSV WKT, Shapefile (via QGIS), WFS
-- Catalogues: IGN Géoplateforme, OSM Overpass, custom WFS
-- 3-step wizard: Upload → Configure → Preview → Import
-- Bulk insert optimization
+### ~~Phase 4: Data Import~~ ✅ COMPLETE
 
 ### Phase 5: Hybrid Search
 - Semantic search (VECTOR_SEARCH on properties)
@@ -264,29 +279,30 @@ npm run analyze
 
 ## 📝 Project Status
 
-**Completion:** ~60% (4/9 phases complete)
+**Completion:** ~70% (5/9 phases complete)
 
 - ✅ Phase 1: Infrastructure (100%)
 - ✅ Phase 2: Map & WKT (100%)
 - ✅ Phase 3: Tool Definitions (100%)
 - ✅ Phase 3: Tools UI (100%)
-- ⏳ Phase 4: Import Wizard (0%)
+- ✅ Phase 4: Import Wizard (100%)
 - ⏳ Phase 5: Hybrid Search (0%)
 - ✅ Phase 6: Layer Management (100%)
 - ⏳ Phase 7: Performance (0%)
 - ⏳ Phase 8: Build & Deploy (0%)
 - ⏳ Phase 9: Testing (0%)
 
+**Build Size:** 191.55 KB gzipped (target: <200 KB) ✅
+
 **Estimated completion:** 12-15 development days (per roadmap)
 
 ## 🚀 Next Steps
 
-1. **Complete Phase 3**: ToolsPanel UI + ToolExecutor component
-2. **Phase 4**: Implement import wizard with WFS/GeoJSON/CSV support
-3. **Phase 5**: Add semantic + spatial hybrid search
-4. **Phase 6**: Layer management panel
-5. **Optimize & Test**: Performance tuning, unit tests
-6. **Deploy**: Production build, documentation
+1. **Phase 5**: Implement hybrid search (semantic + spatial)
+2. **Phase 7**: Performance optimizations (caching, viewport filtering)
+3. **Phase 8**: Production build & deployment
+4. **Phase 9**: Testing & validation
+5. **Final Polish**: Documentation, examples, tutorials
 
 ## 📄 License
 

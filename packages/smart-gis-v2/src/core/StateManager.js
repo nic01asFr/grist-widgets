@@ -53,7 +53,8 @@ class StateManager {
       data: {
         currentTable: null,
         catalogs: [],
-        styles: []
+        styles: [],
+        importHistory: []
       }
     };
 
