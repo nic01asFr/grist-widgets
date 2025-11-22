@@ -29,6 +29,18 @@ const widgets = [
     }]
   },
   {
+    name: 'Smart GIS v2',
+    description: 'Réécriture complète du système GIS avec 30+ outils spatiaux (mesure, transformation, analyse, requêtes), import wizard multi-format (GeoJSON, CSV, WFS), recherche hybride (sémantique + spatiale), layer management avancé. Architecture QGIS-like professionnelle. 196KB gzipped. Phases 1-6/9 (80%).',
+    path: 'smart-gis-v2',
+    widgetId: '@nic01asFr/smart-gis-v2',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
+  },
+  {
     name: 'Cluster Quest',
     description: 'Formation interactive pour apprendre à maîtriser les clusters et vecteurs dans Grist. 9 chapitres, exercices pratiques, leaderboard multi-joueurs.',
     path: 'cluster-quest',
