@@ -1,0 +1,187 @@
+/* LayersPanel Styles */
+
+.layers-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.layers-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.layers-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.features-count {
+  font-size: 0.75rem;
+  color: #6b7280;
+  background: #e5e7eb;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+}
+
+.layers-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.layer-item:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.layer-item.selected {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.layer-item.hidden {
+  opacity: 0.5;
+  background: #f9fafb;
+}
+
+.layer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.btn-visibility {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  transition: transform 0.2s;
+}
+
+.btn-visibility:hover {
+  transform: scale(1.1);
+}
+
+.layer-info {
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.layer-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.badge-count {
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.badge-type {
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+}
+
+.layer-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-action {
+  padding: 0.375rem;
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.btn-action:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-delete:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+.layers-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.layers-stats {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.layers-stats strong {
+  color: #1f2937;
+}
+
+/* Empty state - reuse from ToolsPanel */
+.layers-panel .empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.layers-panel .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.layers-panel .empty-state p {
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+}
+
+.layers-panel .hint {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  padding: 0.5rem;
+  background: #fff;
+  border-radius: 4px;
+}
