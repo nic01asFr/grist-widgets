@@ -12,8 +12,8 @@ const CONFIG = {
         COMPONENTS: 'Components'
     },
     CANVAS: {
-        WIDTH: 960,
-        HEIGHT: 700,
+        WIDTH: 800,
+        HEIGHT: 450,
         BACKGROUND: '#1a1a1a'
     },
     THEMES: [
@@ -149,7 +149,9 @@ async function loadData() {
             height: components.height?.[i],
             style_preset: components.style_preset?.[i],
             color: components.color?.[i],
-            font_size: components.font_size?.[i]
+            font_size: components.font_size?.[i],
+            x_canvas: components.x_canvas?.[i],
+            y_canvas: components.y_canvas?.[i]
         }));
 
         populatePresentationSelect();
@@ -201,9 +203,11 @@ function handleSelectionClear() {
 function handleObjectModified(e) {
     const obj = e.target;
     if (obj && obj.componentData) {
-        // Update component width/height only (position reste "center" ou autre)
-        obj.componentData.width = Math.round(obj.width * obj.scaleX) + 'px';
-        obj.componentData.height = Math.round(obj.height * obj.scaleY) + 'px';
+        // Update component position, width, height (valeurs numériques)
+        obj.componentData.x_canvas = Math.round(obj.left);
+        obj.componentData.y_canvas = Math.round(obj.top);
+        obj.componentData.width = Math.round(obj.width * obj.scaleX);
+        obj.componentData.height = Math.round(obj.height * obj.scaleY);
 
         // Debounced save to Grist
         debouncedSaveComponent(obj.componentData);
@@ -343,14 +347,13 @@ function addComponentToCanvas(component) {
 }
 
 function createTextObject(component) {
-    // Convertir position en coordonnées
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
 
     const text = new fabric.Textbox(component.content || 'Double-clic pour éditer', {
         left: coords.x,
         top: coords.y,
-        width: parseFloat(component.width) || 300,
-        fontSize: parseFloat(component.font_size) || 24,
+        width: Number(component.width) || 300,
+        fontSize: Number(component.font_size) || 24,
         fill: component.color || '#ffffff',
         fontFamily: 'Arial',
         editable: false
@@ -364,30 +367,40 @@ function createTextObject(component) {
     return text;
 }
 
+// Helper: obtenir coordonnées d'un composant
+function getComponentCoords(component) {
+    // Priorité 1: coordonnées canvas sauvegardées
+    if (component.x_canvas !== undefined && component.y_canvas !== undefined) {
+        return { x: component.x_canvas, y: component.y_canvas };
+    }
+    // Priorité 2: position prédéfinie
+    return getPositionCoords(component.position || 'center');
+}
+
 // Convertir position textuelle en coordonnées
 function getPositionCoords(position) {
     const positions = {
         'top-left': { x: 50, y: 50 },
-        'top': { x: 480, y: 50 },
-        'top-right': { x: 860, y: 50 },
-        'left': { x: 50, y: 350 },
-        'center': { x: 280, y: 250 },
-        'right': { x: 660, y: 350 },
-        'bottom-left': { x: 50, y: 600 },
-        'bottom': { x: 480, y: 600 },
-        'bottom-right': { x: 860, y: 600 }
+        'top': { x: 350, y: 50 },
+        'top-right': { x: 650, y: 50 },
+        'left': { x: 50, y: 200 },
+        'center': { x: 300, y: 200 },
+        'right': { x: 550, y: 200 },
+        'bottom-left': { x: 50, y: 350 },
+        'bottom': { x: 350, y: 350 },
+        'bottom-right': { x: 650, y: 350 }
     };
     return positions[position] || positions['center'];
 }
 
 function createImageObject(component) {
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
     // Placeholder for images
     return new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: parseFloat(component.width) || 200,
-        height: parseFloat(component.height) || 150,
+        width: Number(component.width) || 200,
+        height: Number(component.height) || 150,
         fill: '#333',
         stroke: '#666',
         strokeWidth: 2
@@ -395,18 +408,18 @@ function createImageObject(component) {
 }
 
 function createShapeObject(component) {
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
     return new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: parseFloat(component.width) || 100,
-        height: parseFloat(component.height) || 100,
+        width: Number(component.width) || 100,
+        height: Number(component.height) || 100,
         fill: component.color || '#4CAF50'
     });
 }
 
 function createPlaceholderObject(component) {
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
     return new fabric.Rect({
         left: coords.x,
         top: coords.y,
@@ -472,17 +485,19 @@ async function createComponent(type, x, y) {
 
         const newOrder = Math.max(...appState.components.filter(c => c.slide === appState.currentSlide.id).map(c => c.order), 0) + 1;
 
-        // Utiliser "position" au lieu de x/y pour la compatibilité avec reveal-builder
+        // Utiliser coordonnées canvas pour positionnement précis (valeurs numériques)
         const componentData = {
             slide: appState.currentSlide.id,
             order: newOrder,
             type: type,
             content: getDefaultContent(type),
-            position: 'center',  // Position par défaut
-            width: '400px',
-            height: '200px',
+            position: 'center',  // Position par défaut pour compatibilité
+            width: 300,
+            height: 150,
             color: '#ffffff',
-            font_size: '24px'
+            font_size: 24,
+            x_canvas: Math.round(x),
+            y_canvas: Math.round(y)
         };
 
         const result = await appState.docApi.applyUserActions([
@@ -536,19 +551,15 @@ function updatePropertiesPanel() {
 
         <div class="property-group">
             <h4>Position</h4>
-            <div class="form-group">
-                <label>Position</label>
-                <select id="prop-position">
-                    <option value="top-left" ${comp.position === 'top-left' ? 'selected' : ''}>Haut Gauche</option>
-                    <option value="top" ${comp.position === 'top' ? 'selected' : ''}>Haut Centre</option>
-                    <option value="top-right" ${comp.position === 'top-right' ? 'selected' : ''}>Haut Droite</option>
-                    <option value="left" ${comp.position === 'left' ? 'selected' : ''}>Milieu Gauche</option>
-                    <option value="center" ${comp.position === 'center' || !comp.position ? 'selected' : ''}>Centre</option>
-                    <option value="right" ${comp.position === 'right' ? 'selected' : ''}>Milieu Droite</option>
-                    <option value="bottom-left" ${comp.position === 'bottom-left' ? 'selected' : ''}>Bas Gauche</option>
-                    <option value="bottom" ${comp.position === 'bottom' ? 'selected' : ''}>Bas Centre</option>
-                    <option value="bottom-right" ${comp.position === 'bottom-right' ? 'selected' : ''}>Bas Droite</option>
-                </select>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>X (px)</label>
+                    <input type="number" id="prop-x-canvas" value="${comp.x_canvas !== undefined ? comp.x_canvas : ''}">
+                </div>
+                <div class="form-group">
+                    <label>Y (px)</label>
+                    <input type="number" id="prop-y-canvas" value="${comp.y_canvas !== undefined ? comp.y_canvas : ''}">
+                </div>
             </div>
         </div>
 
@@ -556,12 +567,12 @@ function updatePropertiesPanel() {
             <h4>Taille</h4>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Largeur</label>
-                    <input type="text" id="prop-width" value="${comp.width || 'auto'}">
+                    <label>Largeur (px)</label>
+                    <input type="number" id="prop-width" value="${comp.width || ''}">
                 </div>
                 <div class="form-group">
-                    <label>Hauteur</label>
-                    <input type="text" id="prop-height" value="${comp.height || 'auto'}">
+                    <label>Hauteur (px)</label>
+                    <input type="number" id="prop-height" value="${comp.height || ''}">
                 </div>
             </div>
         </div>
@@ -573,13 +584,15 @@ function updatePropertiesPanel() {
                 <label>Contenu</label>
                 <textarea id="prop-content" rows="3">${comp.content || ''}</textarea>
             </div>
-            <div class="form-group">
-                <label>Taille</label>
-                <input type="text" id="prop-font-size" value="${comp.font_size || '24px'}">
-            </div>
-            <div class="form-group">
-                <label>Couleur</label>
-                <input type="text" id="prop-color" value="${comp.color || '#ffffff'}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Taille (px)</label>
+                    <input type="number" id="prop-font-size" value="${comp.font_size || '24'}">
+                </div>
+                <div class="form-group">
+                    <label>Couleur</label>
+                    <input type="color" id="prop-color" value="${comp.color || '#ffffff'}">
+                </div>
             </div>
         </div>
         ` : ''}
@@ -602,15 +615,25 @@ function clearPropertiesPanel() {
 window.saveProperties = async function() {
     if (!appState.selectedComponent) return;
 
-    const updates = {
-        position: document.getElementById('prop-position')?.value || 'center',
-        width: document.getElementById('prop-width')?.value,
-        height: document.getElementById('prop-height')?.value
-    };
+    const updates = {};
 
+    // Taille (valeurs numériques)
+    const widthValue = document.getElementById('prop-width')?.value;
+    const heightValue = document.getElementById('prop-height')?.value;
+    if (widthValue !== '') updates.width = parseInt(widthValue);
+    if (heightValue !== '') updates.height = parseInt(heightValue);
+
+    // Position canvas
+    const xCanvas = document.getElementById('prop-x-canvas')?.value;
+    const yCanvas = document.getElementById('prop-y-canvas')?.value;
+    if (xCanvas !== '') updates.x_canvas = parseInt(xCanvas);
+    if (yCanvas !== '') updates.y_canvas = parseInt(yCanvas);
+
+    // Propriétés spécifiques au type
     if (appState.selectedComponent.type === 'text') {
         updates.content = document.getElementById('prop-content')?.value;
-        updates.font_size = document.getElementById('prop-font-size')?.value;
+        const fontSizeValue = document.getElementById('prop-font-size')?.value;
+        if (fontSizeValue !== '') updates.font_size = parseInt(fontSizeValue);
         updates.color = document.getElementById('prop-color')?.value;
     }
 
@@ -689,8 +712,8 @@ const SLIDE_TEMPLATES = [
         description: 'Slide de titre avec logo',
         layout: 'title',
         components: [
-            { type: 'image', position: 'top-right', width: '150px', height: '150px' },
-            { type: 'text', position: 'center', width: '600px', content: '# Titre Principal', font_size: '48px', color: '#ffffff' }
+            { type: 'image', position: 'top-right', width: 150, height: 150 },
+            { type: 'text', position: 'center', width: 600, content: '# Titre Principal', font_size: 48, color: '#ffffff' }
         ]
     },
     {
@@ -698,8 +721,8 @@ const SLIDE_TEMPLATES = [
         description: 'Texte gauche, liste droite',
         layout: 'two-column',
         components: [
-            { type: 'text', position: 'left', width: '400px', content: '## Titre\n\nTexte explicatif', font_size: '24px', color: '#ffffff' },
-            { type: 'list', position: 'right', width: '400px', content: 'Point 1\nPoint 2\nPoint 3', font_size: '20px', color: '#ffffff' }
+            { type: 'text', position: 'left', width: 400, content: '## Titre\n\nTexte explicatif', font_size: 24, color: '#ffffff' },
+            { type: 'list', position: 'right', width: 400, content: 'Point 1\nPoint 2\nPoint 3', font_size: 20, color: '#ffffff' }
         ]
     },
     {
@@ -707,7 +730,7 @@ const SLIDE_TEMPLATES = [
         description: 'Un seul texte centré',
         layout: 'content',
         components: [
-            { type: 'text', position: 'center', width: '700px', content: '## Votre Titre\n\nVotre contenu ici...', font_size: '28px', color: '#ffffff' }
+            { type: 'text', position: 'center', width: 700, content: '## Votre Titre\n\nVotre contenu ici...', font_size: 28, color: '#ffffff' }
         ]
     }
 ];
@@ -934,11 +957,21 @@ function showSetupError(missing) {
 // Debounced save
 const debouncedSaveComponent = debounce(async (component) => {
     try {
+        const updates = {
+            width: component.width,
+            height: component.height
+        };
+
+        // Ajouter x_canvas et y_canvas si définis
+        if (component.x_canvas !== undefined) {
+            updates.x_canvas = component.x_canvas;
+        }
+        if (component.y_canvas !== undefined) {
+            updates.y_canvas = component.y_canvas;
+        }
+
         await appState.docApi.applyUserActions([
-            ['UpdateRecord', CONFIG.TABLES.COMPONENTS, component.id, {
-                width: component.width,
-                height: component.height
-            }]
+            ['UpdateRecord', CONFIG.TABLES.COMPONENTS, component.id, updates]
         ]);
     } catch (error) {
         console.error('Error saving component:', error);
@@ -999,11 +1032,13 @@ window.createMissingTables = async function() {
                 { id: 'type', fields: { type: 'Choice', label: 'Type', widgetOptions: JSON.stringify({ choices: CONFIG.COMPONENT_TYPES }) } },
                 { id: 'content', fields: { type: 'Text', label: 'Contenu' } },
                 { id: 'position', fields: { type: 'Choice', label: 'Position', widgetOptions: JSON.stringify({ choices: ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'] }) } },
-                { id: 'width', fields: { type: 'Text', label: 'Largeur' } },
-                { id: 'height', fields: { type: 'Text', label: 'Hauteur' } },
+                { id: 'width', fields: { type: 'Numeric', label: 'Largeur (px)' } },
+                { id: 'height', fields: { type: 'Numeric', label: 'Hauteur (px)' } },
                 { id: 'style_preset', fields: { type: 'Text', label: 'Style' } },
                 { id: 'color', fields: { type: 'Text', label: 'Couleur' } },
-                { id: 'font_size', fields: { type: 'Text', label: 'Taille police' } }
+                { id: 'font_size', fields: { type: 'Numeric', label: 'Taille police (px)' } },
+                { id: 'x_canvas', fields: { type: 'Numeric', label: 'X Canvas (px)' } },
+                { id: 'y_canvas', fields: { type: 'Numeric', label: 'Y Canvas (px)' } }
             ]]);
         }
 
@@ -1161,11 +1196,11 @@ async function updateSlideBackground(color) {
 // ENHANCED COMPONENT RENDERERS
 // ========================================
 function createCodeObject(component) {
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
     return new fabric.Textbox(component.content || '// Code here', {
         left: coords.x,
         top: coords.y,
-        width: parseFloat(component.width) || 400,
+        width: Number(component.width) || 400,
         fontSize: 16,
         fill: '#00ff00',
         backgroundColor: '#1e1e1e',
@@ -1175,15 +1210,15 @@ function createCodeObject(component) {
 }
 
 function createListObject(component) {
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
     const items = (component.content || 'Item 1\nItem 2').split('\n');
     const listText = items.map(item => '• ' + item).join('\n');
 
     return new fabric.Textbox(listText, {
         left: coords.x,
         top: coords.y,
-        width: parseFloat(component.width) || 300,
-        fontSize: parseFloat(component.font_size) || 20,
+        width: Number(component.width) || 300,
+        fontSize: Number(component.font_size) || 20,
         fill: component.color || '#ffffff',
         fontFamily: 'Arial',
         editable: false
@@ -1191,12 +1226,12 @@ function createListObject(component) {
 }
 
 function createQuoteObject(component) {
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
     return new fabric.Textbox(component.content || '"Citation"\n— Auteur', {
         left: coords.x,
         top: coords.y,
-        width: parseFloat(component.width) || 400,
-        fontSize: parseFloat(component.font_size) || 24,
+        width: Number(component.width) || 400,
+        fontSize: Number(component.font_size) || 24,
         fill: component.color || '#ffffff',
         fontStyle: 'italic',
         fontFamily: 'Georgia',
@@ -1205,23 +1240,23 @@ function createQuoteObject(component) {
 }
 
 function createButtonObject(component) {
-    const coords = getPositionCoords(component.position || 'center');
+    const coords = getComponentCoords(component);
     const text = new fabric.Text(component.content || 'Button', {
-        left: coords.x,
-        top: coords.y,
         fontSize: 18,
         fill: '#ffffff',
-        fontFamily: 'Arial'
+        fontFamily: 'Arial',
+        originX: 'center',
+        originY: 'center'
     });
 
     const rect = new fabric.Rect({
-        left: coords.x,
-        top: coords.y,
-        width: parseFloat(component.width) || 150,
-        height: parseFloat(component.height) || 50,
+        width: Number(component.width) || 150,
+        height: Number(component.height) || 50,
         fill: '#4CAF50',
         rx: 6,
-        ry: 6
+        ry: 6,
+        originX: 'center',
+        originY: 'center'
     });
 
     const group = new fabric.Group([rect, text], {
@@ -1232,36 +1267,102 @@ function createButtonObject(component) {
     return group;
 }
 
-// Update addComponentToCanvas to use new renderers
+function createTableObject(component) {
+    const coords = getComponentCoords(component);
+    // Placeholder pour table - afficher un rectangle avec grille
+    return new fabric.Rect({
+        left: coords.x,
+        top: coords.y,
+        width: Number(component.width) || 300,
+        height: Number(component.height) || 150,
+        fill: 'transparent',
+        stroke: '#666',
+        strokeWidth: 2
+    });
+}
+
+function createVideoObject(component) {
+    const coords = getComponentCoords(component);
+    const videoWidth = Number(component.width) || 400;
+    const videoHeight = Number(component.height) || 225;
+
+    // Placeholder pour vidéo
+    const rect = new fabric.Rect({
+        left: coords.x,
+        top: coords.y,
+        width: videoWidth,
+        height: videoHeight,
+        fill: '#000',
+        stroke: '#666',
+        strokeWidth: 2
+    });
+
+    const playIcon = new fabric.Triangle({
+        left: coords.x + videoWidth / 2,
+        top: coords.y + videoHeight / 2,
+        width: 50,
+        height: 50,
+        fill: '#fff',
+        angle: 90,
+        originX: 'center',
+        originY: 'center'
+    });
+
+    return new fabric.Group([rect, playIcon], {
+        left: coords.x,
+        top: coords.y
+    });
+}
+
+function createIframeObject(component) {
+    const coords = getComponentCoords(component);
+    // Placeholder pour iframe
+    return new fabric.Rect({
+        left: coords.x,
+        top: coords.y,
+        width: Number(component.width) || 400,
+        height: Number(component.height) || 300,
+        fill: '#f0f0f0',
+        stroke: '#999',
+        strokeWidth: 2,
+        strokeDashArray: [5, 5]
+    });
+}
+
+function createChartObject(component) {
+    const coords = getComponentCoords(component);
+    // Placeholder pour chart
+    return new fabric.Rect({
+        left: coords.x,
+        top: coords.y,
+        width: Number(component.width) || 350,
+        height: Number(component.height) || 250,
+        fill: '#2a2a2a',
+        stroke: '#666',
+        strokeWidth: 2
+    });
+}
+
+// Renderers map - tous les types de composants
+const COMPONENT_RENDERERS_MAP = {
+    'text': createTextObject,
+    'image': createImageObject,
+    'code': createCodeObject,
+    'list': createListObject,
+    'table': createTableObject,
+    'quote': createQuoteObject,
+    'video': createVideoObject,
+    'iframe': createIframeObject,
+    'chart': createChartObject,
+    'shape': createShapeObject,
+    'button': createButtonObject
+};
+
+// Update addComponentToCanvas to use all renderers
 const originalAddComponentToCanvas = addComponentToCanvas;
 addComponentToCanvas = function(component) {
-    let fabricObject;
-
-    switch (component.type) {
-        case 'text':
-            fabricObject = createTextObject(component);
-            break;
-        case 'image':
-            fabricObject = createImageObject(component);
-            break;
-        case 'shape':
-            fabricObject = createShapeObject(component);
-            break;
-        case 'code':
-            fabricObject = createCodeObject(component);
-            break;
-        case 'list':
-            fabricObject = createListObject(component);
-            break;
-        case 'quote':
-            fabricObject = createQuoteObject(component);
-            break;
-        case 'button':
-            fabricObject = createButtonObject(component);
-            break;
-        default:
-            fabricObject = createPlaceholderObject(component);
-    }
+    const renderer = COMPONENT_RENDERERS_MAP[component.type] || createPlaceholderObject;
+    const fabricObject = renderer(component);
 
     if (fabricObject) {
         fabricObject.componentData = component;
