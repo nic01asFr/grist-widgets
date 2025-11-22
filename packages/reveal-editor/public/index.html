@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reveal.js Editor - WYSIWYG Presentation Editor</title>
+
+    <!-- Grist Plugin API -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <!-- Fabric.js for canvas manipulation -->
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+
+    <!-- Quill for rich text editing -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.0/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.0/dist/quill.js"></script>
+
+    <!-- Color Picker -->
+    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.8.2/dist/pickr.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.8.2/dist/themes/nano.min.css">
+
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <!-- Top Toolbar -->
+    <div id="toolbar">
+        <div class="toolbar-section">
+            <div class="toolbar-group">
+                <label for="presentation-select">Présentation:</label>
+                <select id="presentation-select">
+                    <option value="">Sélectionner...</option>
+                </select>
+                <button id="btn-new-presentation" class="btn-icon" title="Nouvelle présentation">➕</button>
+            </div>
+        </div>
+
+        <div class="toolbar-section">
+            <div class="toolbar-group">
+                <button id="btn-undo" class="btn-icon" title="Annuler (Ctrl+Z)" disabled>↶</button>
+                <button id="btn-redo" class="btn-icon" title="Rétablir (Ctrl+Shift+Z)" disabled>↷</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+                <button id="btn-align-left" class="btn-icon" title="Aligner à gauche">⬅</button>
+                <button id="btn-align-center" class="btn-icon" title="Centrer">⬌</button>
+                <button id="btn-align-right" class="btn-icon" title="Aligner à droite">➡</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+                <button id="btn-align-top" class="btn-icon" title="Aligner en haut">⬆</button>
+                <button id="btn-align-middle" class="btn-icon" title="Centrer verticalement">⬍</button>
+                <button id="btn-align-bottom" class="btn-icon" title="Aligner en bas">⬇</button>
+            </div>
+        </div>
+
+        <div class="toolbar-section">
+            <div class="toolbar-group">
+                <button id="btn-templates" class="btn-primary">📋 Templates</button>
+                <button id="btn-preview" class="btn-primary">👁️ Preview</button>
+            </div>
+        </div>
+
+        <div class="toolbar-section">
+            <div class="sync-status">
+                <span id="sync-indicator" class="sync-dot"></span>
+                <span id="sync-text">Non connecté</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Layout: 3 Panels -->
+    <div id="main-container">
+        <!-- Left Panel: Slides List -->
+        <div id="slides-panel" class="panel">
+            <div class="panel-header">
+                <h3>📑 Slides</h3>
+                <button id="btn-add-slide" class="btn-icon" title="Ajouter un slide">➕</button>
+            </div>
+            <div id="slides-list" class="slides-list">
+                <!-- Slides thumbnails will be inserted here -->
+                <div class="empty-state">
+                    <p>Aucun slide</p>
+                    <p style="font-size: 0.8em; opacity: 0.7;">Créez un slide pour commencer</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel: Canvas -->
+        <div id="canvas-panel" class="panel panel-main">
+            <div class="panel-header">
+                <div class="canvas-info">
+                    <span id="current-slide-title">Aucun slide sélectionné</span>
+                    <span class="canvas-zoom">
+                        <button id="btn-zoom-out" class="btn-icon-sm">−</button>
+                        <span id="zoom-level">100%</span>
+                        <button id="btn-zoom-in" class="btn-icon-sm">+</button>
+                    </span>
+                </div>
+                <div class="canvas-actions">
+                    <label for="layout-select">Layout:</label>
+                    <select id="layout-select">
+                        <option value="title">Title</option>
+                        <option value="content" selected>Content</option>
+                        <option value="two-column">Two Column</option>
+                        <option value="three-column">Three Column</option>
+                        <option value="sidebar-left">Sidebar Left</option>
+                        <option value="sidebar-right">Sidebar Right</option>
+                        <option value="grid-2x2">Grid 2x2</option>
+                        <option value="full">Full</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <button id="btn-bg-color" class="btn-icon" title="Couleur de fond">🎨</button>
+                </div>
+            </div>
+
+            <div id="canvas-container">
+                <canvas id="canvas"></canvas>
+                <div id="canvas-overlay" class="canvas-overlay">
+                    <!-- Grid/guides overlay -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Properties -->
+        <div id="properties-panel" class="panel">
+            <div class="panel-header">
+                <h3>⚙️ Propriétés</h3>
+            </div>
+            <div id="properties-content" class="properties-content">
+                <div class="empty-state">
+                    <p>Aucune sélection</p>
+                    <p style="font-size: 0.8em; opacity: 0.7;">Sélectionnez un composant pour voir ses propriétés</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Panel: Components Palette -->
+    <div id="components-palette">
+        <div class="palette-header">
+            <h4>🧩 Composants</h4>
+            <span style="font-size: 0.7em; opacity: 0.7;">Glissez-déposez sur le canvas</span>
+        </div>
+        <div class="palette-items">
+            <div class="palette-item" data-component-type="text" draggable="true">
+                <div class="palette-icon">T</div>
+                <div class="palette-label">Texte</div>
+            </div>
+            <div class="palette-item" data-component-type="image" draggable="true">
+                <div class="palette-icon">🖼️</div>
+                <div class="palette-label">Image</div>
+            </div>
+            <div class="palette-item" data-component-type="code" draggable="true">
+                <div class="palette-icon">&lt;/&gt;</div>
+                <div class="palette-label">Code</div>
+            </div>
+            <div class="palette-item" data-component-type="list" draggable="true">
+                <div class="palette-icon">≡</div>
+                <div class="palette-label">Liste</div>
+            </div>
+            <div class="palette-item" data-component-type="table" draggable="true">
+                <div class="palette-icon">⊞</div>
+                <div class="palette-label">Tableau</div>
+            </div>
+            <div class="palette-item" data-component-type="quote" draggable="true">
+                <div class="palette-icon">"</div>
+                <div class="palette-label">Citation</div>
+            </div>
+            <div class="palette-item" data-component-type="video" draggable="true">
+                <div class="palette-icon">▶</div>
+                <div class="palette-label">Vidéo</div>
+            </div>
+            <div class="palette-item" data-component-type="chart" draggable="true">
+                <div class="palette-icon">📊</div>
+                <div class="palette-label">Graphique</div>
+            </div>
+            <div class="palette-item" data-component-type="shape" draggable="true">
+                <div class="palette-icon">●</div>
+                <div class="palette-label">Forme</div>
+            </div>
+            <div class="palette-item" data-component-type="button" draggable="true">
+                <div class="palette-icon">[ ]</div>
+                <div class="palette-label">Bouton</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Templates Modal -->
+    <div id="templates-modal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>📋 Templates de Slides</h2>
+                <button class="modal-close" onclick="closeTemplatesModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="templates-grid" id="templates-grid">
+                    <!-- Templates will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Text Editor Modal -->
+    <div id="text-editor-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Éditer le Texte</h2>
+                <button class="modal-close" onclick="closeTextEditorModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="text-editor-container"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeTextEditorModal()" class="btn-secondary">Annuler</button>
+                <button onclick="saveTextEdit()" class="btn-primary">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Presentation Modal -->
+    <div id="new-presentation-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>➕ Nouvelle Présentation</h2>
+                <button class="modal-close" onclick="closeNewPresentationModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-pres-title">Titre:</label>
+                    <input type="text" id="new-pres-title" placeholder="Ma présentation">
+                </div>
+                <div class="form-group">
+                    <label for="new-pres-theme">Thème:</label>
+                    <select id="new-pres-theme">
+                        <option value="black">Black</option>
+                        <option value="white">White</option>
+                        <option value="league">League</option>
+                        <option value="sky">Sky</option>
+                        <option value="beige">Beige</option>
+                        <option value="night">Night</option>
+                        <option value="serif">Serif</option>
+                        <option value="simple">Simple</option>
+                        <option value="solarized">Solarized</option>
+                        <option value="moon">Moon</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeNewPresentationModal()" class="btn-secondary">Annuler</button>
+                <button onclick="createPresentation()" class="btn-primary">Créer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Setup Screen (same as builder) -->
+    <div id="setup-screen">
+        <div class="setup-card">
+            <h2 style="text-align: center; margin-top: 0;">🎨 Reveal.js Editor</h2>
+            <p style="font-size: 0.9em; text-align: center; opacity: 0.8;">
+                Éditeur WYSIWYG pour vos présentations
+            </p>
+
+            <div id="setup-status">
+                <div class="spinner"></div>
+                <p style="text-align: center; margin-top: 1em;">Vérification des tables...</p>
+            </div>
+
+            <div id="setup-error" style="display: none;"></div>
+
+            <div id="setup-actions" style="display: none; text-align: center; margin-top: 1em;">
+                <button id="btn-create-tables" class="btn-primary">
+                    🔨 Créer les tables automatiquement
+                </button>
+                <p style="font-size: 0.8em; opacity: 0.7; margin-top: 1em;">
+                    Les tables Presentations, Slides et Components seront créées
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
