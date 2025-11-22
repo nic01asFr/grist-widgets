@@ -53,6 +53,18 @@ const widgets = [
     }]
   },
   {
+    name: 'Reveal.js Builder',
+    description: 'Créateur de présentations Reveal.js data-driven. Configurez vos slides, layouts et composants directement dans des tables Grist. 10 layouts, 11 types de composants (texte, image, code, graphiques, etc.), styles prédéfinis, animations, et preview temps réel.',
+    path: 'reveal-builder',
+    widgetId: '@nic01asFr/reveal-builder',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
+  },
+  {
     name: 'Panoramax Explorer',
     description: 'Explorateur interactif d\'images Panoramax avec carte Leaflet. Mode exploration pour découvrir des panoramas et mode visualisation pour afficher les vues sauvegardées. Création automatique de table pour sauvegarder les vues favorites.',
     path: 'panoramax-explorer',

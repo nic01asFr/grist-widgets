@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reveal.js Builder - Grist Widget</title>
+
+    <!-- Grist Plugin API -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <!-- Reveal.js CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.css">
+    <!-- Theme sera chargé dynamiquement selon config Grist -->
+    <link id="reveal-theme" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/theme/black.css">
+
+    <!-- Highlight.js pour coloration syntaxique -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/monokai.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
+
+    <!-- Marked.js pour Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+
+    <!-- Chart.js pour les graphiques -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <!-- Status Bar -->
+    <div id="status-bar">
+        <div class="status-item">
+            <div id="connection-status"></div>
+            <span id="connection-text">Connexion...</span>
+        </div>
+        <div class="status-item">
+            <span id="presentation-title">Aucune présentation active</span>
+        </div>
+        <div class="status-item">
+            <span id="slide-count">0 slides</span>
+        </div>
+        <div class="status-actions">
+            <button id="btn-fullscreen" class="btn-icon" title="Présentation plein écran">
+                🖥️
+            </button>
+            <button id="btn-reload" class="btn-icon" title="Recharger">
+                🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading/Setup Screen -->
+    <div id="setup-screen">
+        <div class="setup-card">
+            <h2 style="text-align: center; margin-top: 0;">🎨 Reveal.js Builder</h2>
+            <p style="font-size: 0.9em; text-align: center; opacity: 0.8;">
+                Widget de création de présentations data-driven
+            </p>
+
+            <div id="setup-status">
+                <div class="spinner"></div>
+                <p style="text-align: center; margin-top: 1em;">Vérification des tables...</p>
+            </div>
+
+            <div id="setup-error" style="display: none;">
+                <!-- Error messages will be inserted here -->
+            </div>
+
+            <div id="setup-actions" style="display: none; text-align: center; margin-top: 1em;">
+                <button id="btn-create-tables" class="btn-primary">
+                    🔨 Créer les tables automatiquement
+                </button>
+                <p style="font-size: 0.8em; opacity: 0.7; margin-top: 1em;">
+                    Les tables Presentations, Slides et Components seront créées
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reveal.js container -->
+    <div class="reveal">
+        <div class="slides">
+            <!-- Slides will be dynamically generated here -->
+            <section>
+                <h1>🎨 Reveal.js Builder</h1>
+                <h3>Créez vos présentations dans Grist</h3>
+                <p style="font-size: 0.8em; opacity: 0.7;">
+                    1. Créez une présentation dans la table Presentations<br>
+                    2. Ajoutez des slides dans la table Slides<br>
+                    3. Ajoutez des composants dans la table Components<br>
+                    4. Activez la présentation (toggle "active")
+                </p>
+            </section>
+        </div>
+    </div>
+
+    <!-- Load Reveal.js BEFORE app.js -->
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>

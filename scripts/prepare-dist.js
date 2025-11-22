@@ -14,6 +14,7 @@ const builtWidgets = ['geo-map', 'smart-gis', 'scrollytelling'];
 const staticWidgets = [
   { name: 'cluster-quest', source: 'public' },
   { name: 'reveal-minimal-example', source: 'public' },
+  { name: 'reveal-builder', source: 'public' },
   { name: 'panoramax-explorer', source: 'public' }
 ];
 
