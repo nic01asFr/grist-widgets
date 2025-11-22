@@ -19,9 +19,9 @@
     --color-text: #e0e0e0;
     --color-text-dim: #999;
     --toolbar-height: 50px;
-    --palette-height: 80px;
-    --panel-width-left: 220px;
-    --panel-width-right: 280px;
+    --palette-height: 90px;
+    --panel-width-left: 200px;
+    --panel-width-right: 260px;
 }
 
 /* ========================================
@@ -95,7 +95,18 @@ body {
     margin: 0 0.3em;
 }
 
-.btn-icon, .btn-icon-sm {
+.btn-icon {
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border);
+    padding: 0.5em 0.7em;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--color-text);
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.btn-icon-sm {
     background: var(--color-bg-light);
     border: 1px solid var(--color-border);
     color: var(--color-text);
@@ -338,15 +349,17 @@ body {
 #canvas-container {
     flex: 1;
     position: relative;
-    overflow: hidden;
+    overflow: auto;
     background: var(--color-bg-dark);
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 20px;
 }
 
 #canvas {
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--color-border);
 }
 
 .canvas-overlay {
@@ -447,42 +460,57 @@ body {
     background: var(--color-bg-medium);
     border-top: 1px solid var(--color-border);
     flex-shrink: 0;
-    padding: 0.5em 1em;
+    padding: 0.7em 1em;
+    display: flex;
+    flex-direction: column;
 }
 
 .palette-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5em;
+    margin-bottom: 0.6em;
 }
 
 .palette-header h4 {
     margin: 0;
-    font-size: 0.85em;
+    font-size: 0.8em;
     font-weight: 500;
+    color: var(--color-text-dim);
 }
 
 .palette-items {
     display: flex;
-    gap: 0.5em;
+    gap: 0.6em;
     overflow-x: auto;
+    padding-bottom: 0.3em;
+}
+
+.palette-items::-webkit-scrollbar {
+    height: 6px;
+}
+
+.palette-items::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
 }
 
 .palette-item {
-    min-width: 60px;
-    padding: 0.5em;
+    min-width: 70px;
+    padding: 0.6em;
     background: var(--color-bg-light);
     border: 2px solid var(--color-border);
     border-radius: 6px;
     text-align: center;
     cursor: grab;
     transition: all 0.2s;
+    flex-shrink: 0;
 }
 
 .palette-item:hover {
     border-color: var(--color-primary);
     transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .palette-item:active {
