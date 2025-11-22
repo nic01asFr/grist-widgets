@@ -144,14 +144,12 @@ async function loadData() {
             order: components.order?.[i] || 0,
             type: components.type?.[i] || 'text',
             content: components.content?.[i],
-            position: components.position?.[i],
+            position: components.position?.[i] || 'center',
             width: components.width?.[i],
             height: components.height?.[i],
             style_preset: components.style_preset?.[i],
             color: components.color?.[i],
-            font_size: components.font_size?.[i],
-            x: components.x?.[i] || 0,
-            y: components.y?.[i] || 0
+            font_size: components.font_size?.[i]
         }));
 
         populatePresentationSelect();
@@ -203,11 +201,9 @@ function handleSelectionClear() {
 function handleObjectModified(e) {
     const obj = e.target;
     if (obj && obj.componentData) {
-        // Update component position/size in state
-        obj.componentData.x = obj.left;
-        obj.componentData.y = obj.top;
-        obj.componentData.width = obj.width * obj.scaleX + 'px';
-        obj.componentData.height = obj.height * obj.scaleY + 'px';
+        // Update component width/height only (position reste "center" ou autre)
+        obj.componentData.width = Math.round(obj.width * obj.scaleX) + 'px';
+        obj.componentData.height = Math.round(obj.height * obj.scaleY) + 'px';
 
         // Debounced save to Grist
         debouncedSaveComponent(obj.componentData);
@@ -347,9 +343,12 @@ function addComponentToCanvas(component) {
 }
 
 function createTextObject(component) {
+    // Convertir position en coordonnées
+    const coords = getPositionCoords(component.position || 'center');
+
     const text = new fabric.Textbox(component.content || 'Double-clic pour éditer', {
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: parseFloat(component.width) || 300,
         fontSize: parseFloat(component.font_size) || 24,
         fill: component.color || '#ffffff',
@@ -365,11 +364,28 @@ function createTextObject(component) {
     return text;
 }
 
+// Convertir position textuelle en coordonnées
+function getPositionCoords(position) {
+    const positions = {
+        'top-left': { x: 50, y: 50 },
+        'top': { x: 480, y: 50 },
+        'top-right': { x: 860, y: 50 },
+        'left': { x: 50, y: 350 },
+        'center': { x: 280, y: 250 },
+        'right': { x: 660, y: 350 },
+        'bottom-left': { x: 50, y: 600 },
+        'bottom': { x: 480, y: 600 },
+        'bottom-right': { x: 860, y: 600 }
+    };
+    return positions[position] || positions['center'];
+}
+
 function createImageObject(component) {
+    const coords = getPositionCoords(component.position || 'center');
     // Placeholder for images
     return new fabric.Rect({
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: parseFloat(component.width) || 200,
         height: parseFloat(component.height) || 150,
         fill: '#333',
@@ -379,9 +395,10 @@ function createImageObject(component) {
 }
 
 function createShapeObject(component) {
+    const coords = getPositionCoords(component.position || 'center');
     return new fabric.Rect({
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: parseFloat(component.width) || 100,
         height: parseFloat(component.height) || 100,
         fill: component.color || '#4CAF50'
@@ -389,9 +406,10 @@ function createShapeObject(component) {
 }
 
 function createPlaceholderObject(component) {
+    const coords = getPositionCoords(component.position || 'center');
     return new fabric.Rect({
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: 150,
         height: 100,
         fill: '#2196F3',
@@ -454,19 +472,21 @@ async function createComponent(type, x, y) {
 
         const newOrder = Math.max(...appState.components.filter(c => c.slide === appState.currentSlide.id).map(c => c.order), 0) + 1;
 
+        // Utiliser "position" au lieu de x/y pour la compatibilité avec reveal-builder
+        const componentData = {
+            slide: appState.currentSlide.id,
+            order: newOrder,
+            type: type,
+            content: getDefaultContent(type),
+            position: 'center',  // Position par défaut
+            width: '400px',
+            height: '200px',
+            color: '#ffffff',
+            font_size: '24px'
+        };
+
         const result = await appState.docApi.applyUserActions([
-            ['AddRecord', CONFIG.TABLES.COMPONENTS, null, {
-                slide: appState.currentSlide.id,
-                order: newOrder,
-                type: type,
-                content: getDefaultContent(type),
-                x: Math.round(x),
-                y: Math.round(y),
-                width: '200px',
-                height: '100px',
-                color: '#ffffff',
-                font_size: '24px'
-            }]
+            ['AddRecord', CONFIG.TABLES.COMPONENTS, null, componentData]
         ]);
 
         const componentId = result.retValues ? result.retValues[0] : result[0];
@@ -480,6 +500,7 @@ async function createComponent(type, x, y) {
     } catch (error) {
         console.error('❌ Error creating component:', error);
         updateSyncStatus('error', 'Erreur');
+        alert('Erreur lors de la création du composant. Vérifiez que les tables existent.');
     }
 }
 
@@ -514,17 +535,25 @@ function updatePropertiesPanel() {
         </div>
 
         <div class="property-group">
-            <h4>Position & Taille</h4>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>X</label>
-                    <input type="number" id="prop-x" value="${comp.x || 0}">
-                </div>
-                <div class="form-group">
-                    <label>Y</label>
-                    <input type="number" id="prop-y" value="${comp.y || 0}">
-                </div>
+            <h4>Position</h4>
+            <div class="form-group">
+                <label>Position</label>
+                <select id="prop-position">
+                    <option value="top-left" ${comp.position === 'top-left' ? 'selected' : ''}>Haut Gauche</option>
+                    <option value="top" ${comp.position === 'top' ? 'selected' : ''}>Haut Centre</option>
+                    <option value="top-right" ${comp.position === 'top-right' ? 'selected' : ''}>Haut Droite</option>
+                    <option value="left" ${comp.position === 'left' ? 'selected' : ''}>Milieu Gauche</option>
+                    <option value="center" ${comp.position === 'center' || !comp.position ? 'selected' : ''}>Centre</option>
+                    <option value="right" ${comp.position === 'right' ? 'selected' : ''}>Milieu Droite</option>
+                    <option value="bottom-left" ${comp.position === 'bottom-left' ? 'selected' : ''}>Bas Gauche</option>
+                    <option value="bottom" ${comp.position === 'bottom' ? 'selected' : ''}>Bas Centre</option>
+                    <option value="bottom-right" ${comp.position === 'bottom-right' ? 'selected' : ''}>Bas Droite</option>
+                </select>
             </div>
+        </div>
+
+        <div class="property-group">
+            <h4>Taille</h4>
             <div class="form-row">
                 <div class="form-group">
                     <label>Largeur</label>
@@ -574,8 +603,7 @@ window.saveProperties = async function() {
     if (!appState.selectedComponent) return;
 
     const updates = {
-        x: parseInt(document.getElementById('prop-x')?.value) || 0,
-        y: parseInt(document.getElementById('prop-y')?.value) || 0,
+        position: document.getElementById('prop-position')?.value || 'center',
         width: document.getElementById('prop-width')?.value,
         height: document.getElementById('prop-height')?.value
     };
@@ -659,10 +687,10 @@ const SLIDE_TEMPLATES = [
     {
         name: 'Titre + Logo',
         description: 'Slide de titre avec logo',
-        layout: 'custom',
+        layout: 'title',
         components: [
-            { type: 'image', x: 750, y: 50, width: '150px', height: '150px' },
-            { type: 'text', x: 280, y: 300, width: '400px', content: '# Titre Principal', font_size: '48px' }
+            { type: 'image', position: 'top-right', width: '150px', height: '150px' },
+            { type: 'text', position: 'center', width: '600px', content: '# Titre Principal', font_size: '48px', color: '#ffffff' }
         ]
     },
     {
@@ -670,19 +698,16 @@ const SLIDE_TEMPLATES = [
         description: 'Texte gauche, liste droite',
         layout: 'two-column',
         components: [
-            { type: 'text', x: 50, y: 100, width: '400px', content: '## Titre\n\nTexte explicatif', position: 'left' },
-            { type: 'list', x: 500, y: 100, width: '400px', content: 'Point 1\nPoint 2\nPoint 3', position: 'right' }
+            { type: 'text', position: 'left', width: '400px', content: '## Titre\n\nTexte explicatif', font_size: '24px', color: '#ffffff' },
+            { type: 'list', position: 'right', width: '400px', content: 'Point 1\nPoint 2\nPoint 3', font_size: '20px', color: '#ffffff' }
         ]
     },
     {
-        name: 'Dashboard 4 KPIs',
-        description: 'Grille 2x2 avec métriques',
-        layout: 'grid-2x2',
+        name: 'Contenu Simple',
+        description: 'Un seul texte centré',
+        layout: 'content',
         components: [
-            { type: 'text', x: 100, y: 100, width: '350px', content: '## 1,234\nUtilisateurs' },
-            { type: 'text', x: 510, y: 100, width: '350px', content: '## 89%\nSatisfaction' },
-            { type: 'text', x: 100, y: 400, width: '350px', content: '## 456\nVentes' },
-            { type: 'text', x: 510, y: 400, width: '350px', content: '## +23%\nCroissance' }
+            { type: 'text', position: 'center', width: '700px', content: '## Votre Titre\n\nVotre contenu ici...', font_size: '28px', color: '#ffffff' }
         ]
     }
 ];
@@ -911,8 +936,6 @@ const debouncedSaveComponent = debounce(async (component) => {
     try {
         await appState.docApi.applyUserActions([
             ['UpdateRecord', CONFIG.TABLES.COMPONENTS, component.id, {
-                x: component.x,
-                y: component.y,
                 width: component.width,
                 height: component.height
             }]
@@ -975,14 +998,12 @@ window.createMissingTables = async function() {
                 { id: 'order', fields: { type: 'Int', label: 'Ordre' } },
                 { id: 'type', fields: { type: 'Choice', label: 'Type', widgetOptions: JSON.stringify({ choices: CONFIG.COMPONENT_TYPES }) } },
                 { id: 'content', fields: { type: 'Text', label: 'Contenu' } },
-                { id: 'position', fields: { type: 'Text', label: 'Position' } },
+                { id: 'position', fields: { type: 'Choice', label: 'Position', widgetOptions: JSON.stringify({ choices: ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'] }) } },
                 { id: 'width', fields: { type: 'Text', label: 'Largeur' } },
                 { id: 'height', fields: { type: 'Text', label: 'Hauteur' } },
                 { id: 'style_preset', fields: { type: 'Text', label: 'Style' } },
                 { id: 'color', fields: { type: 'Text', label: 'Couleur' } },
-                { id: 'font_size', fields: { type: 'Text', label: 'Taille police' } },
-                { id: 'x', fields: { type: 'Numeric', label: 'X' } },
-                { id: 'y', fields: { type: 'Numeric', label: 'Y' } }
+                { id: 'font_size', fields: { type: 'Text', label: 'Taille police' } }
             ]]);
         }
 
@@ -1140,9 +1161,10 @@ async function updateSlideBackground(color) {
 // ENHANCED COMPONENT RENDERERS
 // ========================================
 function createCodeObject(component) {
+    const coords = getPositionCoords(component.position || 'center');
     return new fabric.Textbox(component.content || '// Code here', {
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: parseFloat(component.width) || 400,
         fontSize: 16,
         fill: '#00ff00',
@@ -1153,12 +1175,13 @@ function createCodeObject(component) {
 }
 
 function createListObject(component) {
+    const coords = getPositionCoords(component.position || 'center');
     const items = (component.content || 'Item 1\nItem 2').split('\n');
     const listText = items.map(item => '• ' + item).join('\n');
 
     return new fabric.Textbox(listText, {
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: parseFloat(component.width) || 300,
         fontSize: parseFloat(component.font_size) || 20,
         fill: component.color || '#ffffff',
@@ -1168,9 +1191,10 @@ function createListObject(component) {
 }
 
 function createQuoteObject(component) {
+    const coords = getPositionCoords(component.position || 'center');
     return new fabric.Textbox(component.content || '"Citation"\n— Auteur', {
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: parseFloat(component.width) || 400,
         fontSize: parseFloat(component.font_size) || 24,
         fill: component.color || '#ffffff',
@@ -1181,17 +1205,18 @@ function createQuoteObject(component) {
 }
 
 function createButtonObject(component) {
+    const coords = getPositionCoords(component.position || 'center');
     const text = new fabric.Text(component.content || 'Button', {
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         fontSize: 18,
         fill: '#ffffff',
         fontFamily: 'Arial'
     });
 
     const rect = new fabric.Rect({
-        left: component.x || 100,
-        top: component.y || 100,
+        left: coords.x,
+        top: coords.y,
         width: parseFloat(component.width) || 150,
         height: parseFloat(component.height) || 50,
         fill: '#4CAF50',
@@ -1200,8 +1225,8 @@ function createButtonObject(component) {
     });
 
     const group = new fabric.Group([rect, text], {
-        left: component.x || 100,
-        top: component.y || 100
+        left: coords.x,
+        top: coords.y
     });
 
     return group;
