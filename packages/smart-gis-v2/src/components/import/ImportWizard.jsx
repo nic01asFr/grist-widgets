@@ -155,6 +155,7 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
       const layerName = config.layer_name || 'Import';
 
       // Prepare records for Grist
+      // Only include safe columns to avoid KeyError if columns don't exist
       const records = parsedData.map((feature, idx) => ({
         layer_name: layerName,
         geometry_wgs84: feature.geometry,
@@ -162,7 +163,8 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
         is_visible: true,
         z_index: 100,
         feature_name: feature.properties?.name || feature.properties?.nom || `Feature ${idx + 1}`,
-        ...feature.properties
+        // Store all original properties as JSON string
+        properties: JSON.stringify(feature.properties || {})
       }));
 
       // Add to Grist

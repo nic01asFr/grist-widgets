@@ -55,7 +55,11 @@ class StateManager {
         catalogs: [],
         styles: [],
         importHistory: [],
-        searchHistory: []
+        searchHistory: [],
+        // Agent-driven queries
+        queryHistory: [],           // History of agent queries
+        currentQuery: null,          // Currently executing query
+        executionSteps: []          // Steps of current execution
       }
     };
 
