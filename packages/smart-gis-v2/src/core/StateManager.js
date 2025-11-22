@@ -54,7 +54,8 @@ class StateManager {
         currentTable: null,
         catalogs: [],
         styles: [],
-        importHistory: []
+        importHistory: [],
+        searchHistory: []
       }
     };
 

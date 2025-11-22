@@ -1,6 +1,6 @@
 # Smart-GIS v2 - Professional Geospatial Widget for Grist
 
-**Status:** 🚧 In Development (Phases 1-4 + 6 Complete - 70%)
+**Status:** 🚧 In Development (Phases 1-6 Complete - 80%)
 
 A complete rewrite of the Smart-GIS widget with professional-grade spatial analysis capabilities, following the comprehensive roadmap for a QGIS-like experience in Grist.
 
@@ -79,6 +79,25 @@ Tool categories organized by function:
 - **ParamsForm**: Auto-generated inputs (choice, number, geometry_picker)
 - **Tool Execution**: Simulation mode (full Grist integration in Phase 4)
 
+### Phase 5: Hybrid Search ✅
+- **Search Configuration**: 3 search modes (semantic, spatial, hybrid)
+- **Semantic Search**: VECTOR_SEARCH integration with similarity threshold
+- **Spatial Search**: 6 spatial predicates
+  - Within: Find geometries contained in zone
+  - Contains: Find geometries that contain target
+  - Intersects: Find intersecting geometries
+  - Distance: Find within radius (with unit selection)
+  - Bbox: Rectangle bounding box search
+  - Touches: Find touching geometries (common boundary)
+- **Hybrid Search**: Combine semantic + spatial filters
+- **SearchPanel**: 3-mode selector with dynamic parameter forms
+- **SearchResults**: Interactive results list with map integration
+  - Click to zoom to individual result
+  - Select all / Zoom to all actions
+  - Highlight selected results
+- **Search History**: Track last 10 searches with quick replay
+- **Map Integration**: Auto-zoom and selection sync
+
 ### Phase 4: Data Import ✅
 - **Import Methods Configuration**: 5 import methods with full specs
   - GeoJSON: Standard GeoJSON/JSON file upload
@@ -111,11 +130,7 @@ Tool categories organized by function:
 
 ### ~~Phase 4: Data Import~~ ✅ COMPLETE
 
-### Phase 5: Hybrid Search
-- Semantic search (VECTOR_SEARCH on properties)
-- Spatial search (ST_* predicates)
-- Combined semantic + spatial filtering
-- Search history
+### ~~Phase 5: Hybrid Search~~ ✅ COMPLETE
 
 ### ~~Phase 6: Layer Management~~ ✅ COMPLETE
 
@@ -279,30 +294,29 @@ npm run analyze
 
 ## 📝 Project Status
 
-**Completion:** ~70% (5/9 phases complete)
+**Completion:** ~80% (6/9 phases complete)
 
 - ✅ Phase 1: Infrastructure (100%)
 - ✅ Phase 2: Map & WKT (100%)
 - ✅ Phase 3: Tool Definitions (100%)
 - ✅ Phase 3: Tools UI (100%)
 - ✅ Phase 4: Import Wizard (100%)
-- ⏳ Phase 5: Hybrid Search (0%)
+- ✅ Phase 5: Hybrid Search (100%)
 - ✅ Phase 6: Layer Management (100%)
 - ⏳ Phase 7: Performance (0%)
 - ⏳ Phase 8: Build & Deploy (0%)
 - ⏳ Phase 9: Testing (0%)
 
-**Build Size:** 191.55 KB gzipped (target: <200 KB) ✅
+**Build Size:** 196.57 KB gzipped (target: <200 KB) ✅
 
 **Estimated completion:** 12-15 development days (per roadmap)
 
 ## 🚀 Next Steps
 
-1. **Phase 5**: Implement hybrid search (semantic + spatial)
-2. **Phase 7**: Performance optimizations (caching, viewport filtering)
-3. **Phase 8**: Production build & deployment
-4. **Phase 9**: Testing & validation
-5. **Final Polish**: Documentation, examples, tutorials
+1. **Phase 7**: Performance optimizations (caching, viewport filtering, lazy loading)
+2. **Phase 8**: Production build & deployment (terser minification)
+3. **Phase 9**: Testing & validation (unit tests, integration tests)
+4. **Final Polish**: Documentation, examples, tutorials
 
 ## 📄 License
 
