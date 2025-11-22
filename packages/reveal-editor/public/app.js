@@ -78,6 +78,7 @@ async function initializeGristAPI() {
         if (tablesCheck.allExist) {
             updateSyncStatus('connected', 'Connecté');
             hideSetupScreen();
+            await ensureCanvasColumns();
             await loadData();
         } else {
             updateSyncStatus('error', 'Tables manquantes');
@@ -993,6 +994,41 @@ function debounce(func, wait) {
 // ========================================
 // TABLE CREATION
 // ========================================
+
+// Ensure x_canvas and y_canvas columns exist
+async function ensureCanvasColumns() {
+    try {
+        const tables = await appState.docApi.fetchTable('_grist_Tables');
+        const componentsTableId = tables.id.find((id, i) => tables.tableId[i] === CONFIG.TABLES.COMPONENTS);
+
+        if (!componentsTableId) return;
+
+        const columns = await appState.docApi.fetchTable('_grist_Tables_column');
+        const componentColumns = columns.id.filter((id, i) => columns.parentId[i] === componentsTableId);
+        const columnNames = componentColumns.map((id, idx) => {
+            const i = columns.id.indexOf(id);
+            return columns.colId[i];
+        });
+
+        const columnsToAdd = [];
+
+        if (!columnNames.includes('x_canvas')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'x_canvas', { type: 'Numeric', label: 'X Canvas (px)' }]);
+        }
+
+        if (!columnNames.includes('y_canvas')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'y_canvas', { type: 'Numeric', label: 'Y Canvas (px)' }]);
+        }
+
+        if (columnsToAdd.length > 0) {
+            console.log('Adding missing canvas columns:', columnsToAdd);
+            await appState.docApi.applyUserActions(columnsToAdd);
+        }
+    } catch (error) {
+        console.error('Error ensuring canvas columns:', error);
+    }
+}
+
 window.createMissingTables = async function() {
     const statusDiv = document.getElementById('setup-status');
     const errorDiv = document.getElementById('setup-error');
@@ -1052,6 +1088,7 @@ window.createMissingTables = async function() {
             const check = await checkRequiredTables();
             if (check.allExist) {
                 hideSetupScreen();
+                await ensureCanvasColumns();
                 await loadData();
                 updateSyncStatus('connected', 'Connecté');
             }
