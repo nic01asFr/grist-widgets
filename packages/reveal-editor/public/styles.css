@@ -1,0 +1,718 @@
+/* ========================================
+   REVEAL.JS EDITOR - STYLES
+   WYSIWYG Editor for Reveal.js presentations
+   ======================================== */
+
+/* ========================================
+   VARIABLES
+   ======================================== */
+:root {
+    --color-primary: #4CAF50;
+    --color-secondary: #2196F3;
+    --color-success: #8BC34A;
+    --color-error: #F44336;
+    --color-warning: #FF9800;
+    --color-bg-dark: #1e1e1e;
+    --color-bg-medium: #2a2a2a;
+    --color-bg-light: #3a3a3a;
+    --color-border: #444;
+    --color-text: #e0e0e0;
+    --color-text-dim: #999;
+    --toolbar-height: 50px;
+    --palette-height: 80px;
+    --panel-width-left: 220px;
+    --panel-width-right: 280px;
+}
+
+/* ========================================
+   BASE
+   ======================================== */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--color-bg-dark);
+    color: var(--color-text);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========================================
+   TOOLBAR
+   ======================================== */
+#toolbar {
+    height: var(--toolbar-height);
+    background: var(--color-bg-medium);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    padding: 0 1em;
+    gap: 1em;
+    flex-shrink: 0;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.toolbar-section:last-child {
+    margin-left: auto;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+}
+
+.toolbar-group label {
+    font-size: 0.85em;
+    margin-right: 0.3em;
+    color: var(--color-text-dim);
+}
+
+.toolbar-group select {
+    background: var(--color-bg-dark);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: 0.4em 0.6em;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--color-border);
+    margin: 0 0.3em;
+}
+
+.btn-icon, .btn-icon-sm {
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 0.5em 0.7em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: all 0.2s;
+}
+
+.btn-icon-sm {
+    padding: 0.2em 0.5em;
+    font-size: 0.9em;
+}
+
+.btn-icon:hover, .btn-icon-sm:hover {
+    background: var(--color-bg-medium);
+    border-color: var(--color-primary);
+}
+
+.btn-icon:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    padding: 0.5em 1em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background: #45a049;
+}
+
+.btn-secondary {
+    background: var(--color-bg-light);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: 0.5em 1em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.btn-secondary:hover {
+    background: var(--color-bg-medium);
+}
+
+.sync-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.8em;
+    color: var(--color-text-dim);
+}
+
+.sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+}
+
+.sync-dot.connected {
+    background: var(--color-success);
+}
+
+.sync-dot.syncing {
+    background: var(--color-warning);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ========================================
+   MAIN CONTAINER (3 PANELS)
+   ======================================== */
+#main-container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    height: calc(100vh - var(--toolbar-height) - var(--palette-height));
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg-dark);
+    border-right: 1px solid var(--color-border);
+}
+
+.panel-header {
+    background: var(--color-bg-medium);
+    padding: 0.8em 1em;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+/* ========================================
+   LEFT PANEL: SLIDES LIST
+   ======================================== */
+#slides-panel {
+    width: var(--panel-width-left);
+    flex-shrink: 0;
+}
+
+.slides-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5em;
+}
+
+.slide-item {
+    background: var(--color-bg-medium);
+    border: 2px solid transparent;
+    border-radius: 6px;
+    padding: 0.5em;
+    margin-bottom: 0.5em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.slide-item:hover {
+    border-color: var(--color-border);
+}
+
+.slide-item.active {
+    border-color: var(--color-primary);
+    background: var(--color-bg-light);
+}
+
+.slide-thumbnail {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 4px;
+    margin-bottom: 0.3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7em;
+    color: var(--color-text-dim);
+}
+
+.slide-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75em;
+}
+
+.slide-title {
+    font-weight: 500;
+}
+
+.slide-number {
+    color: var(--color-text-dim);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2em 1em;
+    color: var(--color-text-dim);
+}
+
+.empty-state p:first-child {
+    font-size: 1.1em;
+    margin-bottom: 0.5em;
+}
+
+/* ========================================
+   CENTER PANEL: CANVAS
+   ======================================== */
+#canvas-panel {
+    flex: 1;
+    border-right: 1px solid var(--color-border);
+}
+
+.panel-main {
+    border-right: 1px solid var(--color-border);
+}
+
+.canvas-info {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    flex: 1;
+}
+
+#current-slide-title {
+    font-weight: 500;
+}
+
+.canvas-zoom {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.85em;
+}
+
+.canvas-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.canvas-actions label {
+    font-size: 0.85em;
+    color: var(--color-text-dim);
+}
+
+.canvas-actions select {
+    background: var(--color-bg-dark);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: 0.4em 0.6em;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+#canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--color-bg-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#canvas {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.canvas-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+/* ========================================
+   RIGHT PANEL: PROPERTIES
+   ======================================== */
+#properties-panel {
+    width: var(--panel-width-right);
+    flex-shrink: 0;
+    border-right: none;
+}
+
+.properties-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1em;
+}
+
+.property-group {
+    margin-bottom: 1.5em;
+}
+
+.property-group h4 {
+    margin: 0 0 0.5em 0;
+    font-size: 0.85em;
+    color: var(--color-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group {
+    margin-bottom: 1em;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.3em;
+    font-size: 0.85em;
+    color: var(--color-text-dim);
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="url"],
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    background: var(--color-bg-medium);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: 0.5em;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-family: inherit;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5em;
+}
+
+.color-input-group {
+    display: flex;
+    gap: 0.5em;
+}
+
+.color-input-group input {
+    flex: 1;
+}
+
+.color-preview {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* ========================================
+   BOTTOM: COMPONENTS PALETTE
+   ======================================== */
+#components-palette {
+    height: var(--palette-height);
+    background: var(--color-bg-medium);
+    border-top: 1px solid var(--color-border);
+    flex-shrink: 0;
+    padding: 0.5em 1em;
+}
+
+.palette-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5em;
+}
+
+.palette-header h4 {
+    margin: 0;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.palette-items {
+    display: flex;
+    gap: 0.5em;
+    overflow-x: auto;
+}
+
+.palette-item {
+    min-width: 60px;
+    padding: 0.5em;
+    background: var(--color-bg-light);
+    border: 2px solid var(--color-border);
+    border-radius: 6px;
+    text-align: center;
+    cursor: grab;
+    transition: all 0.2s;
+}
+
+.palette-item:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+}
+
+.palette-item:active {
+    cursor: grabbing;
+}
+
+.palette-item.dragging {
+    opacity: 0.5;
+}
+
+.palette-icon {
+    font-size: 1.2em;
+    margin-bottom: 0.2em;
+}
+
+.palette-label {
+    font-size: 0.7em;
+    color: var(--color-text-dim);
+}
+
+/* ========================================
+   MODALS
+   ======================================== */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--color-bg-medium);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-content.modal-large {
+    max-width: 900px;
+}
+
+.modal-header {
+    padding: 1em 1.5em;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--color-text);
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.modal-close:hover {
+    background: var(--color-bg-light);
+}
+
+.modal-body {
+    padding: 1.5em;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 1em 1.5em;
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+/* Templates Grid */
+.templates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1em;
+}
+
+.template-item {
+    background: var(--color-bg-dark);
+    border: 2px solid var(--color-border);
+    border-radius: 6px;
+    padding: 1em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.template-item:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+}
+
+.template-preview {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 4px;
+    margin-bottom: 0.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+}
+
+.template-name {
+    font-weight: 500;
+    margin-bottom: 0.3em;
+}
+
+.template-description {
+    font-size: 0.8em;
+    color: var(--color-text-dim);
+}
+
+/* Text Editor */
+#text-editor-container {
+    min-height: 200px;
+}
+
+/* ========================================
+   SETUP SCREEN
+   ======================================== */
+#setup-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.setup-card {
+    background: var(--color-bg-medium);
+    padding: 2em;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    border: 1px solid var(--color-border);
+}
+
+.spinner {
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid var(--color-primary);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ========================================
+   FABRIC.JS CUSTOM STYLES
+   ======================================== */
+.canvas-container {
+    margin: 0 auto !important;
+}
+
+/* Selection handles */
+.upper-canvas {
+    border: 1px solid var(--color-border);
+}
+
+/* ========================================
+   SCROLLBARS
+   ======================================== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-bg-light);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border);
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.mt-1 { margin-top: 0.5em; }
+.mt-2 { margin-top: 1em; }
+.mb-1 { margin-bottom: 0.5em; }
+.mb-2 { margin-bottom: 1em; }

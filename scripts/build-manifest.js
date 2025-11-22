@@ -65,6 +65,18 @@ const widgets = [
     }]
   },
   {
+    name: 'Reveal.js Editor',
+    description: 'Éditeur visuel WYSIWYG pour créer et éditer des présentations Reveal.js dans Grist. Interface 3 panneaux avec glisser-déposer, édition visuelle, templates prédéfinis, alignement automatique, undo/redo, zoom, et synchronisation automatique avec Grist. Fonctionne avec Reveal.js Builder pour la visualisation.',
+    path: 'reveal-editor',
+    widgetId: '@nic01asFr/reveal-editor',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
+  },
+  {
     name: 'Panoramax Explorer',
     description: 'Explorateur interactif d\'images Panoramax avec carte Leaflet. Mode exploration pour découvrir des panoramas et mode visualisation pour afficher les vues sauvegardées. Création automatique de table pour sauvegarder les vues favorites.',
     path: 'panoramax-explorer',
