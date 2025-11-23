@@ -39,7 +39,9 @@ const MapView = () => {
     };
   }, []);
 
-  // OPTIMIZATION: Debounced map move handler (prevents 300+ setState during pan/zoom)
+  // OPTIMIZATION: Debounced + batched map move handler
+  // Prevents 300+ setState during pan/zoom (3 setState per event)
+  // Now: 1 batchUpdate per 200ms instead of 300+ individual setState
   const handleMapMove = useCallback((e) => {
     // Clear previous timeout
     if (moveTimeoutRef.current) {
@@ -50,12 +52,13 @@ const MapView = () => {
     moveTimeoutRef.current = setTimeout(() => {
       const map = e.target;
       const newCenter = map.getCenter();
-      const newZoom = map.getZoom();
 
-      // Batch updates to reduce re-renders
-      StateManager.setState('map.center', [newCenter.lat, newCenter.lng], 'Map moved');
-      StateManager.setState('map.zoom', newZoom, 'Map zoomed');
-      StateManager.setState('map.bounds', map.getBounds(), 'Map bounds changed');
+      // OPTIMIZATION: Batch all map updates into ONE state change
+      StateManager.batchUpdate({
+        'map.center': [newCenter.lat, newCenter.lng],
+        'map.zoom': map.getZoom(),
+        'map.bounds': map.getBounds()
+      }, 'Map interaction');
     }, 200);
   }, []);
 
