@@ -175,14 +175,14 @@ export const SYSTEM_SCHEMAS = {
  */
 export async function getTableColumns(docApi, tableName) {
   try {
-    const tables = await docApi.getDocAPI().fetchTable('_grist_Tables');
+    const tables = await docApi.fetchTable('_grist_Tables');
     const table = tables.find(t => t.tableId === tableName);
 
     if (!table) {
       return [];
     }
 
-    const columns = await docApi.getDocAPI().fetchTable('_grist_Tables_column');
+    const columns = await docApi.fetchTable('_grist_Tables_column');
     return columns
       .filter(col => col.parentId === table.id)
       .map(col => col.colId);
@@ -300,7 +300,7 @@ export async function initializeSystemTables(docApi, tableNames = null) {
 
     try {
       // Check if table exists
-      const tables = await docApi.getDocAPI().fetchTable('_grist_Tables');
+      const tables = await docApi.fetchTable('_grist_Tables');
       const tableExists = tables.some(t => t.tableId === tableName);
 
       if (!tableExists) {
