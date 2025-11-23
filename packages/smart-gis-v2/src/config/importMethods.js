@@ -420,9 +420,12 @@ export const IMPORT_METHODS = {
         count: max_features || 1000
       });
 
-      // Add filter if search text provided
+      // Add simple filter if search text provided
       if (search_text && search_text.trim()) {
-        const cqlFilter = `nom ILIKE '%${search_text}%' OR nom_com ILIKE '%${search_text}%' OR nom_dep ILIKE '%${search_text}%' OR nom_reg ILIKE '%${search_text}%'`;
+        // Use simple LIKE filter on 'nom' property (exists in most layers)
+        // Escape single quotes in search text
+        const escapedText = search_text.replace(/'/g, "''");
+        const cqlFilter = `nom LIKE '%${escapedText}%'`;
         params.append('cql_filter', cqlFilter);
       }
 
@@ -430,13 +433,14 @@ export const IMPORT_METHODS = {
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Erreur IGN: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
       }
 
       const geojson = await response.json();
 
       if (!geojson.features || geojson.features.length === 0) {
-        throw new Error('Aucune donnée trouvée pour cette recherche');
+        throw new Error('Aucune donnée trouvée. Essayez sans filtre ou avec un autre nom.');
       }
 
       return geojson.features.map((feature, idx) => ({
