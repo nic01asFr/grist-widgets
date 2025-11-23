@@ -1,31 +1,65 @@
 /**
  * MapView - Leaflet map container with performance optimizations
+ *
+ * Phase 1: Debouncing, memoization
+ * Phase 2: Geometry cache, batch updates
+ * Phase 3: Viewport culling, progressive loading
  */
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import StateManager from '../../core/StateManager';
 import LayerRenderer from './LayerRenderer';
+import { filterVisibleLayers, ProgressiveLoader } from '../../utils/viewportManager';
 import 'leaflet/dist/leaflet.css';
+
+// OPTIMIZATION: Progressive loader instance (shared)
+const progressiveLoader = new ProgressiveLoader(100, 50);
 
 const MapView = () => {
   const [center, setCenter] = useState([48.8566, 2.3522]);
   const [zoom, setZoom] = useState(6);
-  const [layers, setLayers] = useState([]);
+  const [allLayers, setAllLayers] = useState([]);
+  const [displayedLayers, setDisplayedLayers] = useState([]);
+  const [mapBounds, setMapBounds] = useState(null);
   const mapRef = useRef(null);
   const moveTimeoutRef = useRef(null);
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     // Subscribe to layers changes
     const unsubscribe = StateManager.subscribe('layers.workspace', (workspaceLayers) => {
-      setLayers(workspaceLayers);
+      setAllLayers(workspaceLayers);
+
+      // OPTIMIZATION: Progressive loading for large datasets
+      if (workspaceLayers.length > 100) {
+        isLoadingRef.current = true;
+        console.log(`[MapView] Progressive loading ${workspaceLayers.length} features...`);
+
+        progressiveLoader.load(workspaceLayers, (loadedSoFar, total) => {
+          setDisplayedLayers(loadedSoFar);
+
+          if (loadedSoFar.length === total) {
+            isLoadingRef.current = false;
+            console.log(`[MapView] ✅ All ${total} features loaded`);
+          }
+        });
+      } else {
+        // Small dataset: load immediately
+        setDisplayedLayers(workspaceLayers);
+      }
     });
 
     // Load initial state
-    setLayers(StateManager.getState('layers.workspace'));
+    const initialLayers = StateManager.getState('layers.workspace');
+    setAllLayers(initialLayers);
+    setDisplayedLayers(initialLayers);
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      progressiveLoader.cancel();
+    };
   }, []);
 
   useEffect(() => {
@@ -52,12 +86,16 @@ const MapView = () => {
     moveTimeoutRef.current = setTimeout(() => {
       const map = e.target;
       const newCenter = map.getCenter();
+      const newBounds = map.getBounds();
+
+      // Update local bounds for viewport culling
+      setMapBounds(newBounds);
 
       // OPTIMIZATION: Batch all map updates into ONE state change
       StateManager.batchUpdate({
         'map.center': [newCenter.lat, newCenter.lng],
         'map.zoom': map.getZoom(),
-        'map.bounds': map.getBounds()
+        'map.bounds': newBounds
       }, 'Map interaction');
     }, 200);
   }, []);
@@ -71,12 +109,23 @@ const MapView = () => {
     };
   }, []);
 
-  // OPTIMIZATION: Memoize layer filtering (prevents recalculation on every render)
+  // OPTIMIZATION: Memoize layer filtering + viewport culling
+  // Phase 1: Filter by visibility
+  // Phase 3: Filter by viewport (only render what's visible on map)
   const { pointLayers, otherLayers } = useMemo(() => {
+    let visibleLayers = displayedLayers;
+
+    // OPTIMIZATION: Viewport culling for large datasets
+    // Only render features within current map bounds
+    if (displayedLayers.length > 100 && mapBounds) {
+      visibleLayers = filterVisibleLayers(displayedLayers, mapBounds);
+    }
+
+    // Separate points from other geometries
     const points = [];
     const others = [];
 
-    layers.forEach(layer => {
+    visibleLayers.forEach(layer => {
       // Skip invisible layers
       if (layer.is_visible === false) return;
 
@@ -86,7 +135,7 @@ const MapView = () => {
     });
 
     return { pointLayers: points, otherLayers: others };
-  }, [layers]);
+  }, [displayedLayers, mapBounds]);
 
   return (
     <MapContainer
