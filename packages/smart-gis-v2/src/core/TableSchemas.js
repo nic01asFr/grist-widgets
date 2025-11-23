@@ -135,15 +135,15 @@ export const AGENT_QUERIES_SCHEMA = {
     // === Timestamps ===
     {
       id: 'created_at',
-      type: 'DateTime',
+      type: 'Int',
       label: 'Created At',
-      description: 'Query creation timestamp'
+      description: 'Query creation timestamp (Unix epoch)'
     },
     {
       id: 'executed_at',
-      type: 'DateTime',
+      type: 'Int',
       label: 'Executed At',
-      description: 'Query execution timestamp'
+      description: 'Query execution timestamp (Unix epoch)'
     },
 
     // === Metadata ===
@@ -337,22 +337,47 @@ export async function initializeSystemTables(docApi, tableNames = null) {
       const tableExists = tables.some(t => t.tableId === tableName);
 
       if (!tableExists) {
-        console.log(`[TableSchemas] 📋 Creating table: ${tableName}`);
+        console.log(`[TableSchemas] 📋 Creating table: ${tableName} with ${schema.columns.length} columns`);
 
-        // Create table with first column from schema
-        const firstCol = schema.columns[0];
+        // Prepare ALL columns for table creation (not just first one)
+        const columnsToCreate = schema.columns.map(col => {
+          const colDef = {
+            id: col.id,
+            type: col.type
+          };
+
+          // Add formula if exists (for calculated columns)
+          if (col.formula) {
+            colDef.formula = col.formula;
+          }
+
+          // Add label if exists
+          if (col.label) {
+            colDef.label = col.label;
+          }
+
+          return colDef;
+        });
+
+        // Create table with ALL columns at once
         await docApi.applyUserActions([
-          ['AddTable', tableName, [
-            { id: firstCol.id, type: firstCol.type }
-          ]]
+          ['AddTable', tableName, columnsToCreate]
         ]);
 
-        console.log(`[TableSchemas] ✓ Created table: ${tableName}`);
-      }
+        console.log(`[TableSchemas] ✓ Created table: ${tableName} with ${columnsToCreate.length} columns`);
+        results[tableName] = {
+          success: true,
+          added: columnsToCreate.map(c => c.id),
+          errors: [],
+          message: `Created table with ${columnsToCreate.length} columns`
+        };
+      } else {
+        console.log(`[TableSchemas] ✓ Table ${tableName} already exists, ensuring columns...`);
 
-      // Ensure all columns exist
-      const columnResult = await ensureTableColumns(docApi, tableName, schema);
-      results[tableName] = columnResult;
+        // Ensure all columns exist
+        const columnResult = await ensureTableColumns(docApi, tableName, schema);
+        results[tableName] = columnResult;
+      }
 
     } catch (error) {
       console.error(`[TableSchemas] ❌ Failed to initialize ${tableName}:`, error);
