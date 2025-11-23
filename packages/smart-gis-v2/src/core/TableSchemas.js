@@ -339,37 +339,56 @@ export async function initializeSystemTables(docApi, tableNames = null) {
       if (!tableExists) {
         console.log(`[TableSchemas] 📋 Creating table: ${tableName} with ${schema.columns.length} columns`);
 
-        // Prepare ALL columns for table creation (not just first one)
-        const columnsToCreate = schema.columns.map(col => {
-          const colDef = {
-            id: col.id,
-            type: col.type
-          };
+        // Separate formula columns from regular columns
+        const regularColumns = [];
+        const formulaColumns = [];
 
-          // Add formula if exists (for calculated columns)
+        schema.columns.forEach(col => {
           if (col.formula) {
-            colDef.formula = col.formula;
+            formulaColumns.push(col);
+          } else {
+            regularColumns.push(col);
           }
-
-          // Add label if exists
-          if (col.label) {
-            colDef.label = col.label;
-          }
-
-          return colDef;
         });
 
-        // Create table with ALL columns at once
+        // Step 1: Create table with regular (non-formula) columns only
+        const columnsToCreate = regularColumns.map(col => ({
+          id: col.id,
+          type: col.type,
+          label: col.label
+        }));
+
         await docApi.applyUserActions([
           ['AddTable', tableName, columnsToCreate]
         ]);
 
-        console.log(`[TableSchemas] ✓ Created table: ${tableName} with ${columnsToCreate.length} columns`);
+        console.log(`[TableSchemas] ✓ Created table with ${columnsToCreate.length} regular columns`);
+
+        // Step 2: Add formula columns separately
+        for (const col of formulaColumns) {
+          try {
+            console.log(`[TableSchemas] ⏳ Adding formula column: ${col.id}`);
+            await docApi.applyUserActions([
+              ['AddColumn', tableName, col.id, {
+                type: col.type,
+                isFormula: true,
+                formula: col.formula,
+                label: col.label
+              }]
+            ]);
+            console.log(`[TableSchemas] ✓ Added formula column: ${col.id}`);
+          } catch (err) {
+            console.error(`[TableSchemas] ✗ Failed to add formula column ${col.id}:`, err);
+          }
+        }
+
+        console.log(`[TableSchemas] ✓ Table ${tableName} fully initialized (${regularColumns.length} regular + ${formulaColumns.length} formula columns)`);
+
         results[tableName] = {
           success: true,
-          added: columnsToCreate.map(c => c.id),
+          added: schema.columns.map(c => c.id),
           errors: [],
-          message: `Created table with ${columnsToCreate.length} columns`
+          message: `Created table with ${schema.columns.length} columns (${regularColumns.length} regular + ${formulaColumns.length} formula)`
         };
       } else {
         console.log(`[TableSchemas] ✓ Table ${tableName} already exists, ensuring columns...`);
