@@ -10,12 +10,15 @@
  * - React.memo to prevent unnecessary re-renders
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Marker, Polyline, Polygon, Popup } from 'react-leaflet';
 import geometryCache from '../../utils/geometry/geometryCache';
 import StateManager from '../../core/StateManager';
+import SelectionManager from '../../services/SelectionManager';
 
 const LayerRenderer = ({ layer }) => {
+  const [isSelected, setIsSelected] = useState(false);
+
   // OPTIMIZATION: Use global geometry cache (prevents re-parsing on every render)
   const geometry = useMemo(() => {
     if (layer.geojson) {
@@ -24,31 +27,48 @@ const LayerRenderer = ({ layer }) => {
     return { type: null, coordinates: [] };
   }, [layer.geojson, layer.id]);
 
+  // Subscribe to selection changes to update highlight
+  useEffect(() => {
+    const unsubscribe = StateManager.subscribe('selection.ids', (selectedIds) => {
+      setIsSelected(selectedIds.includes(layer.id));
+    });
+
+    // Check initial state
+    const currentSelection = StateManager.getState('selection.ids');
+    setIsSelected(currentSelection.includes(layer.id));
+
+    return unsubscribe;
+  }, [layer.id]);
+
+  // Base style with selection highlight
   const style = useMemo(() => {
     try {
-      return layer.style ? JSON.parse(layer.style) : getDefaultStyle(geometry.type);
+      const baseStyle = layer.style ? JSON.parse(layer.style) : getDefaultStyle(geometry.type);
+
+      // Add highlight style if selected
+      if (isSelected) {
+        return {
+          ...baseStyle,
+          color: '#ffff00',           // Yellow border for selected
+          weight: (baseStyle.weight || 2) + 2,  // Thicker border
+          fillColor: '#ffff00',       // Yellow fill
+          fillOpacity: (baseStyle.fillOpacity || 0.3) + 0.2  // More opaque
+        };
+      }
+
+      return baseStyle;
     } catch {
       return getDefaultStyle(geometry.type);
     }
-  }, [layer.style, geometry.type]);
+  }, [layer.style, geometry.type, isSelected]);
 
-  const handleClick = () => {
-    const currentSelection = StateManager.getState('selection.ids');
+  // Handle click with Grist sync
+  const handleClick = (e) => {
+    // Check if Ctrl/Cmd key is pressed for multi-select
+    const multiSelect = e.originalEvent.ctrlKey || e.originalEvent.metaKey;
 
-    // Toggle selection
-    if (currentSelection.includes(layer.id)) {
-      StateManager.setState(
-        'selection.ids',
-        currentSelection.filter(id => id !== layer.id),
-        'Deselect feature'
-      );
-    } else {
-      StateManager.setState(
-        'selection.ids',
-        [...currentSelection, layer.id],
-        'Select feature'
-      );
-    }
+    // Use SelectionManager to sync with Grist
+    SelectionManager.handleMapClick(layer.id, multiSelect);
   };
 
   // OPTIMIZATION: Memoize properties parsing (prevents JSON.parse on every popup render)
@@ -234,11 +254,13 @@ function getDefaultStyle(geometryType) {
 }
 
 // OPTIMIZATION: React.memo prevents re-render when props haven't changed
-// Only re-render if layer.id or layer.geojson changes
+// Note: Selection state is managed internally via StateManager subscription,
+// so we don't need to include it in the comparison here
 export default React.memo(LayerRenderer, (prevProps, nextProps) => {
   return (
     prevProps.layer.id === nextProps.layer.id &&
     prevProps.layer.geojson === nextProps.layer.geojson &&
-    prevProps.layer.is_visible === nextProps.layer.is_visible
+    prevProps.layer.is_visible === nextProps.layer.is_visible &&
+    prevProps.layer.style === nextProps.layer.style
   );
 });
