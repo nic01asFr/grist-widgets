@@ -187,7 +187,10 @@ const COMPONENT_RENDERERS = {
         // Si le contenu commence par # ou -, c'est du markdown
         const content = c.content || '';
         if (content.trim().match(/^(#|##|###|-|\*|>)/m)) {
-            return marked.parse(content);
+            // Utiliser marked.js si disponible, sinon fallback
+            if (typeof marked !== 'undefined') {
+                return marked.parse(content);
+            }
         }
         return `<p>${escapeHTML(content)}</p>`;
     },
@@ -204,9 +207,15 @@ const COMPONENT_RENDERERS = {
         if (!c.content) return '';
 
         const language = detectLanguage(c.content);
-        const highlighted = hljs.highlightAuto(c.content, [language]).value;
 
-        return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+        // Utiliser highlight.js si disponible, sinon fallback
+        if (typeof hljs !== 'undefined') {
+            const highlighted = hljs.highlightAuto(c.content, [language]).value;
+            return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+        } else {
+            // Fallback sans coloration syntaxique
+            return `<pre><code class="language-${language}">${escapeHTML(c.content)}</code></pre>`;
+        }
     },
 
     list: (c) => {
@@ -320,6 +329,11 @@ const COMPONENT_RENDERERS = {
     chart: (c) => {
         if (!c.content) return '<p style="opacity: 0.5;">⚠️ Aucune donnée</p>';
 
+        // Vérifier si Chart.js est disponible
+        if (typeof Chart === 'undefined') {
+            return '<p style="opacity: 0.5;">⚠️ Chart.js non disponible</p>';
+        }
+
         const chartId = `chart-${c.id || Math.random().toString(36).substr(2, 9)}`;
 
         // Initialiser le graphique après un court délai
@@ -378,13 +392,27 @@ function renderComponent(component, positionOverride = null) {
     // Construire les styles
     const styles = {};
 
-    if (component.width && component.width !== 'auto') styles.width = component.width;
-    if (component.height && component.height !== 'auto') styles.height = component.height;
+    // Positionnement absolu si x_canvas/y_canvas sont définis
+    if (component.x_canvas !== undefined && component.x_canvas !== null &&
+        component.y_canvas !== undefined && component.y_canvas !== null) {
+        styles.position = 'absolute';
+        styles.left = `${component.x_canvas}px`;
+        styles.top = `${component.y_canvas}px`;
+    }
+
+    if (component.width && component.width !== 'auto') {
+        styles.width = typeof component.width === 'number' ? `${component.width}px` : component.width;
+    }
+    if (component.height && component.height !== 'auto') {
+        styles.height = typeof component.height === 'number' ? `${component.height}px` : component.height;
+    }
 
     const fontSize = component.font_size === 'custom'
         ? component.font_size_custom
         : component.font_size;
-    if (fontSize) styles.fontSize = fontSize;
+    if (fontSize) {
+        styles.fontSize = typeof fontSize === 'number' ? `${fontSize}px` : fontSize;
+    }
 
     if (component.color) styles.color = component.color;
     if (component.background) styles.background = component.background;
