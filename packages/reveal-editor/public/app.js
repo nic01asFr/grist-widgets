@@ -304,6 +304,9 @@ function loadSlide(slideId) {
 
     // Load components
     loadSlideComponents(slideId);
+
+    // Show slide properties in panel
+    showSlideProperties();
 }
 
 function loadSlideComponents(slideId) {
@@ -592,12 +595,17 @@ function updatePropertiesPanel() {
 }
 
 function clearPropertiesPanel() {
-    document.getElementById('properties-content').innerHTML = `
-        <div class="empty-state">
-            <p>Aucune sélection</p>
-            <p style="font-size: 0.8em; opacity: 0.7;">Sélectionnez un composant</p>
-        </div>
-    `;
+    // Quand on désélectionne un composant, afficher les propriétés de la slide
+    if (appState.currentSlide) {
+        showSlideProperties();
+    } else {
+        document.getElementById('properties-content').innerHTML = `
+            <div class="empty-state">
+                <p>Aucune sélection</p>
+                <p style="font-size: 0.8em; opacity: 0.7;">Sélectionnez un composant ou une slide</p>
+            </div>
+        `;
+    }
 }
 
 window.saveProperties = async function() {
@@ -723,6 +731,176 @@ window.saveTextEdit = async function() {
         closeTextEditorModal();
     } catch (error) {
         console.error('Error saving text:', error);
+    }
+};
+
+// ========================================
+// SLIDE PROPERTIES
+// ========================================
+function showSlideProperties() {
+    if (!appState.currentSlide) return;
+
+    const container = document.getElementById('properties-content');
+    const slide = appState.currentSlide;
+
+    container.innerHTML = `
+        <div style="padding: 1em;">
+            <h3 style="margin-top: 0;">📄 Propriétés de la Slide</h3>
+
+            <div style="margin-bottom: 1em;">
+                <label style="display: block; margin-bottom: 0.5em; color: #aaa;">Titre:</label>
+                <input type="text" id="slide-prop-title" value="${slide.title || ''}"
+                    style="width: 100%; padding: 8px; background: #2a2a2a; color: #fff; border: 1px solid #555; border-radius: 4px;">
+            </div>
+
+            <div style="margin-bottom: 1em;">
+                <label style="display: block; margin-bottom: 0.5em; color: #aaa;">Layout:</label>
+                <select id="slide-prop-layout"
+                    style="width: 100%; padding: 8px; background: #2a2a2a; color: #fff; border: 1px solid #555; border-radius: 4px;">
+                    <option value="title" ${slide.layout === 'title' ? 'selected' : ''}>Title</option>
+                    <option value="content" ${slide.layout === 'content' ? 'selected' : ''}>Content</option>
+                    <option value="two-col" ${slide.layout === 'two-col' ? 'selected' : ''}>Two Columns</option>
+                    <option value="full" ${slide.layout === 'full' ? 'selected' : ''}>Full</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 1em;">
+                <label style="display: block; margin-bottom: 0.5em; color: #aaa;">Couleur de fond:</label>
+                <input type="color" id="slide-prop-background" value="${slide.background_color || '#1a1a1a'}"
+                    style="width: 100%; height: 40px; background: #2a2a2a; border: 1px solid #555; border-radius: 4px; cursor: pointer;">
+            </div>
+
+            <div style="margin-bottom: 1em;">
+                <label style="display: block; margin-bottom: 0.5em; color: #aaa;">Ordre:</label>
+                <input type="number" id="slide-prop-order" value="${slide.order || 1}"
+                    style="width: 100%; padding: 8px; background: #2a2a2a; color: #fff; border: 1px solid #555; border-radius: 4px;">
+            </div>
+
+            <button onclick="saveSlideProperties()"
+                style="width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                💾 Enregistrer
+            </button>
+        </div>
+    `;
+}
+
+window.saveSlideProperties = async function() {
+    if (!appState.currentSlide) return;
+
+    const title = document.getElementById('slide-prop-title').value;
+    const layout = document.getElementById('slide-prop-layout').value;
+    const backgroundColor = document.getElementById('slide-prop-background').value;
+    const order = parseInt(document.getElementById('slide-prop-order').value);
+
+    try {
+        await appState.docApi.applyUserActions([
+            ['UpdateRecord', CONFIG.TABLES.SLIDES, appState.currentSlide.id, {
+                title: title,
+                layout: layout,
+                background_color: backgroundColor,
+                order: order
+            }]
+        ]);
+
+        // Update local state
+        appState.currentSlide.title = title;
+        appState.currentSlide.layout = layout;
+        appState.currentSlide.background_color = backgroundColor;
+        appState.currentSlide.order = order;
+
+        // Update UI
+        document.getElementById('current-slide-title').textContent = title || `Slide ${order}`;
+        document.getElementById('layout-select').value = layout;
+
+        // Update canvas background
+        appState.canvas.setBackgroundColor(backgroundColor, appState.canvas.renderAll.bind(appState.canvas));
+
+        // Reload data to update slide list
+        await loadData();
+
+        console.log('✅ Slide properties saved');
+    } catch (error) {
+        console.error('❌ Error saving slide properties:', error);
+        alert('Erreur lors de la sauvegarde des propriétés');
+    }
+};
+
+// ========================================
+// CONTENT EDITOR (for code, list, quote)
+// ========================================
+function openContentEditor(component, title) {
+    const modal = document.getElementById('content-editor-modal');
+    const titleElement = document.getElementById('content-editor-title');
+    const textarea = document.getElementById('content-editor-textarea');
+
+    titleElement.textContent = title;
+    textarea.value = component.content || '';
+    modal.style.display = 'flex';
+
+    // Store current component for saving
+    window.currentEditingComponent = component;
+}
+
+window.closeContentEditorModal = function() {
+    document.getElementById('content-editor-modal').style.display = 'none';
+};
+
+window.saveContentEdit = async function() {
+    if (!window.currentEditingComponent) return;
+
+    const content = document.getElementById('content-editor-textarea').value;
+
+    try {
+        await appState.docApi.applyUserActions([
+            ['UpdateRecord', CONFIG.TABLES.COMPONENTS, window.currentEditingComponent.id, {
+                content: content
+            }]
+        ]);
+
+        await loadData();
+        loadSlide(appState.currentSlide.id);
+        closeContentEditorModal();
+    } catch (error) {
+        console.error('Error saving content:', error);
+    }
+};
+
+// ========================================
+// BUTTON EDITOR
+// ========================================
+function openButtonEditor(component) {
+    const modal = document.getElementById('button-editor-modal');
+    document.getElementById('button-content').value = component.content || '';
+    document.getElementById('button-url').value = component.url || '';
+    modal.style.display = 'flex';
+
+    // Store current component for saving
+    window.currentEditingComponent = component;
+}
+
+window.closeButtonEditorModal = function() {
+    document.getElementById('button-editor-modal').style.display = 'none';
+};
+
+window.saveButtonEdit = async function() {
+    if (!window.currentEditingComponent) return;
+
+    const content = document.getElementById('button-content').value;
+    const url = document.getElementById('button-url').value;
+
+    try {
+        await appState.docApi.applyUserActions([
+            ['UpdateRecord', CONFIG.TABLES.COMPONENTS, window.currentEditingComponent.id, {
+                content: content,
+                url: url
+            }]
+        ]);
+
+        await loadData();
+        loadSlide(appState.currentSlide.id);
+        closeButtonEditorModal();
+    } catch (error) {
+        console.error('Error saving button:', error);
     }
 };
 
@@ -1268,7 +1446,7 @@ async function updateSlideBackground(color) {
 // ========================================
 function createCodeObject(component) {
     const coords = getComponentCoords(component);
-    return new fabric.Textbox(component.content || '// Code here', {
+    const codeBox = new fabric.Textbox(component.content || '// Code here\n// Double-clic pour éditer', {
         left: coords.x,
         top: coords.y,
         width: Number(component.width) || 400,
@@ -1278,14 +1456,21 @@ function createCodeObject(component) {
         fontFamily: 'monospace',
         editable: false
     });
+
+    // Double-click to edit
+    codeBox.on('mousedblclick', () => {
+        openContentEditor(component, '💻 Éditer le code');
+    });
+
+    return codeBox;
 }
 
 function createListObject(component) {
     const coords = getComponentCoords(component);
-    const items = (component.content || 'Item 1\nItem 2').split('\n');
+    const items = (component.content || 'Item 1\nItem 2\nDouble-clic pour éditer').split('\n');
     const listText = items.map(item => '• ' + item).join('\n');
 
-    return new fabric.Textbox(listText, {
+    const listBox = new fabric.Textbox(listText, {
         left: coords.x,
         top: coords.y,
         width: Number(component.width) || 300,
@@ -1294,11 +1479,18 @@ function createListObject(component) {
         fontFamily: 'Arial',
         editable: false
     });
+
+    // Double-click to edit
+    listBox.on('mousedblclick', () => {
+        openContentEditor(component, '📋 Éditer la liste');
+    });
+
+    return listBox;
 }
 
 function createQuoteObject(component) {
     const coords = getComponentCoords(component);
-    return new fabric.Textbox(component.content || '"Citation"\n— Auteur', {
+    const quoteBox = new fabric.Textbox(component.content || '"Citation"\n— Auteur\n\nDouble-clic pour éditer', {
         left: coords.x,
         top: coords.y,
         width: Number(component.width) || 400,
@@ -1308,6 +1500,13 @@ function createQuoteObject(component) {
         fontFamily: 'Georgia',
         editable: false
     });
+
+    // Double-click to edit
+    quoteBox.on('mousedblclick', () => {
+        openContentEditor(component, '💬 Éditer la citation');
+    });
+
+    return quoteBox;
 }
 
 function createButtonObject(component) {
@@ -1333,6 +1532,11 @@ function createButtonObject(component) {
     const group = new fabric.Group([rect, text], {
         left: coords.x,
         top: coords.y
+    });
+
+    // Double-click to edit
+    group.on('mousedblclick', () => {
+        openButtonEditor(component);
     });
 
     return group;
