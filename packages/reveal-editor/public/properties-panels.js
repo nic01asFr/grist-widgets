@@ -2,6 +2,12 @@
 // Ce fichier contient les fonctions pour générer les panneaux de propriétés
 
 function getPropertiesHTML(comp) {
+    // Calculer les pourcentages à partir des pixels
+    const xPercent = comp.x_canvas !== undefined ? ((comp.x_canvas / 960) * 100).toFixed(1) : '';
+    const yPercent = comp.y_canvas !== undefined ? ((comp.y_canvas / 700) * 100).toFixed(1) : '';
+    const widthPercent = comp.width !== undefined ? ((comp.width / 960) * 100).toFixed(1) : '';
+    const heightPercent = comp.height !== undefined ? ((comp.height / 700) * 100).toFixed(1) : '';
+
     // Propriétés communes
     let html = `
         <div class="property-group">
@@ -10,29 +16,33 @@ function getPropertiesHTML(comp) {
         </div>
 
         <div class="property-group">
-            <h4>Position</h4>
+            <h4>Position relative (%)</h4>
             <div class="form-row">
                 <div class="form-group">
-                    <label>X (px)</label>
-                    <input type="number" id="prop-x-canvas" value="${comp.x_canvas !== undefined ? comp.x_canvas : ''}">
+                    <label>X (%)</label>
+                    <input type="number" step="0.1" id="prop-x-percent" value="${xPercent}">
+                    <small style="opacity: 0.6; font-size: 0.85em;">${comp.x_canvas !== undefined ? comp.x_canvas + 'px' : ''}</small>
                 </div>
                 <div class="form-group">
-                    <label>Y (px)</label>
-                    <input type="number" id="prop-y-canvas" value="${comp.y_canvas !== undefined ? comp.y_canvas : ''}">
+                    <label>Y (%)</label>
+                    <input type="number" step="0.1" id="prop-y-percent" value="${yPercent}">
+                    <small style="opacity: 0.6; font-size: 0.85em;">${comp.y_canvas !== undefined ? comp.y_canvas + 'px' : ''}</small>
                 </div>
             </div>
         </div>
 
         <div class="property-group">
-            <h4>Taille</h4>
+            <h4>Taille relative (%)</h4>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Largeur (px)</label>
-                    <input type="number" id="prop-width" value="${comp.width || ''}">
+                    <label>Largeur (%)</label>
+                    <input type="number" step="0.1" id="prop-width-percent" value="${widthPercent}">
+                    <small style="opacity: 0.6; font-size: 0.85em;">${comp.width || ''}${comp.width ? 'px' : ''}</small>
                 </div>
                 <div class="form-group">
-                    <label>Hauteur (px)</label>
-                    <input type="number" id="prop-height" value="${comp.height || ''}">
+                    <label>Hauteur (%)</label>
+                    <input type="number" step="0.1" id="prop-height-percent" value="${heightPercent}">
+                    <small style="opacity: 0.6; font-size: 0.85em;">${comp.height || ''}${comp.height ? 'px' : ''}</small>
                 </div>
             </div>
         </div>
