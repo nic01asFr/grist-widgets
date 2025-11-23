@@ -129,6 +129,31 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
       await handleParseAndPreview();
     }
 
+    // For online services (IGN, OSM), fetch data when moving from config to preview
+    if (currentStep.id === 'config' && method.fetch && !parsedData) {
+      // Validate required config fields
+      const requiredFields = currentStep.fields.filter(f => f.required);
+      const missingFields = requiredFields.filter(f => !config[f.name]);
+
+      if (missingFields.length > 0) {
+        setError(`Champs requis: ${missingFields.map(f => f.label).join(', ')}`);
+        return;
+      }
+
+      // Fetch data from online service
+      setIsLoading(true);
+      try {
+        const features = await method.fetch(config);
+        setParsedData(features);
+        setPreviewFeatures(features.slice(0, 5));
+        setIsLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     if (currentStepIndex < steps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     }
