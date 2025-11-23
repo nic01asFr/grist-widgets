@@ -417,6 +417,10 @@ export const IMPORT_METHODS = {
     description: 'Données géographiques officielles françaises (IGN)',
     color: '#0ea5e9',
 
+    // Enable dynamic field discovery and filtering
+    supportsDynamicFilters: true,
+    wfsServiceUrl: 'https://data.geopf.fr/wfs',
+
     steps: [
       {
         id: 'config',
