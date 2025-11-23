@@ -253,20 +253,24 @@ export async function ensureTableColumns(docApi, tableName, schema) {
       if (!existingColumns.includes(col.id)) {
         console.log(`[TableSchemas] ⏳ Adding missing column: ${col.id} (${col.type})`);
         try {
-          // Step 1: Create column (regular or formula)
+          // Step 1: Create column (with isFormula if needed, but no formula yet)
+          const colInfo = {
+            type: col.type,
+            label: col.label
+          };
+          if (col.formula) {
+            colInfo.isFormula = true;
+          }
+
           await docApi.applyUserActions([
-            ['AddColumn', tableName, col.id, {
-              type: col.type,
-              label: col.label
-            }]
+            ['AddColumn', tableName, col.id, colInfo]
           ]);
 
-          // Step 2: If formula column, convert it
+          // Step 2: If formula column, define the formula
           if (col.formula) {
-            console.log(`[TableSchemas]   → Converting to formula: ${col.formula}`);
+            console.log(`[TableSchemas]   → Defining formula: ${col.formula}`);
             await docApi.applyUserActions([
               ['ModifyColumn', tableName, col.id, {
-                isFormula: true,
                 formula: col.formula
               }]
             ]);
@@ -373,18 +377,18 @@ export async function initializeSystemTables(docApi, tableNames = null) {
           try {
             console.log(`[TableSchemas] ⏳ Adding formula column: ${col.id}`);
 
-            // Step 2a: Create empty column first
+            // Step 2a: Create formula column (empty, no formula yet)
             await docApi.applyUserActions([
               ['AddColumn', tableName, col.id, {
                 type: col.type,
+                isFormula: true,
                 label: col.label
               }]
             ]);
 
-            // Step 2b: Convert to formula column
+            // Step 2b: Define the formula
             await docApi.applyUserActions([
               ['ModifyColumn', tableName, col.id, {
-                isFormula: true,
                 formula: col.formula
               }]
             ]);
