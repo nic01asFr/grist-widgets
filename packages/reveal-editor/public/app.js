@@ -187,7 +187,39 @@ function initializeCanvas() {
     // Object modification events
     appState.canvas.on('object:modified', handleObjectModified);
 
+    // Ajuster le scale du canvas pour qu'il tienne dans l'espace disponible
+    scaleCanvasToFit();
+
+    // Re-scale sur resize de la fenêtre
+    window.addEventListener('resize', scaleCanvasToFit);
+
     console.log('🎨 Canvas initialized');
+}
+
+// Ajuster automatiquement le scale du canvas-frame pour qu'il tienne dans l'espace disponible
+function scaleCanvasToFit() {
+    const canvasContainer = document.getElementById('canvas-container');
+    const canvasFrame = document.querySelector('.canvas-frame');
+
+    if (!canvasContainer || !canvasFrame) return;
+
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+    const PADDING = 40; // padding du container
+
+    // Dimensions disponibles
+    const containerWidth = canvasContainer.clientWidth - PADDING * 2;
+    const containerHeight = canvasContainer.clientHeight - PADDING * 2;
+
+    // Calculer le scale pour que le canvas tienne entièrement
+    const scaleX = containerWidth / CANVAS_WIDTH;
+    const scaleY = containerHeight / CANVAS_HEIGHT;
+    const scale = Math.min(scaleX, scaleY, 1); // Ne jamais scaler au-dessus de 1
+
+    // Appliquer le scale
+    canvasFrame.style.transform = `scale(${scale})`;
+
+    console.log(`📐 Canvas scaled to ${(scale * 100).toFixed(1)}%`);
 }
 
 function handleSelection(e) {
@@ -323,6 +355,9 @@ function loadSlideComponents(slideId) {
     });
 
     appState.canvas.renderAll();
+
+    // Recalculer le scale après chargement des composants
+    requestAnimationFrame(() => scaleCanvasToFit());
 }
 
 // ========================================
