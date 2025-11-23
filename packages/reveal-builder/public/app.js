@@ -378,13 +378,27 @@ function renderComponent(component, positionOverride = null) {
     // Construire les styles
     const styles = {};
 
-    if (component.width && component.width !== 'auto') styles.width = component.width;
-    if (component.height && component.height !== 'auto') styles.height = component.height;
+    // Positionnement absolu si x_canvas/y_canvas sont définis
+    if (component.x_canvas !== undefined && component.x_canvas !== null &&
+        component.y_canvas !== undefined && component.y_canvas !== null) {
+        styles.position = 'absolute';
+        styles.left = `${component.x_canvas}px`;
+        styles.top = `${component.y_canvas}px`;
+    }
+
+    if (component.width && component.width !== 'auto') {
+        styles.width = typeof component.width === 'number' ? `${component.width}px` : component.width;
+    }
+    if (component.height && component.height !== 'auto') {
+        styles.height = typeof component.height === 'number' ? `${component.height}px` : component.height;
+    }
 
     const fontSize = component.font_size === 'custom'
         ? component.font_size_custom
         : component.font_size;
-    if (fontSize) styles.fontSize = fontSize;
+    if (fontSize) {
+        styles.fontSize = typeof fontSize === 'number' ? `${fontSize}px` : fontSize;
+    }
 
     if (component.color) styles.color = component.color;
     if (component.background) styles.background = component.background;

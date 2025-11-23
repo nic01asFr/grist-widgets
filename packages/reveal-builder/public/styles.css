@@ -201,6 +201,10 @@ body {
 /* Content Layout */
 .layout-content {
     padding: var(--spacing-lg);
+    position: relative;
+    width: 960px;
+    height: 700px;
+    margin: 0 auto;
 }
 
 /* Two Column Layout */

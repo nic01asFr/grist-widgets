@@ -12,8 +12,8 @@ const CONFIG = {
         COMPONENTS: 'Components'
     },
     CANVAS: {
-        WIDTH: 800,
-        HEIGHT: 450,
+        WIDTH: 960,  // Aligné avec Reveal.js
+        HEIGHT: 700, // Aligné avec Reveal.js
         BACKGROUND: '#1a1a1a'
     },
     THEMES: [
@@ -378,18 +378,18 @@ function getComponentCoords(component) {
     return getPositionCoords(component.position || 'center');
 }
 
-// Convertir position textuelle en coordonnées
+// Convertir position textuelle en coordonnées (pour canvas 960x700)
 function getPositionCoords(position) {
     const positions = {
-        'top-left': { x: 50, y: 50 },
-        'top': { x: 350, y: 50 },
-        'top-right': { x: 650, y: 50 },
-        'left': { x: 50, y: 200 },
-        'center': { x: 300, y: 200 },
-        'right': { x: 550, y: 200 },
-        'bottom-left': { x: 50, y: 350 },
-        'bottom': { x: 350, y: 350 },
-        'bottom-right': { x: 650, y: 350 }
+        'top-left': { x: 80, y: 80 },
+        'top': { x: 430, y: 80 },
+        'top-right': { x: 780, y: 80 },
+        'left': { x: 80, y: 325 },
+        'center': { x: 430, y: 325 },
+        'right': { x: 780, y: 325 },
+        'bottom-left': { x: 80, y: 570 },
+        'bottom': { x: 430, y: 570 },
+        'bottom-right': { x: 780, y: 570 }
     };
     return positions[position] || positions['center'];
 }
