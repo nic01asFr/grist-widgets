@@ -93,7 +93,7 @@ body {
 /* Sidebar */
 .sidebar {
   display: flex;
-  width: 320px;
+  width: 40%;
   background: #f9fafb;
   border-right: 1px solid #e5e7eb;
   transition: width 0.3s;
@@ -108,7 +108,6 @@ body {
   flex-direction: column;
   background: #ffffff;
   border-right: 1px solid #e5e7eb;
-  width: 60px;
 }
 
 .tab-button {
