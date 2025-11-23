@@ -931,7 +931,6 @@ const SLIDE_TEMPLATES = [
         components: [
             {
                 type: 'text',
-                x_percent: 50, y_percent: 35,
                 width_percent: 80, height_percent: 18,
                 content: '# Démonstration Complète',
                 font_size: 64,
@@ -940,7 +939,6 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 65,
                 width_percent: 70, height_percent: 12,
                 content: '9 Layouts • 11 Composants • 9 Positions',
                 font_size: 28,
@@ -961,16 +959,14 @@ const SLIDE_TEMPLATES = [
         components: [
             {
                 type: 'text',
-                x_percent: 50, y_percent: 20,
                 width_percent: 90, height_percent: 12,
                 content: '## Layout: Content',
                 font_size: 36,
                 color: '#ffffff',
-                position: 'center'
+                position: 'top'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 50,
                 width_percent: 80, height_percent: 30,
                 content: 'Ce layout permet un contenu centré simple.\n\nIdéal pour un message unique et percutant.',
                 font_size: 24,
@@ -989,29 +985,18 @@ const SLIDE_TEMPLATES = [
         layout: 'two-column',
         background_color: '#1a1a1a',
         components: [
-            {
-                type: 'text',
-                x_percent: 50, y_percent: 10,
-                width_percent: 90, height_percent: 10,
-                content: '## Layout: Two-Column',
-                font_size: 32,
-                color: '#ffffff',
-                position: 'center'
-            },
             // Colonne gauche
             {
                 type: 'text',
-                x_percent: 25, y_percent: 28,
-                width_percent: 40, height_percent: 8,
+                width_percent: 80,
                 content: '### Colonne Gauche',
                 font_size: 24,
                 color: '#4CAF50',
-                position: 'center'
+                position: 'left'
             },
             {
                 type: 'list',
-                x_percent: 10, y_percent: 45,
-                width_percent: 35, height_percent: 40,
+                width_percent: 80,
                 content: '✓ Point 1\n✓ Point 2\n✓ Point 3\n✓ Point 4\n✓ Point 5',
                 font_size: 20,
                 color: '#cccccc',
@@ -1020,19 +1005,17 @@ const SLIDE_TEMPLATES = [
             // Colonne droite
             {
                 type: 'text',
-                x_percent: 75, y_percent: 28,
-                width_percent: 40, height_percent: 8,
+                width_percent: 80,
                 content: '### Colonne Droite',
                 font_size: 24,
                 color: '#2196F3',
-                position: 'center'
+                position: 'right'
             },
             {
                 type: 'chart',
-                x_percent: 75, y_percent: 60,
-                width_percent: 35, height_percent: 35,
+                width_percent: 80, height_percent: 35,
                 color: '#2196F3',
-                position: 'center'
+                position: 'right'
             }
         ]
     },
@@ -1046,92 +1029,74 @@ const SLIDE_TEMPLATES = [
         layout: 'three-column',
         background_color: '#2a2a2a',
         components: [
-            {
-                type: 'text',
-                x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 8,
-                content: '## Layout: Three-Column',
-                font_size: 28,
-                color: '#ffffff',
-                position: 'center'
-            },
             // Colonne 1
             {
                 type: 'shape',
-                x_percent: 17, y_percent: 32,
-                width_percent: 18, height_percent: 20,
+                width_percent: 60, height_percent: 20,
                 color: '#4CAF50',
-                position: 'center'
+                position: 'col-1'
             },
             {
                 type: 'text',
-                x_percent: 17, y_percent: 35,
-                width_percent: 18, height_percent: 10,
+                width_percent: 60,
                 content: '1',
                 font_size: 56,
                 color: '#ffffff',
-                position: 'center'
+                position: 'col-1'
             },
             {
                 type: 'text',
-                x_percent: 17, y_percent: 60,
-                width_percent: 25, height_percent: 18,
+                width_percent: 80,
                 content: '### Créer\n\nAjoutez contenu',
                 font_size: 18,
                 color: '#cccccc',
-                position: 'center'
+                position: 'col-1'
             },
             // Colonne 2
             {
                 type: 'shape',
-                x_percent: 50, y_percent: 32,
-                width_percent: 18, height_percent: 20,
+                width_percent: 60, height_percent: 20,
                 color: '#2196F3',
-                position: 'center'
+                position: 'col-2'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 35,
-                width_percent: 18, height_percent: 10,
+                width_percent: 60,
                 content: '2',
                 font_size: 56,
                 color: '#ffffff',
-                position: 'center'
+                position: 'col-2'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 60,
-                width_percent: 25, height_percent: 18,
+                width_percent: 80,
                 content: '### Éditer\n\nPersonnalisez',
                 font_size: 18,
                 color: '#cccccc',
-                position: 'center'
+                position: 'col-2'
             },
             // Colonne 3
             {
                 type: 'shape',
-                x_percent: 83, y_percent: 32,
-                width_percent: 18, height_percent: 20,
+                width_percent: 60, height_percent: 20,
                 color: '#F44336',
-                position: 'center'
+                position: 'col-3'
             },
             {
                 type: 'text',
-                x_percent: 83, y_percent: 35,
-                width_percent: 18, height_percent: 10,
+                width_percent: 60,
                 content: '3',
                 font_size: 56,
                 color: '#ffffff',
-                position: 'center'
+                position: 'col-3'
             },
             {
                 type: 'text',
-                x_percent: 83, y_percent: 60,
-                width_percent: 25, height_percent: 18,
+                width_percent: 80,
                 content: '### Présenter\n\nAffichez',
                 font_size: 18,
                 color: '#cccccc',
-                position: 'center'
+                position: 'col-3'
             }
         ]
     },
@@ -1145,41 +1110,29 @@ const SLIDE_TEMPLATES = [
         layout: 'sidebar-left',
         background_color: '#1a1a1a',
         components: [
-            {
-                type: 'text',
-                x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 8,
-                content: '## Layout: Sidebar-Left',
-                font_size: 28,
-                color: '#ffffff',
-                position: 'center'
-            },
-            // Sidebar gauche
+            // Sidebar gauche (col-1)
             {
                 type: 'shape',
-                x_percent: 18, y_percent: 50,
-                width_percent: 28, height_percent: 68,
+                width_percent: 85, height_percent: 85,
                 color: '#2a2a2a',
-                position: 'center'
+                position: 'col-1'
             },
             {
                 type: 'list',
-                x_percent: 18, y_percent: 50,
-                width_percent: 25, height_percent: 60,
+                width_percent: 80,
                 content: '📌 Navigation\n\n• Section 1\n• Section 2\n• Section 3\n• Section 4\n• Section 5',
                 font_size: 16,
                 color: '#4CAF50',
-                position: 'left'
+                position: 'col-1'
             },
-            // Contenu principal
+            // Contenu principal (col-2)
             {
                 type: 'text',
-                x_percent: 65, y_percent: 38,
-                width_percent: 55, height_percent: 50,
+                width_percent: 85,
                 content: '### Contenu Principal\n\nLe sidebar à gauche peut contenir un menu, une table des matières, ou des informations contextuelles.\n\nLe contenu principal occupe l\'espace restant.',
                 font_size: 20,
                 color: '#cccccc',
-                position: 'left'
+                position: 'col-2'
             }
         ]
     },
@@ -1193,41 +1146,29 @@ const SLIDE_TEMPLATES = [
         layout: 'sidebar-right',
         background_color: '#2a2a2a',
         components: [
-            {
-                type: 'text',
-                x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 8,
-                content: '## Layout: Sidebar-Right',
-                font_size: 28,
-                color: '#ffffff',
-                position: 'center'
-            },
-            // Contenu principal (code)
+            // Contenu principal (col-1)
             {
                 type: 'code',
-                x_percent: 32, y_percent: 45,
-                width_percent: 52, height_percent: 55,
+                width_percent: 85,
                 content: '// Exemple d\'intégration\ngrist.ready();\n\ngrist.onRecords(records => {\n  records.forEach(rec => {\n    const data = rec.fields;\n    processData(data);\n  });\n});\n\nfunction processData(data) {\n  console.log(data);\n}',
                 font_size: 16,
                 color: '#00ff00',
-                position: 'center'
+                position: 'col-1'
             },
-            // Sidebar droite
+            // Sidebar droite (col-2)
             {
                 type: 'shape',
-                x_percent: 82, y_percent: 50,
-                width_percent: 28, height_percent: 68,
+                width_percent: 85, height_percent: 85,
                 color: '#1a1a1a',
-                position: 'center'
+                position: 'col-2'
             },
             {
                 type: 'text',
-                x_percent: 82, y_percent: 50,
-                width_percent: 25, height_percent: 60,
+                width_percent: 80,
                 content: '💡 Notes\n\nLe sidebar à droite est parfait pour:\n\n• Annotations\n• Explications\n• Références\n• Liens utiles',
                 font_size: 15,
                 color: '#FFC107',
-                position: 'left'
+                position: 'col-2'
             }
         ]
     },
@@ -1241,81 +1182,44 @@ const SLIDE_TEMPLATES = [
         layout: 'grid-2x2',
         background_color: '#1a1a1a',
         components: [
-            {
-                type: 'text',
-                x_percent: 50, y_percent: 5,
-                width_percent: 90, height_percent: 6,
-                content: '## Layout: Grid-2x2',
-                font_size: 24,
-                color: '#ffffff',
-                position: 'center'
-            },
             // Case 1 (top-left)
             {
-                type: 'shape',
-                x_percent: 25, y_percent: 32,
-                width_percent: 40, height_percent: 32,
-                color: '#4CAF50',
-                position: 'center'
-            },
-            {
                 type: 'text',
-                x_percent: 25, y_percent: 32,
-                width_percent: 35, height_percent: 28,
+                width_percent: 80,
                 content: '📊\n\nGraphique\nCase 1',
                 font_size: 22,
                 color: '#ffffff',
+                background: '#4CAF50',
                 position: 'center'
             },
             // Case 2 (top-right)
             {
-                type: 'shape',
-                x_percent: 75, y_percent: 32,
-                width_percent: 40, height_percent: 32,
-                color: '#2196F3',
-                position: 'center'
-            },
-            {
                 type: 'text',
-                x_percent: 75, y_percent: 32,
-                width_percent: 35, height_percent: 28,
+                width_percent: 80,
                 content: '📈\n\nDonnées\nCase 2',
                 font_size: 22,
                 color: '#ffffff',
+                background: '#2196F3',
                 position: 'center'
             },
             // Case 3 (bottom-left)
             {
-                type: 'shape',
-                x_percent: 25, y_percent: 72,
-                width_percent: 40, height_percent: 32,
-                color: '#F44336',
-                position: 'center'
-            },
-            {
                 type: 'text',
-                x_percent: 25, y_percent: 72,
-                width_percent: 35, height_percent: 28,
+                width_percent: 80,
                 content: '💻\n\nCode\nCase 3',
                 font_size: 22,
                 color: '#ffffff',
+                background: '#F44336',
                 position: 'center'
             },
             // Case 4 (bottom-right)
             {
-                type: 'shape',
-                x_percent: 75, y_percent: 72,
-                width_percent: 40, height_percent: 32,
-                color: '#FFC107',
-                position: 'center'
-            },
-            {
                 type: 'text',
-                x_percent: 75, y_percent: 72,
-                width_percent: 35, height_percent: 28,
+                width_percent: 80,
                 content: '🎯\n\nRésultats\nCase 4',
                 font_size: 22,
                 color: '#ffffff',
+                background: '#FFC107',
                 position: 'center'
             }
         ]
@@ -1332,19 +1236,17 @@ const SLIDE_TEMPLATES = [
         components: [
             {
                 type: 'video',
-                x_percent: 50, y_percent: 50,
                 width_percent: 100, height_percent: 100,
                 url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
                 position: 'center'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 92,
-                width_percent: 80, height_percent: 6,
+                width_percent: 80,
                 content: 'Layout Full - Médias plein écran',
                 font_size: 20,
                 color: '#ffffff',
-                position: 'center'
+                position: 'bottom'
             }
         ]
     },
@@ -1380,111 +1282,40 @@ const SLIDE_TEMPLATES = [
     },
 
     // ========================================
-    // 10. TOUS LES 11 COMPOSANTS
-    // ========================================
-    {
-        name: '🎨 Tous les composants (1/2)',
-        description: '11 types de composants',
-        layout: 'content',
-        background_color: '#1a1a1a',
-        components: [
-            {
-                type: 'text',
-                x_percent: 50, y_percent: 4,
-                width_percent: 90, height_percent: 6,
-                content: '## 11 Types de Composants Disponibles',
-                font_size: 24,
-                color: '#ffffff',
-                position: 'center'
-            },
-            // Ligne 1: Text, Image, Code, List
-            { type: 'text', x_percent: 12, y_percent: 18, width_percent: 18, height_percent: 8, content: '1. Text', font_size: 16, color: '#4CAF50', position: 'top-left' },
-            { type: 'shape', x_percent: 12, y_percent: 25, width_percent: 10, height_percent: 8, color: '#4CAF50', position: 'center' },
-
-            { type: 'text', x_percent: 31, y_percent: 18, width_percent: 18, height_percent: 8, content: '2. Image', font_size: 16, color: '#2196F3', position: 'top' },
-            { type: 'image', x_percent: 31, y_percent: 25, width_percent: 12, height_percent: 10, url: '', position: 'center' },
-
-            { type: 'text', x_percent: 50, y_percent: 18, width_percent: 18, height_percent: 8, content: '3. Code', font_size: 16, color: '#00ff00', position: 'top' },
-            { type: 'code', x_percent: 50, y_percent: 25, width_percent: 18, height_percent: 10, content: '// JS\nconst x=1;', font_size: 10, color: '#00ff00', position: 'center' },
-
-            { type: 'text', x_percent: 72, y_percent: 18, width_percent: 18, height_percent: 8, content: '4. List', font_size: 16, color: '#FFC107', position: 'top-right' },
-            { type: 'list', x_percent: 72, y_percent: 25, width_percent: 16, height_percent: 10, content: '• A\n• B\n• C', font_size: 12, color: '#FFC107', position: 'left' },
-
-            // Ligne 2: Table, Quote, Video, Iframe
-            { type: 'text', x_percent: 12, y_percent: 42, width_percent: 18, height_percent: 8, content: '5. Table', font_size: 16, color: '#9C27B0', position: 'left' },
-            { type: 'table', x_percent: 12, y_percent: 49, width_percent: 14, height_percent: 12, color: '#9C27B0', position: 'center' },
-
-            { type: 'text', x_percent: 31, y_percent: 42, width_percent: 18, height_percent: 8, content: '6. Quote', font_size: 16, color: '#E91E63', position: 'center' },
-            { type: 'quote', x_percent: 31, y_percent: 49, width_percent: 18, height_percent: 12, content: '"Citation"', font_size: 12, color: '#E91E63', position: 'center' },
-
-            { type: 'text', x_percent: 50, y_percent: 42, width_percent: 18, height_percent: 8, content: '7. Video', font_size: 16, color: '#FF5722', position: 'center' },
-            { type: 'video', x_percent: 50, y_percent: 49, width_percent: 16, height_percent: 12, url: '', position: 'center' },
-
-            { type: 'text', x_percent: 72, y_percent: 42, width_percent: 18, height_percent: 8, content: '8. Iframe', font_size: 16, color: '#3F51B5', position: 'right' },
-            { type: 'iframe', x_percent: 72, y_percent: 49, width_percent: 16, height_percent: 12, url: 'https://example.com', position: 'center' },
-
-            // Ligne 3: Chart, Shape, Button
-            { type: 'text', x_percent: 25, y_percent: 70, width_percent: 18, height_percent: 8, content: '9. Chart', font_size: 16, color: '#009688', position: 'bottom-left' },
-            { type: 'chart', x_percent: 25, y_percent: 80, width_percent: 16, height_percent: 14, color: '#009688', position: 'center' },
-
-            { type: 'text', x_percent: 50, y_percent: 70, width_percent: 18, height_percent: 8, content: '10. Shape', font_size: 16, color: '#607D8B', position: 'bottom' },
-            { type: 'shape', x_percent: 50, y_percent: 80, width_percent: 12, height_percent: 10, color: '#607D8B', position: 'center' },
-
-            { type: 'text', x_percent: 75, y_percent: 70, width_percent: 18, height_percent: 8, content: '11. Button', font_size: 16, color: '#F44336', position: 'bottom-right' },
-            { type: 'button', x_percent: 75, y_percent: 80, width_percent: 18, height_percent: 9, content: 'Click!', color: '#ffffff', background: '#F44336', url: '', position: 'center' }
-        ]
-    },
-
-    // ========================================
-    // 11. DEMO DES 9 POSITIONS
+    // 10. DEMO DES 9 POSITIONS
     // ========================================
     {
         name: '📍 Les 9 Positions',
         description: 'Démonstration positions',
-        layout: 'content',
+        layout: 'custom',
         background_color: '#2a2a2a',
         components: [
             {
                 type: 'text',
-                x_percent: 50, y_percent: 5,
-                width_percent: 90, height_percent: 6,
+                x_percent: 50, y_percent: 8,
+                width_percent: 90,
                 content: '## 9 Positions Disponibles',
                 font_size: 24,
                 color: '#ffffff',
-                position: 'center'
+                position: 'top'
             },
-            // Grille 3x3 pour montrer les positions
-            { type: 'shape', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 18, color: '#F44336', position: 'center' },
-            { type: 'text', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-left', font_size: 16, color: '#ffffff', position: 'top-left' },
+            // Grille 3x3 pour montrer les positions (custom layout avec positionnement précis)
+            { type: 'text', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-left', font_size: 18, color: '#ffffff', background: '#F44336', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top', font_size: 18, color: '#ffffff', background: '#E91E63', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-right', font_size: 18, color: '#ffffff', background: '#9C27B0', position: 'center' },
 
-            { type: 'shape', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 18, color: '#E91E63', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top', font_size: 16, color: '#ffffff', position: 'top' },
+            { type: 'text', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 18, content: 'left', font_size: 18, color: '#ffffff', background: '#3F51B5', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 18, content: 'center', font_size: 18, color: '#ffffff', background: '#2196F3', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 18, content: 'right', font_size: 18, color: '#ffffff', background: '#009688', position: 'center' },
 
-            { type: 'shape', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 18, color: '#9C27B0', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-right', font_size: 16, color: '#ffffff', position: 'top-right' },
-
-            { type: 'shape', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 18, color: '#3F51B5', position: 'center' },
-            { type: 'text', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 18, content: 'left', font_size: 16, color: '#ffffff', position: 'left' },
-
-            { type: 'shape', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 18, color: '#2196F3', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 18, content: 'center', font_size: 16, color: '#ffffff', position: 'center' },
-
-            { type: 'shape', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 18, color: '#009688', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 18, content: 'right', font_size: 16, color: '#ffffff', position: 'right' },
-
-            { type: 'shape', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 18, color: '#4CAF50', position: 'center' },
-            { type: 'text', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-left', font_size: 16, color: '#ffffff', position: 'bottom-left' },
-
-            { type: 'shape', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 18, color: '#8BC34A', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom', font_size: 16, color: '#ffffff', position: 'bottom' },
-
-            { type: 'shape', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 18, color: '#FFC107', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-right', font_size: 16, color: '#ffffff', position: 'bottom-right' }
+            { type: 'text', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-left', font_size: 18, color: '#ffffff', background: '#4CAF50', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom', font_size: 18, color: '#ffffff', background: '#8BC34A', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-right', font_size: 18, color: '#ffffff', background: '#FFC107', position: 'center' }
         ]
     },
 
     // ========================================
-    // 12. PAGE DE FIN
+    // 11. PAGE DE FIN
     // ========================================
     {
         name: '🏁 Fin de la démo',
@@ -1494,8 +1325,7 @@ const SLIDE_TEMPLATES = [
         components: [
             {
                 type: 'text',
-                x_percent: 50, y_percent: 35,
-                width_percent: 80, height_percent: 18,
+                width_percent: 80,
                 content: '## Démonstration Complète',
                 font_size: 56,
                 color: '#ffffff',
@@ -1503,8 +1333,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'list',
-                x_percent: 50, y_percent: 65,
-                width_percent: 60, height_percent: 20,
+                width_percent: 60,
                 content: '✅ 9 Layouts différents\n✅ 11 Types de composants\n✅ 9 Positions disponibles\n✅ Personnalisation complète',
                 font_size: 20,
                 color: '#e0e7ff',
