@@ -26,7 +26,7 @@ const CONFIG = {
     ],
     COMPONENT_TYPES: [
         'text', 'image', 'code', 'list', 'table',
-        'quote', 'video', 'chart', 'shape', 'button'
+        'quote', 'video', 'iframe', 'chart', 'shape', 'button'
     ]
 };
 

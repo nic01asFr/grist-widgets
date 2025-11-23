@@ -187,7 +187,10 @@ const COMPONENT_RENDERERS = {
         // Si le contenu commence par # ou -, c'est du markdown
         const content = c.content || '';
         if (content.trim().match(/^(#|##|###|-|\*|>)/m)) {
-            return marked.parse(content);
+            // Utiliser marked.js si disponible, sinon fallback
+            if (typeof marked !== 'undefined') {
+                return marked.parse(content);
+            }
         }
         return `<p>${escapeHTML(content)}</p>`;
     },
@@ -204,9 +207,15 @@ const COMPONENT_RENDERERS = {
         if (!c.content) return '';
 
         const language = detectLanguage(c.content);
-        const highlighted = hljs.highlightAuto(c.content, [language]).value;
 
-        return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+        // Utiliser highlight.js si disponible, sinon fallback
+        if (typeof hljs !== 'undefined') {
+            const highlighted = hljs.highlightAuto(c.content, [language]).value;
+            return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+        } else {
+            // Fallback sans coloration syntaxique
+            return `<pre><code class="language-${language}">${escapeHTML(c.content)}</code></pre>`;
+        }
     },
 
     list: (c) => {
@@ -319,6 +328,11 @@ const COMPONENT_RENDERERS = {
 
     chart: (c) => {
         if (!c.content) return '<p style="opacity: 0.5;">⚠️ Aucune donnée</p>';
+
+        // Vérifier si Chart.js est disponible
+        if (typeof Chart === 'undefined') {
+            return '<p style="opacity: 0.5;">⚠️ Chart.js non disponible</p>';
+        }
 
         const chartId = `chart-${c.id || Math.random().toString(36).substr(2, 9)}`;
 
