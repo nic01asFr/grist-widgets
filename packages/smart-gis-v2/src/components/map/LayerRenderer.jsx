@@ -48,9 +48,18 @@ const LayerRenderer = ({ layer }) => {
     }
   };
 
-  const renderPopup = () => {
-    const properties = layer.properties ? JSON.parse(layer.properties) : {};
+  // OPTIMIZATION: Memoize properties parsing (prevents JSON.parse on every popup render)
+  const properties = useMemo(() => {
+    if (!layer.properties) return {};
+    try {
+      return JSON.parse(layer.properties);
+    } catch (error) {
+      console.warn('[LayerRenderer] Invalid properties JSON:', error);
+      return {};
+    }
+  }, [layer.properties]);
 
+  const renderPopup = () => {
     return (
       <Popup>
         <div className="feature-popup">
