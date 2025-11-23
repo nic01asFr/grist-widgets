@@ -988,7 +988,7 @@ const SLIDE_TEMPLATES = [
             // Colonne gauche
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 15,
                 content: '### Colonne Gauche',
                 font_size: 24,
                 color: '#4CAF50',
@@ -996,7 +996,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'list',
-                width_percent: 80,
+                width_percent: 80, height_percent: 50,
                 content: '✓ Point 1\n✓ Point 2\n✓ Point 3\n✓ Point 4\n✓ Point 5',
                 font_size: 20,
                 color: '#cccccc',
@@ -1005,7 +1005,7 @@ const SLIDE_TEMPLATES = [
             // Colonne droite
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 15,
                 content: '### Colonne Droite',
                 font_size: 24,
                 color: '#2196F3',
@@ -1013,7 +1013,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'chart',
-                width_percent: 80, height_percent: 35,
+                width_percent: 80, height_percent: 50,
                 color: '#2196F3',
                 position: 'right'
             }
@@ -1038,7 +1038,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 60,
+                width_percent: 60, height_percent: 15,
                 content: '1',
                 font_size: 56,
                 color: '#ffffff',
@@ -1046,7 +1046,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 25,
                 content: '### Créer\n\nAjoutez contenu',
                 font_size: 18,
                 color: '#cccccc',
@@ -1061,7 +1061,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 60,
+                width_percent: 60, height_percent: 15,
                 content: '2',
                 font_size: 56,
                 color: '#ffffff',
@@ -1069,7 +1069,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 25,
                 content: '### Éditer\n\nPersonnalisez',
                 font_size: 18,
                 color: '#cccccc',
@@ -1084,7 +1084,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 60,
+                width_percent: 60, height_percent: 15,
                 content: '3',
                 font_size: 56,
                 color: '#ffffff',
@@ -1092,7 +1092,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 25,
                 content: '### Présenter\n\nAffichez',
                 font_size: 18,
                 color: '#cccccc',
@@ -1119,7 +1119,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'list',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '📌 Navigation\n\n• Section 1\n• Section 2\n• Section 3\n• Section 4\n• Section 5',
                 font_size: 16,
                 color: '#4CAF50',
@@ -1128,7 +1128,7 @@ const SLIDE_TEMPLATES = [
             // Contenu principal (col-2)
             {
                 type: 'text',
-                width_percent: 85,
+                width_percent: 85, height_percent: 60,
                 content: '### Contenu Principal\n\nLe sidebar à gauche peut contenir un menu, une table des matières, ou des informations contextuelles.\n\nLe contenu principal occupe l\'espace restant.',
                 font_size: 20,
                 color: '#cccccc',
@@ -1149,7 +1149,7 @@ const SLIDE_TEMPLATES = [
             // Contenu principal (col-1)
             {
                 type: 'code',
-                width_percent: 85,
+                width_percent: 85, height_percent: 60,
                 content: '// Exemple d\'intégration\ngrist.ready();\n\ngrist.onRecords(records => {\n  records.forEach(rec => {\n    const data = rec.fields;\n    processData(data);\n  });\n});\n\nfunction processData(data) {\n  console.log(data);\n}',
                 font_size: 16,
                 color: '#00ff00',
@@ -1164,7 +1164,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '💡 Notes\n\nLe sidebar à droite est parfait pour:\n\n• Annotations\n• Explications\n• Références\n• Liens utiles',
                 font_size: 15,
                 color: '#FFC107',
@@ -1185,41 +1185,45 @@ const SLIDE_TEMPLATES = [
             // Case 1 (top-left)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '📊\n\nGraphique\nCase 1',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#4CAF50',
+                padding: 'medium',
                 position: 'center'
             },
             // Case 2 (top-right)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '📈\n\nDonnées\nCase 2',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#2196F3',
+                padding: 'medium',
                 position: 'center'
             },
             // Case 3 (bottom-left)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '💻\n\nCode\nCase 3',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#F44336',
+                padding: 'medium',
                 position: 'center'
             },
             // Case 4 (bottom-right)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '🎯\n\nRésultats\nCase 4',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#FFC107',
+                padding: 'medium',
                 position: 'center'
             }
         ]
@@ -1262,21 +1266,19 @@ const SLIDE_TEMPLATES = [
         components: [
             {
                 type: 'text',
-                x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 8,
+                x_percent: 50, y_percent: 15,
+                width_percent: 80, height_percent: 12,
                 content: '## Layout: Custom',
                 font_size: 28,
-                color: '#ffffff',
-                position: 'center'
+                color: '#ffffff'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 45,
+                x_percent: 50, y_percent: 50,
                 width_percent: 70, height_percent: 30,
-                content: 'Le layout custom permet une disposition totalement libre.\n\nVous positionnez chaque élément exactement où vous voulez.',
-                font_size: 22,
-                color: '#cccccc',
-                position: 'center'
+                content: 'Le layout custom permet une disposition totalement libre.\n\nVous positionnez chaque élément exactement où vous voulez avec x_percent et y_percent.',
+                font_size: 20,
+                color: '#cccccc'
             }
         ]
     },
@@ -1286,31 +1288,30 @@ const SLIDE_TEMPLATES = [
     // ========================================
     {
         name: '📍 Les 9 Positions',
-        description: 'Démonstration positions',
+        description: 'Démonstration positions (custom layout)',
         layout: 'custom',
         background_color: '#2a2a2a',
         components: [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 8,
-                width_percent: 90,
+                width_percent: 80, height_percent: 10,
                 content: '## 9 Positions Disponibles',
                 font_size: 24,
-                color: '#ffffff',
-                position: 'top'
+                color: '#ffffff'
             },
-            // Grille 3x3 pour montrer les positions (custom layout avec positionnement précis)
-            { type: 'text', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-left', font_size: 18, color: '#ffffff', background: '#F44336', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top', font_size: 18, color: '#ffffff', background: '#E91E63', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-right', font_size: 18, color: '#ffffff', background: '#9C27B0', position: 'center' },
+            // Grille 3x3 - en custom layout, on utilise x_percent/y_percent, pas position
+            { type: 'text', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 16, content: 'top-left', font_size: 16, color: '#ffffff', background: '#F44336', padding: 'medium' },
+            { type: 'text', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 16, content: 'top', font_size: 16, color: '#ffffff', background: '#E91E63', padding: 'medium' },
+            { type: 'text', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 16, content: 'top-right', font_size: 16, color: '#ffffff', background: '#9C27B0', padding: 'medium' },
 
-            { type: 'text', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 18, content: 'left', font_size: 18, color: '#ffffff', background: '#3F51B5', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 18, content: 'center', font_size: 18, color: '#ffffff', background: '#2196F3', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 18, content: 'right', font_size: 18, color: '#ffffff', background: '#009688', position: 'center' },
+            { type: 'text', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 16, content: 'left', font_size: 16, color: '#ffffff', background: '#3F51B5', padding: 'medium' },
+            { type: 'text', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 16, content: 'center', font_size: 16, color: '#ffffff', background: '#2196F3', padding: 'medium' },
+            { type: 'text', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 16, content: 'right', font_size: 16, color: '#ffffff', background: '#009688', padding: 'medium' },
 
-            { type: 'text', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-left', font_size: 18, color: '#ffffff', background: '#4CAF50', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom', font_size: 18, color: '#ffffff', background: '#8BC34A', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-right', font_size: 18, color: '#ffffff', background: '#FFC107', position: 'center' }
+            { type: 'text', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 16, content: 'bottom-left', font_size: 16, color: '#ffffff', background: '#4CAF50', padding: 'medium' },
+            { type: 'text', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 16, content: 'bottom', font_size: 16, color: '#ffffff', background: '#8BC34A', padding: 'medium' },
+            { type: 'text', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 16, content: 'bottom-right', font_size: 16, color: '#ffffff', background: '#FFC107', padding: 'medium' }
         ]
     },
 
