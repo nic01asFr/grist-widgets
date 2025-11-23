@@ -180,16 +180,17 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
       const layerName = config.layer_name || 'Import';
 
       // Prepare records for Grist
-      // Use complete schema (columns ensured by TableSchema.initializeGISTable at startup)
+      // IMPORTANT: Only include NON-FORMULA columns
+      // Formula columns (geometry_type, centroid, area_km2, etc.) are auto-calculated by Grist
       const records = parsedData.map((feature, idx) => ({
+        // Regular columns only (NOT formulas)
         layer_name: layerName,
         geometry_wgs84: feature.geometry,
         properties: JSON.stringify(feature.properties || {}),
-        geometry_type: detectGeometryType(feature.geometry),
-        is_visible: true,
-        z_index: 100,
         feature_name: feature.properties?.name || feature.properties?.nom || `Feature ${idx + 1}`,
-        import_session: Date.now() // Unique session ID for this import
+        import_session: Date.now(),
+        is_visible: true,
+        z_index: 100
       }));
 
       // Add to Grist
