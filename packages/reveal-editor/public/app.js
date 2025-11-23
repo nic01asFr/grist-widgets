@@ -921,29 +921,282 @@ window.saveButtonEdit = async function() {
 // ========================================
 const SLIDE_TEMPLATES = [
     {
-        name: 'Titre + Logo',
-        description: 'Slide de titre avec logo',
-        layout: 'title',
-        components: [
-            { type: 'image', position: 'top-right', width: 150, height: 150 },
-            { type: 'text', position: 'center', width: 600, content: '# Titre Principal', font_size: 48, color: '#ffffff' }
-        ]
-    },
-    {
-        name: 'Deux Colonnes',
-        description: 'Texte gauche, liste droite',
-        layout: 'two-column',
-        components: [
-            { type: 'text', position: 'left', width: 400, content: '## Titre\n\nTexte explicatif', font_size: 24, color: '#ffffff' },
-            { type: 'list', position: 'right', width: 400, content: 'Point 1\nPoint 2\nPoint 3', font_size: 20, color: '#ffffff' }
-        ]
-    },
-    {
-        name: 'Contenu Simple',
-        description: 'Un seul texte centré',
+        name: '🎬 Page de titre',
+        description: 'Titre principal avec sous-titre',
         layout: 'content',
+        background_color: '#667eea',
         components: [
-            { type: 'text', position: 'center', width: 700, content: '## Votre Titre\n\nVotre contenu ici...', font_size: 28, color: '#ffffff' }
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 35,
+                width_percent: 70,
+                content: 'Grist Reveal.js Builder',
+                font_size: 56,
+                color: '#ffffff'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 55,
+                width_percent: 60,
+                content: 'Créez des présentations interactives directement dans Grist',
+                font_size: 24,
+                color: '#e0e7ff'
+            }
+        ]
+    },
+    {
+        name: '💬 Citation inspirante',
+        description: 'Grande citation avec auteur',
+        layout: 'content',
+        background_color: '#1a1a1a',
+        components: [
+            {
+                type: 'quote',
+                x_percent: 50, y_percent: 45,
+                width_percent: 70,
+                content: '"La simplicité est la sophistication suprême."\n\n— Leonardo da Vinci',
+                font_size: 32,
+                color: '#4CAF50'
+            }
+        ]
+    },
+    {
+        name: '💻 Code avec explication',
+        description: 'Bloc de code et texte explicatif',
+        layout: 'content',
+        background_color: '#2a2a2a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 5, y_percent: 8,
+                width_percent: 90,
+                content: '## Exemple de code Python',
+                font_size: 32,
+                color: '#ffffff'
+            },
+            {
+                type: 'code',
+                x_percent: 5, y_percent: 25,
+                width_percent: 90, height_percent: 35,
+                content: 'def hello_world():\n    print("Hello, Grist!")\n    return True\n\nhello_world()',
+                font_size: 18,
+                color: '#00ff00'
+            },
+            {
+                type: 'text',
+                x_percent: 5, y_percent: 70,
+                width_percent: 90,
+                content: 'Syntaxe colorée automatique avec highlight.js',
+                font_size: 20,
+                color: '#aaaaaa'
+            }
+        ]
+    },
+    {
+        name: '📋 Liste de fonctionnalités',
+        description: 'Titre et liste à puces',
+        layout: 'content',
+        background_color: '#764ba2',
+        components: [
+            {
+                type: 'text',
+                x_percent: 10, y_percent: 10,
+                width_percent: 80,
+                content: '## Fonctionnalités principales',
+                font_size: 40,
+                color: '#ffffff'
+            },
+            {
+                type: 'list',
+                x_percent: 15, y_percent: 35,
+                width_percent: 70,
+                content: '11 types de composants disponibles\nPositionnement précis en pourcentages\nÉdition visuelle avec Fabric.js\nSynchronisation temps réel avec Grist\nExport en présentation Reveal.js\nSupport des animations et transitions',
+                font_size: 24,
+                color: '#ffffff'
+            }
+        ]
+    },
+    {
+        name: '🔄 Deux colonnes comparaison',
+        description: 'Avant/Après ou comparaison',
+        layout: 'content',
+        background_color: '#1a1a1a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 25, y_percent: 12,
+                width_percent: 35,
+                content: '### ❌ Avant',
+                font_size: 28,
+                color: '#F44336'
+            },
+            {
+                type: 'list',
+                x_percent: 10, y_percent: 30,
+                width_percent: 35,
+                content: 'Processus manuel\nErreurs fréquentes\nPas de collaboration\nPas de traçabilité',
+                font_size: 20,
+                color: '#ffcccc'
+            },
+            {
+                type: 'text',
+                x_percent: 75, y_percent: 12,
+                width_percent: 35,
+                content: '### ✅ Après',
+                font_size: 28,
+                color: '#4CAF50'
+            },
+            {
+                type: 'list',
+                x_percent: 60, y_percent: 30,
+                width_percent: 35,
+                content: 'Automatisation complète\nZéro erreur\nCollaboration temps réel\nHistorique complet',
+                font_size: 20,
+                color: '#ccffcc'
+            }
+        ]
+    },
+    {
+        name: '🎯 Call-to-Action',
+        description: 'CTA avec bouton',
+        layout: 'content',
+        background_color: '#667eea',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 30,
+                width_percent: 70,
+                content: '## Prêt à commencer ?',
+                font_size: 48,
+                color: '#ffffff'
+            },
+            {
+                type: 'button',
+                x_percent: 50, y_percent: 55,
+                width_percent: 25, height_percent: 10,
+                content: 'Démarrer maintenant',
+                color: '#ffffff',
+                background: '#4CAF50',
+                url: 'https://grist.com'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 75,
+                width_percent: 60,
+                content: 'Gratuit pour toujours • Aucune carte bancaire requise',
+                font_size: 18,
+                color: '#e0e7ff'
+            }
+        ]
+    },
+    {
+        name: '📊 Données et graphique',
+        description: 'Espace pour graphique et texte',
+        layout: 'content',
+        background_color: '#2a2a2a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 8,
+                width_percent: 90,
+                content: '## Croissance utilisateurs 2024',
+                font_size: 36,
+                color: '#ffffff'
+            },
+            {
+                type: 'chart',
+                x_percent: 50, y_percent: 50,
+                width_percent: 80, height_percent: 60,
+                color: '#4CAF50'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 85,
+                width_percent: 80,
+                content: '+150% de croissance cette année',
+                font_size: 20,
+                color: '#4CAF50'
+            }
+        ]
+    },
+    {
+        name: '🎨 Showcase composants',
+        description: 'Démo de tous les types',
+        layout: 'content',
+        background_color: '#1a1a1a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 5,
+                width_percent: 90,
+                content: '## 11 types de composants',
+                font_size: 32,
+                color: '#ffffff'
+            },
+            { type: 'text', x_percent: 15, y_percent: 20, width_percent: 20, content: 'Texte', font_size: 16, color: '#4CAF50' },
+            { type: 'shape', x_percent: 15, y_percent: 30, width_percent: 10, height_percent: 8, color: '#2196F3' },
+            { type: 'list', x_percent: 40, y_percent: 25, width_percent: 20, content: 'Item 1\nItem 2\nItem 3', font_size: 14, color: '#ffffff' },
+            { type: 'button', x_percent: 70, y_percent: 27, width_percent: 15, height_percent: 7, content: 'Bouton', color: '#ffffff', background: '#F44336' },
+            { type: 'code', x_percent: 15, y_percent: 50, width_percent: 35, height_percent: 20, content: '// Code\nconst x = 42;', font_size: 12, color: '#00ff00' },
+            { type: 'quote', x_percent: 60, y_percent: 55, width_percent: 35, content: '"Citation"', font_size: 14, color: '#FFC107' },
+            { type: 'table', x_percent: 30, y_percent: 80, width_percent: 40, height_percent: 15, color: '#9C27B0' }
+        ]
+    },
+    {
+        name: '📹 Vidéo avec description',
+        description: 'Zone vidéo et texte',
+        layout: 'content',
+        background_color: '#000000',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 8,
+                width_percent: 90,
+                content: '## Tutoriel vidéo',
+                font_size: 36,
+                color: '#ffffff'
+            },
+            {
+                type: 'video',
+                x_percent: 50, y_percent: 45,
+                width_percent: 70, height_percent: 50,
+                url: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 85,
+                width_percent: 70,
+                content: 'Apprenez à créer vos premières présentations',
+                font_size: 20,
+                color: '#aaaaaa'
+            }
+        ]
+    },
+    {
+        name: '🎓 Process en 3 étapes',
+        description: 'Timeline ou processus',
+        layout: 'content',
+        background_color: '#2a2a2a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 8,
+                width_percent: 90,
+                content: '## Comment ça marche ?',
+                font_size: 36,
+                color: '#ffffff'
+            },
+            { type: 'shape', x_percent: 17, y_percent: 35, width_percent: 12, height_percent: 17, color: '#4CAF50' },
+            { type: 'text', x_percent: 17, y_percent: 38, width_percent: 12, content: '1', font_size: 48, color: '#ffffff' },
+            { type: 'text', x_percent: 17, y_percent: 60, width_percent: 25, content: '### Créer\n\nAjoutez votre contenu dans Grist', font_size: 18, color: '#ffffff' },
+
+            { type: 'shape', x_percent: 50, y_percent: 35, width_percent: 12, height_percent: 17, color: '#2196F3' },
+            { type: 'text', x_percent: 50, y_percent: 38, width_percent: 12, content: '2', font_size: 48, color: '#ffffff' },
+            { type: 'text', x_percent: 50, y_percent: 60, width_percent: 25, content: '### Éditer\n\nPersonnalisez avec l\'éditeur visuel', font_size: 18, color: '#ffffff' },
+
+            { type: 'shape', x_percent: 83, y_percent: 35, width_percent: 12, height_percent: 17, color: '#F44336' },
+            { type: 'text', x_percent: 83, y_percent: 38, width_percent: 12, content: '3', font_size: 48, color: '#ffffff' },
+            { type: 'text', x_percent: 83, y_percent: 60, width_percent: 25, content: '### Présenter\n\nAffichez votre présentation', font_size: 18, color: '#ffffff' }
         ]
     }
 ];
@@ -976,27 +1229,59 @@ window.applyTemplate = async function(templateIndex) {
     const template = SLIDE_TEMPLATES[templateIndex];
 
     try {
-        // Create slide
+        // Create slide avec couleur de fond
+        const slideData = {
+            presentation: appState.currentPresentation.id,
+            order: appState.slides.filter(s => s.presentation === appState.currentPresentation.id).length + 1,
+            title: template.name,
+            layout: template.layout
+        };
+
+        if (template.background_color) {
+            slideData.background_color = template.background_color;
+        }
+
         const slideResult = await appState.docApi.applyUserActions([
-            ['AddRecord', CONFIG.TABLES.SLIDES, null, {
-                presentation: appState.currentPresentation.id,
-                order: appState.slides.filter(s => s.presentation === appState.currentPresentation.id).length + 1,
-                title: template.name,
-                layout: template.layout
-            }]
+            ['AddRecord', CONFIG.TABLES.SLIDES, null, slideData]
         ]);
 
         const slideId = slideResult.retValues ? slideResult.retValues[0] : slideResult[0];
 
-        // Create components
+        // Create components - convertir pourcentages en pixels
         for (let i = 0; i < template.components.length; i++) {
             const comp = template.components[i];
+            const componentData = {
+                slide: slideId,
+                order: i + 1,
+                type: comp.type,
+                content: comp.content,
+                url: comp.url,
+                position: comp.position,
+                font_size: comp.font_size,
+                color: comp.color,
+                background: comp.background
+            };
+
+            // Convertir pourcentages → pixels + garder pourcentages
+            if (comp.x_percent !== undefined) {
+                componentData.x_percent = comp.x_percent;
+                componentData.x_canvas = Math.round((comp.x_percent / 100) * CONFIG.CANVAS.WIDTH);
+            }
+            if (comp.y_percent !== undefined) {
+                componentData.y_percent = comp.y_percent;
+                componentData.y_canvas = Math.round((comp.y_percent / 100) * CONFIG.CANVAS.HEIGHT);
+            }
+            if (comp.width_percent !== undefined) {
+                componentData.width_percent = comp.width_percent;
+                componentData.width = Math.round((comp.width_percent / 100) * CONFIG.CANVAS.WIDTH);
+            }
+            if (comp.height_percent !== undefined) {
+                componentData.height_percent = comp.height_percent;
+                componentData.height = Math.round((comp.height_percent / 100) * CONFIG.CANVAS.HEIGHT);
+            }
+
             await appState.docApi.applyUserActions([
-                ['AddRecord', CONFIG.TABLES.COMPONENTS, null, {
-                    slide: slideId,
-                    order: i + 1,
-                    ...comp
-                }]
+                ['AddRecord', CONFIG.TABLES.COMPONENTS, null, componentData]
             ]);
         }
 
