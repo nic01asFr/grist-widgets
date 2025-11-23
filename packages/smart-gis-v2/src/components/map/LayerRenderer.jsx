@@ -1,8 +1,8 @@
 /**
  * LayerRenderer - Renders individual geometries
  *
- * Reads Grist ST_AsGeoJSON results from `geojson` column
- * (calculated by: geojson = ST_AsGeoJSON($geometry_wgs84))
+ * Reads Grist ST_ASGEOJSON results from `geojson` column
+ * (calculated by: geojson = ST_ASGEOJSON($geometry_wgs84))
  */
 
 import React, { useMemo } from 'react';

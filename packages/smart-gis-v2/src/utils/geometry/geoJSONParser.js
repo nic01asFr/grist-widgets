@@ -1,11 +1,11 @@
 /**
- * GeoJSON Parser - Parse Grist ST_AsGeoJSON output → Leaflet coordinates
+ * GeoJSON Parser - Parse Grist ST_ASGEOJSON output → Leaflet coordinates
  *
- * This function reads the `geojson` column (calculated by Grist ST_AsGeoJSON formula)
+ * This function reads the `geojson` column (calculated by Grist ST_ASGEOJSON formula)
  * and converts it to Leaflet-compatible coordinates.
  *
  * Architecture:
- * - Grist calculates: geojson = ST_AsGeoJSON($geometry_wgs84)
+ * - Grist calculates: geojson = ST_ASGEOJSON($geometry_wgs84)
  * - Widget reads: JSON.parse(record.geojson)
  * - Widget extracts coordinates for Leaflet display
  *
@@ -14,8 +14,8 @@
  */
 
 /**
- * Parse GeoJSON string from Grist ST_AsGeoJSON column
- * @param {string} geoJSONString - GeoJSON string from ST_AsGeoJSON formula
+ * Parse GeoJSON string from Grist ST_ASGEOJSON column
+ * @param {string} geoJSONString - GeoJSON string from ST_ASGEOJSON formula
  * @returns {Object} { type, coordinates } - Leaflet-compatible format
  */
 export function parseGeoJSON(geoJSONString) {

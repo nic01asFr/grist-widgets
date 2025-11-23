@@ -73,7 +73,7 @@ export const GIS_WORKSPACE_SCHEMA = {
       id: 'geojson',
       type: 'Text',
       label: 'GeoJSON',
-      formula: 'ST_AsGeoJSON($geometry_wgs84)'
+      formula: 'ST_ASGEOJSON($geometry_wgs84)'
     },
 
     // === Affichage et style ===
