@@ -354,15 +354,28 @@ function addComponentToCanvas(component) {
 
 function createTextObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Calculer les dimensions à partir des pourcentages si disponibles
+    let width = 300; // défaut
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
 
     const text = new fabric.Textbox(component.content || 'Double-clic pour éditer', {
         left: coords.x,
         top: coords.y,
-        width: Number(component.width) || 300,
+        width: width,
         fontSize: Number(component.font_size) || 24,
         fill: component.color || '#ffffff',
         fontFamily: 'Arial',
-        editable: false
+        editable: false,
+        textAlign: component.align || 'left',
+        originX: 'center',
+        originY: 'center'
     });
 
     // Double-click to edit
@@ -375,44 +388,157 @@ function createTextObject(component) {
 
 // Helper: obtenir coordonnées d'un composant
 function getComponentCoords(component) {
-    // Priorité 1: coordonnées canvas sauvegardées
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Priorité 1: coordonnées canvas sauvegardées (si l'utilisateur a déplacé manuellement)
     if (component.x_canvas !== undefined && component.y_canvas !== undefined) {
         return { x: component.x_canvas, y: component.y_canvas };
     }
-    // Priorité 2: position prédéfinie
-    return getPositionCoords(component.position || 'center');
+
+    // Priorité 2: layout custom avec x_percent/y_percent
+    if (component.x_percent !== undefined && component.y_percent !== undefined) {
+        return {
+            x: (component.x_percent / 100) * CANVAS_WIDTH,
+            y: (component.y_percent / 100) * CANVAS_HEIGHT
+        };
+    }
+
+    // Priorité 3: position basée sur le layout actuel
+    const layout = appState.currentSlide?.layout || 'content';
+    return getPositionCoordsForLayout(component.position || 'center', layout);
 }
 
-// Convertir position textuelle en coordonnées (pour canvas 960x700)
-function getPositionCoords(position) {
+// Convertir position textuelle en coordonnées selon le layout
+function getPositionCoordsForLayout(position, layout) {
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+    const PADDING = 40;
+
+    // Layout custom: positions centrées absolues
+    if (layout === 'custom') {
+        const positions = {
+            'top-left': { x: 100, y: 80 },
+            'top': { x: CANVAS_WIDTH / 2, y: 80 },
+            'top-right': { x: CANVAS_WIDTH - 100, y: 80 },
+            'left': { x: 100, y: CANVAS_HEIGHT / 2 },
+            'center': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
+            'right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT / 2 },
+            'bottom-left': { x: 100, y: CANVAS_HEIGHT - 80 },
+            'bottom': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT - 80 },
+            'bottom-right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 80 }
+        };
+        return positions[position] || positions['center'];
+    }
+
+    // Layout two-column: diviser en 2 zones
+    if (layout === 'two-column') {
+        const colWidth = (CANVAS_WIDTH - PADDING * 3) / 2;
+        if (position === 'left') {
+            return { x: PADDING + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'right') {
+            return { x: PADDING * 2 + colWidth + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout three-column: diviser en 3 zones
+    if (layout === 'three-column') {
+        const colWidth = (CANVAS_WIDTH - PADDING * 4) / 3;
+        if (position === 'col-1' || position === 'left') {
+            return { x: PADDING + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-2' || position === 'center') {
+            return { x: PADDING * 2 + colWidth + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-3' || position === 'right') {
+            return { x: PADDING * 3 + colWidth * 2 + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout sidebar-left: 30% / 70%
+    if (layout === 'sidebar-left') {
+        const sidebarWidth = CANVAS_WIDTH * 0.3;
+        const mainWidth = CANVAS_WIDTH * 0.7;
+        if (position === 'col-1' || position === 'left') {
+            return { x: sidebarWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-2' || position === 'right') {
+            return { x: sidebarWidth + mainWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout sidebar-right: 70% / 30%
+    if (layout === 'sidebar-right') {
+        const mainWidth = CANVAS_WIDTH * 0.7;
+        const sidebarWidth = CANVAS_WIDTH * 0.3;
+        if (position === 'col-1' || position === 'left') {
+            return { x: mainWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-2' || position === 'right') {
+            return { x: mainWidth + sidebarWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout grid-2x2: grille 2x2
+    if (layout === 'grid-2x2') {
+        const cellWidth = (CANVAS_WIDTH - PADDING * 3) / 2;
+        const cellHeight = (CANVAS_HEIGHT - PADDING * 3) / 2;
+        // Les composants sont ajoutés dans l'ordre: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
+        // On utilise le center pour tous et on laisse l'ordre gérer le placement
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layouts title, content, full: positions standards centrées
     const positions = {
-        'top-left': { x: 80, y: 80 },
-        'top': { x: 430, y: 80 },
-        'top-right': { x: 780, y: 80 },
-        'left': { x: 80, y: 325 },
-        'center': { x: 430, y: 325 },
-        'right': { x: 780, y: 325 },
-        'bottom-left': { x: 80, y: 570 },
-        'bottom': { x: 430, y: 570 },
-        'bottom-right': { x: 780, y: 570 }
+        'top-left': { x: 100, y: 80 },
+        'top': { x: CANVAS_WIDTH / 2, y: 100 },
+        'top-right': { x: CANVAS_WIDTH - 100, y: 80 },
+        'left': { x: 100, y: CANVAS_HEIGHT / 2 },
+        'center': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
+        'right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT / 2 },
+        'bottom-left': { x: 100, y: CANVAS_HEIGHT - 80 },
+        'bottom': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT - 100 },
+        'bottom-right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 80 }
     };
     return positions[position] || positions['center'];
 }
 
 function createImageObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
     const imageUrl = component.url || component.attachment;
+
+    // Calculer dimensions à partir des pourcentages
+    let width = 200, height = 150; // défauts
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
+    if (component.height_percent !== undefined && component.height_percent !== null) {
+        height = (component.height_percent / 100) * CANVAS_HEIGHT;
+    } else if (component.height) {
+        height = Number(component.height);
+    }
 
     if (!imageUrl) {
         // Placeholder si pas d'URL
         return new fabric.Rect({
             left: coords.x,
             top: coords.y,
-            width: Number(component.width) || 200,
-            height: Number(component.height) || 150,
+            width: width,
+            height: height,
             fill: '#333',
             stroke: '#666',
-            strokeWidth: 2
+            strokeWidth: 2,
+            originX: 'center',
+            originY: 'center'
         });
     }
 
@@ -420,12 +546,14 @@ function createImageObject(component) {
     const placeholder = new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: Number(component.width) || 200,
-        height: Number(component.height) || 150,
+        width: width,
+        height: height,
         fill: '#333',
         stroke: '#666',
         strokeWidth: 2,
-        opacity: 0.5
+        opacity: 0.5,
+        originX: 'center',
+        originY: 'center'
     });
 
     // Charger l'image réelle
@@ -435,8 +563,10 @@ function createImageObject(component) {
         img.set({
             left: coords.x,
             top: coords.y,
-            scaleX: (Number(component.width) || 200) / img.width,
-            scaleY: (Number(component.height) || 150) / img.height
+            scaleX: width / img.width,
+            scaleY: height / img.height,
+            originX: 'center',
+            originY: 'center'
         });
 
         img.componentData = component;
@@ -456,25 +586,61 @@ function createImageObject(component) {
 
 function createShapeObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Calculer dimensions à partir des pourcentages
+    let width = 100, height = 100; // défauts
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
+    if (component.height_percent !== undefined && component.height_percent !== null) {
+        height = (component.height_percent / 100) * CANVAS_HEIGHT;
+    } else if (component.height) {
+        height = Number(component.height);
+    }
+
     return new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: Number(component.width) || 100,
-        height: Number(component.height) || 100,
-        fill: component.color || '#4CAF50'
+        width: width,
+        height: height,
+        fill: component.color || '#4CAF50',
+        originX: 'center',
+        originY: 'center'
     });
 }
 
 function createPlaceholderObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Calculer dimensions à partir des pourcentages
+    let width = 150, height = 100; // défauts
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
+    if (component.height_percent !== undefined && component.height_percent !== null) {
+        height = (component.height_percent / 100) * CANVAS_HEIGHT;
+    } else if (component.height) {
+        height = Number(component.height);
+    }
+
     return new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: 150,
-        height: 100,
+        width: width,
+        height: height,
         fill: '#2196F3',
         stroke: '#1976D2',
-        strokeWidth: 2
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center'
     });
 }
 
