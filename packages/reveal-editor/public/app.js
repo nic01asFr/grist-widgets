@@ -398,16 +398,57 @@ function getPositionCoords(position) {
 
 function createImageObject(component) {
     const coords = getComponentCoords(component);
-    // Placeholder for images
-    return new fabric.Rect({
+    const imageUrl = component.url || component.attachment;
+
+    if (!imageUrl) {
+        // Placeholder si pas d'URL
+        return new fabric.Rect({
+            left: coords.x,
+            top: coords.y,
+            width: Number(component.width) || 200,
+            height: Number(component.height) || 150,
+            fill: '#333',
+            stroke: '#666',
+            strokeWidth: 2
+        });
+    }
+
+    // Créer un placeholder temporaire
+    const placeholder = new fabric.Rect({
         left: coords.x,
         top: coords.y,
         width: Number(component.width) || 200,
         height: Number(component.height) || 150,
         fill: '#333',
         stroke: '#666',
-        strokeWidth: 2
+        strokeWidth: 2,
+        opacity: 0.5
     });
+
+    // Charger l'image réelle
+    fabric.Image.fromURL(imageUrl, (img) => {
+        if (!img) return;
+
+        img.set({
+            left: coords.x,
+            top: coords.y,
+            scaleX: (Number(component.width) || 200) / img.width,
+            scaleY: (Number(component.height) || 150) / img.height
+        });
+
+        img.componentData = component;
+
+        // Remplacer le placeholder par l'image réelle
+        const index = appState.canvas.getObjects().indexOf(placeholder);
+        if (index !== -1) {
+            appState.canvas.remove(placeholder);
+            appState.canvas.insertAt(img, index);
+            appState.fabricObjects.set(component.id, img);
+            appState.canvas.renderAll();
+        }
+    }, { crossOrigin: 'anonymous' });
+
+    return placeholder;
 }
 
 function createShapeObject(component) {
@@ -1316,7 +1357,7 @@ function createVideoObject(component) {
     const videoWidth = Number(component.width) || 400;
     const videoHeight = Number(component.height) || 225;
 
-    // Placeholder pour vidéo
+    // Rectangle noir pour fond vidéo
     const rect = new fabric.Rect({
         left: coords.x,
         top: coords.y,
@@ -1327,6 +1368,7 @@ function createVideoObject(component) {
         strokeWidth: 2
     });
 
+    // Icône play
     const playIcon = new fabric.Triangle({
         left: coords.x + videoWidth / 2,
         top: coords.y + videoHeight / 2,
@@ -1338,7 +1380,20 @@ function createVideoObject(component) {
         originY: 'center'
     });
 
-    return new fabric.Group([rect, playIcon], {
+    // Texte avec URL si disponible
+    const elements = [rect, playIcon];
+    if (component.url) {
+        const urlText = new fabric.Text(component.url.substring(0, 40) + '...', {
+            left: coords.x + 10,
+            top: coords.y + videoHeight - 30,
+            fontSize: 12,
+            fill: '#fff',
+            fontFamily: 'monospace'
+        });
+        elements.push(urlText);
+    }
+
+    return new fabric.Group(elements, {
         left: coords.x,
         top: coords.y
     });
@@ -1346,16 +1401,51 @@ function createVideoObject(component) {
 
 function createIframeObject(component) {
     const coords = getComponentCoords(component);
-    // Placeholder pour iframe
-    return new fabric.Rect({
+    const iframeWidth = Number(component.width) || 400;
+    const iframeHeight = Number(component.height) || 300;
+
+    // Rectangle avec bordure pointillée
+    const rect = new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: Number(component.width) || 400,
-        height: Number(component.height) || 300,
+        width: iframeWidth,
+        height: iframeHeight,
         fill: '#f0f0f0',
         stroke: '#999',
         strokeWidth: 2,
         strokeDashArray: [5, 5]
+    });
+
+    // Texte "IFRAME" au centre
+    const label = new fabric.Text('IFRAME', {
+        left: coords.x + iframeWidth / 2,
+        top: coords.y + iframeHeight / 2 - 20,
+        fontSize: 20,
+        fill: '#666',
+        fontFamily: 'Arial',
+        originX: 'center',
+        originY: 'center'
+    });
+
+    const elements = [rect, label];
+
+    // Afficher l'URL si disponible
+    if (component.url) {
+        const urlText = new fabric.Text(component.url.substring(0, 50) + '...', {
+            left: coords.x + iframeWidth / 2,
+            top: coords.y + iframeHeight / 2 + 10,
+            fontSize: 12,
+            fill: '#666',
+            fontFamily: 'monospace',
+            originX: 'center',
+            originY: 'center'
+        });
+        elements.push(urlText);
+    }
+
+    return new fabric.Group(elements, {
+        left: coords.x,
+        top: coords.y
     });
 }
 
