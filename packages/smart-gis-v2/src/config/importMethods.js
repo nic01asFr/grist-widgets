@@ -464,6 +464,279 @@ export const IMPORT_METHODS = {
     }
   },
 
+  ign_geoplateforme: {
+    id: 'ign_geoplateforme',
+    label: 'IGN Géoplateforme',
+    icon: '🇫🇷',
+    description: 'Données géographiques officielles françaises (IGN)',
+    color: '#0ea5e9',
+
+    steps: [
+      {
+        id: 'config',
+        label: 'Configuration',
+        component: 'ImportConfig',
+        fields: [
+          {
+            name: 'ign_layer',
+            label: 'Couche IGN',
+            type: 'choice',
+            required: true,
+            options: [
+              { value: 'BDTOPO_V3:commune', label: '🏘️ Communes' },
+              { value: 'BDTOPO_V3:departement', label: '🗺️ Départements' },
+              { value: 'BDTOPO_V3:region', label: '🌍 Régions' },
+              { value: 'ADMINEXPRESS-COG-CARTO.LATEST:arrondissement', label: '🏙️ Arrondissements' },
+              { value: 'BDTOPO_V3:batiment', label: '🏢 Bâtiments' },
+              { value: 'BDTOPO_V3:troncon_de_route', label: '🛣️ Routes' },
+              { value: 'BDTOPO_V3:troncon_hydrographique', label: '💧 Cours d\'eau' },
+              { value: 'BDTOPO_V3:zone_de_vegetation', label: '🌳 Végétation' }
+            ],
+            defaultValue: 'BDTOPO_V3:commune'
+          },
+          {
+            name: 'search_text',
+            label: 'Rechercher (nom de commune, département...)',
+            type: 'text',
+            placeholder: 'Ex: Paris, Lyon, Île-de-France...',
+            help: 'Laissez vide pour récupérer toutes les entités (attention: peut être long)'
+          },
+          {
+            name: 'max_features',
+            label: 'Nombre max de résultats',
+            type: 'number',
+            min: 1,
+            max: 10000,
+            defaultValue: 1000
+          },
+          {
+            name: 'layer_name',
+            label: 'Nom du layer dans Grist',
+            type: 'text',
+            required: true,
+            defaultValue: 'Import IGN'
+          }
+        ]
+      },
+      {
+        id: 'preview',
+        label: 'Aperçu',
+        component: 'PreviewData'
+      }
+    ],
+
+    validate: (config) => {
+      if (!config.ign_layer) {
+        return { valid: false, error: 'Aucune couche sélectionnée' };
+      }
+      return { valid: true };
+    },
+
+    fetch: async (config) => {
+      const { ign_layer, search_text, max_features } = config;
+
+      // Build WFS request
+      const params = new URLSearchParams({
+        service: 'WFS',
+        version: '2.0.0',
+        request: 'GetFeature',
+        typeName: ign_layer,
+        outputFormat: 'application/json',
+        count: max_features || 1000
+      });
+
+      // Add filter if search text provided
+      if (search_text && search_text.trim()) {
+        const cqlFilter = `nom ILIKE '%${search_text}%' OR nom_com ILIKE '%${search_text}%' OR nom_dep ILIKE '%${search_text}%' OR nom_reg ILIKE '%${search_text}%'`;
+        params.append('cql_filter', cqlFilter);
+      }
+
+      const url = `https://data.geopf.fr/wfs?${params.toString()}`;
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Erreur IGN: ${response.status} ${response.statusText}`);
+      }
+
+      const geojson = await response.json();
+
+      if (!geojson.features || geojson.features.length === 0) {
+        throw new Error('Aucune donnée trouvée pour cette recherche');
+      }
+
+      return geojson.features.map((feature, idx) => ({
+        geometry: JSON.stringify(feature.geometry),
+        properties: feature.properties || {},
+        feature_index: idx
+      }));
+    }
+  },
+
+  osm_overpass: {
+    id: 'osm_overpass',
+    label: 'OpenStreetMap',
+    icon: '🗺️',
+    description: 'Données OpenStreetMap via Overpass API',
+    color: '#22c55e',
+
+    steps: [
+      {
+        id: 'config',
+        label: 'Configuration',
+        component: 'ImportConfig',
+        fields: [
+          {
+            name: 'osm_type',
+            label: 'Type d\'élément OSM',
+            type: 'choice',
+            required: true,
+            options: [
+              { value: 'amenity=school', label: '🏫 Écoles' },
+              { value: 'amenity=hospital', label: '🏥 Hôpitaux' },
+              { value: 'amenity=pharmacy', label: '💊 Pharmacies' },
+              { value: 'amenity=restaurant', label: '🍽️ Restaurants' },
+              { value: 'amenity=cafe', label: '☕ Cafés' },
+              { value: 'amenity=bank', label: '🏦 Banques' },
+              { value: 'amenity=post_office', label: '📮 Bureaux de poste' },
+              { value: 'amenity=library', label: '📚 Bibliothèques' },
+              { value: 'amenity=parking', label: '🅿️ Parkings' },
+              { value: 'highway=motorway', label: '🛣️ Autoroutes' },
+              { value: 'highway=primary', label: '🛤️ Routes principales' },
+              { value: 'highway=residential', label: '🏘️ Rues résidentielles' },
+              { value: 'building=yes', label: '🏢 Bâtiments (tous)' },
+              { value: 'building=residential', label: '🏠 Bâtiments résidentiels' },
+              { value: 'building=commercial', label: '🏬 Bâtiments commerciaux' },
+              { value: 'natural=water', label: '💧 Plans d\'eau' },
+              { value: 'natural=wood', label: '🌲 Forêts' },
+              { value: 'landuse=residential', label: '🏘️ Zones résidentielles' },
+              { value: 'landuse=commercial', label: '🏬 Zones commerciales' },
+              { value: 'landuse=forest', label: '🌲 Zones forestières' }
+            ],
+            defaultValue: 'amenity=school'
+          },
+          {
+            name: 'place_name',
+            label: 'Nom du lieu (ville, département, pays...)',
+            type: 'text',
+            required: true,
+            placeholder: 'Ex: Paris, Lyon, Île-de-France, France...',
+            help: 'Zone géographique où effectuer la recherche'
+          },
+          {
+            name: 'timeout',
+            label: 'Timeout (secondes)',
+            type: 'number',
+            min: 5,
+            max: 180,
+            defaultValue: 25,
+            help: 'Temps max pour la requête Overpass'
+          },
+          {
+            name: 'layer_name',
+            label: 'Nom du layer dans Grist',
+            type: 'text',
+            required: true,
+            defaultValue: 'Import OSM'
+          }
+        ]
+      },
+      {
+        id: 'preview',
+        label: 'Aperçu',
+        component: 'PreviewData'
+      }
+    ],
+
+    validate: (config) => {
+      if (!config.osm_type) {
+        return { valid: false, error: 'Aucun type OSM sélectionné' };
+      }
+      if (!config.place_name || !config.place_name.trim()) {
+        return { valid: false, error: 'Nom du lieu requis' };
+      }
+      return { valid: true };
+    },
+
+    fetch: async (config) => {
+      const { osm_type, place_name, timeout } = config;
+
+      // Parse OSM type (e.g., "amenity=school" → tag="amenity", value="school")
+      const [tag, value] = osm_type.split('=');
+
+      let overpassQuery = `[out:json][timeout:${timeout || 25}];
+area[name="${place_name}"]->.searchArea;
+(
+  node["${tag}"="${value}"](area.searchArea);
+  way["${tag}"="${value}"](area.searchArea);
+  relation["${tag}"="${value}"](area.searchArea);
+);
+out geom;`;
+
+      const response = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: overpassQuery
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur Overpass: ${response.status} ${response.statusText}`);
+      }
+
+      const osmData = await response.json();
+
+      if (!osmData.elements || osmData.elements.length === 0) {
+        throw new Error('Aucune donnée OSM trouvée pour cette recherche');
+      }
+
+      // Convert OSM elements to GeoJSON features
+      const features = osmData.elements.map((element, idx) => {
+        let geometry;
+
+        if (element.type === 'node') {
+          geometry = {
+            type: 'Point',
+            coordinates: [element.lon, element.lat]
+          };
+        } else if (element.type === 'way' && element.geometry) {
+          const coords = element.geometry.map(point => [point.lon, point.lat]);
+          const isClosed = coords.length > 3 &&
+                          coords[0][0] === coords[coords.length - 1][0] &&
+                          coords[0][1] === coords[coords.length - 1][1];
+          geometry = (isClosed || element.tags?.area === 'yes')
+            ? { type: 'Polygon', coordinates: [coords] }
+            : { type: 'LineString', coordinates: coords };
+        } else if (element.type === 'relation' && element.members) {
+          // Simplified: treat as point at centroid
+          const allCoords = element.members.flatMap(m => m.geometry || []);
+          if (allCoords.length > 0) {
+            const avgLon = allCoords.reduce((sum, p) => sum + p.lon, 0) / allCoords.length;
+            const avgLat = allCoords.reduce((sum, p) => sum + p.lat, 0) / allCoords.length;
+            geometry = { type: 'Point', coordinates: [avgLon, avgLat] };
+          }
+        }
+
+        if (!geometry) {
+          return null;
+        }
+
+        return {
+          geometry: JSON.stringify(geometry),
+          properties: {
+            osm_id: element.id,
+            osm_type: element.type,
+            ...(element.tags || {})
+          },
+          feature_index: idx
+        };
+      }).filter(f => f !== null);
+
+      if (features.length === 0) {
+        throw new Error('Aucune géométrie valide trouvée');
+      }
+
+      return features;
+    }
+  },
+
   shapefile: {
     id: 'shapefile',
     label: 'Shapefile (via QGIS)',
