@@ -971,6 +971,8 @@ const debouncedSaveComponent = debounce(async (component) => {
             updates.y_canvas = component.y_canvas;
         }
 
+        console.log(`💾 Saving component ${component.id} at (${updates.x_canvas}, ${updates.y_canvas})`);
+
         await appState.docApi.applyUserActions([
             ['UpdateRecord', CONFIG.TABLES.COMPONENTS, component.id, updates]
         ]);
