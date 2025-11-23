@@ -58,7 +58,7 @@ const LAYOUTS = {
     title: {
         render: (slide, components) => `
             <div class="layout-title">
-                ${components.map(c => renderComponent(c, 'center')).join('')}
+                ${components.map(c => renderComponent(c, 'center', 'title')).join('')}
             </div>
         `
     },
@@ -66,7 +66,7 @@ const LAYOUTS = {
     content: {
         render: (slide, components) => `
             <div class="layout-content">
-                ${components.map(c => renderComponent(c)).join('')}
+                ${components.map(c => renderComponent(c, null, 'content')).join('')}
             </div>
         `
     },
@@ -86,10 +86,10 @@ const LAYOUTS = {
                 return `
                     <div class="layout-two-column">
                         <div class="column-left">
-                            ${components.slice(0, mid).map(c => renderComponent(c)).join('')}
+                            ${components.slice(0, mid).map(c => renderComponent(c, null, 'two-column')).join('')}
                         </div>
                         <div class="column-right">
-                            ${components.slice(mid).map(c => renderComponent(c)).join('')}
+                            ${components.slice(mid).map(c => renderComponent(c, null, 'two-column')).join('')}
                         </div>
                     </div>
                 `;
@@ -98,10 +98,10 @@ const LAYOUTS = {
             return `
                 <div class="layout-two-column">
                     <div class="column-left">
-                        ${left.map(c => renderComponent(c)).join('')}
+                        ${left.map(c => renderComponent(c, null, 'two-column')).join('')}
                     </div>
                     <div class="column-right">
-                        ${right.map(c => renderComponent(c)).join('')}
+                        ${right.map(c => renderComponent(c, null, 'two-column')).join('')}
                     </div>
                 </div>
             `;
@@ -116,9 +116,9 @@ const LAYOUTS = {
 
             return `
                 <div class="layout-three-column">
-                    <div class="column">${col1.map(c => renderComponent(c)).join('')}</div>
-                    <div class="column">${col2.map(c => renderComponent(c)).join('')}</div>
-                    <div class="column">${col3.map(c => renderComponent(c)).join('')}</div>
+                    <div class="column">${col1.map(c => renderComponent(c, null, 'three-column')).join('')}</div>
+                    <div class="column">${col2.map(c => renderComponent(c, null, 'three-column')).join('')}</div>
+                    <div class="column">${col3.map(c => renderComponent(c, null, 'three-column')).join('')}</div>
                 </div>
             `;
         }
@@ -131,8 +131,8 @@ const LAYOUTS = {
 
             return `
                 <div class="layout-sidebar-left">
-                    <div class="sidebar">${left.map(c => renderComponent(c)).join('')}</div>
-                    <div class="main">${right.map(c => renderComponent(c)).join('')}</div>
+                    <div class="sidebar">${left.map(c => renderComponent(c, null, 'sidebar-left')).join('')}</div>
+                    <div class="main">${right.map(c => renderComponent(c, null, 'sidebar-left')).join('')}</div>
                 </div>
             `;
         }
@@ -145,8 +145,8 @@ const LAYOUTS = {
 
             return `
                 <div class="layout-sidebar-right">
-                    <div class="main">${left.map(c => renderComponent(c)).join('')}</div>
-                    <div class="sidebar">${right.map(c => renderComponent(c)).join('')}</div>
+                    <div class="main">${left.map(c => renderComponent(c, null, 'sidebar-right')).join('')}</div>
+                    <div class="sidebar">${right.map(c => renderComponent(c, null, 'sidebar-right')).join('')}</div>
                 </div>
             `;
         }
@@ -156,7 +156,7 @@ const LAYOUTS = {
         render: (slide, components) => `
             <div class="layout-grid-2x2">
                 ${components.slice(0, 4).map(c => `
-                    <div class="grid-item">${renderComponent(c)}</div>
+                    <div class="grid-item">${renderComponent(c, null, 'grid-2x2')}</div>
                 `).join('')}
             </div>
         `
@@ -165,7 +165,7 @@ const LAYOUTS = {
     full: {
         render: (slide, components) => `
             <div class="layout-full">
-                ${components.map(c => renderComponent(c)).join('')}
+                ${components.map(c => renderComponent(c, null, 'full')).join('')}
             </div>
         `
     },
@@ -173,7 +173,7 @@ const LAYOUTS = {
     custom: {
         render: (slide, components) => `
             <div class="layout-custom">
-                ${components.map(c => renderComponent(c, c.position)).join('')}
+                ${components.map(c => renderComponent(c, c.position, 'custom')).join('')}
             </div>
         `
     }
@@ -391,9 +391,12 @@ const COMPONENT_RENDERERS = {
 // ========================================
 // COMPONENT RENDERER
 // ========================================
-function renderComponent(component, positionOverride = null) {
+function renderComponent(component, positionOverride = null, slideLayout = 'content') {
     const position = positionOverride || component.position || 'center';
     const preset = STYLE_PRESETS[component.style_preset] || {};
+
+    // Ajouter le layout au composant pour le positionnement
+    component._slideLayout = slideLayout;
 
     // Construire les styles
     const styles = {};
@@ -401,23 +404,50 @@ function renderComponent(component, positionOverride = null) {
     // Appliquer preset D'ABORD (sera écrasé par les propriétés spécifiques du composant)
     Object.assign(styles, preset);
 
-    // PRIORITÉ : Utiliser les pourcentages (relatifs) si disponibles
-    if (component.x_percent !== undefined && component.x_percent !== null &&
-        component.y_percent !== undefined && component.y_percent !== null) {
-        styles.position = 'absolute';
-        styles.left = `${component.x_percent}%`;
-        styles.top = `${component.y_percent}%`;
-        console.log(`📍 Component ${component.type} positioned at (${component.x_percent.toFixed(1)}%, ${component.y_percent.toFixed(1)}%)`);
-    }
-    // FALLBACK : Utiliser les pixels (absolus) si pas de pourcentages
-    else if (component.x_canvas !== undefined && component.x_canvas !== null &&
-        component.y_canvas !== undefined && component.y_canvas !== null) {
-        styles.position = 'absolute';
-        styles.left = `${component.x_canvas}px`;
-        styles.top = `${component.y_canvas}px`;
-        console.log(`📍 Component ${component.type} positioned at (${component.x_canvas}px, ${component.y_canvas}px) - using pixels fallback`);
+    // POSITIONNEMENT MODERNE avec Flexbox/Grid
+    // Pour layout "custom" uniquement: utiliser position absolute (grille 12x12)
+    // Pour les autres layouts: le positionnement est géré par flex/grid dans le CSS
+    const slideLayout = component._slideLayout || 'custom';
+
+    if (slideLayout === 'custom') {
+        // Layout custom: position absolute avec coordonnées (ancien système)
+        if (component.x_percent !== undefined && component.x_percent !== null &&
+            component.y_percent !== undefined && component.y_percent !== null) {
+            styles.position = 'absolute';
+            styles.left = `${component.x_percent}%`;
+            styles.top = `${component.y_percent}%`;
+            console.log(`📍 [Custom] Component ${component.type} positioned at (${component.x_percent.toFixed(1)}%, ${component.y_percent.toFixed(1)}%)`);
+        }
     } else {
-        console.log(`⚠️ Component ${component.type} missing positioning, using grid position: ${position}`);
+        // Layouts modernes (flex/grid): pas de position absolute
+        // Le positionnement est géré par les classes flex/grid du layout
+
+        // Flex alignment pour composant individuel
+        if (component.position) {
+            const alignmentMap = {
+                'top-left': { alignSelf: 'flex-start', justifySelf: 'flex-start' },
+                'top': { alignSelf: 'flex-start', justifySelf: 'center' },
+                'top-right': { alignSelf: 'flex-start', justifySelf: 'flex-end' },
+                'left': { alignSelf: 'center', justifySelf: 'flex-start' },
+                'center': { alignSelf: 'center', justifySelf: 'center' },
+                'right': { alignSelf: 'center', justifySelf: 'flex-end' },
+                'bottom-left': { alignSelf: 'flex-end', justifySelf: 'flex-start' },
+                'bottom': { alignSelf: 'flex-end', justifySelf: 'center' },
+                'bottom-right': { alignSelf: 'flex-end', justifySelf: 'flex-end' }
+            };
+
+            const alignment = alignmentMap[component.position];
+            if (alignment) {
+                Object.assign(styles, alignment);
+            }
+        }
+
+        // Order pour contrôler l'ordre d'affichage dans flex
+        if (component.order !== undefined && component.order !== null) {
+            styles.order = component.order;
+        }
+
+        console.log(`📍 [${slideLayout}] Component ${component.type} using flex/grid positioning`);
     }
 
     // Dimensions en pourcentages (PRIORITÉ) ou pixels (FALLBACK)
