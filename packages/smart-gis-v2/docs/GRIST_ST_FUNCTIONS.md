@@ -48,7 +48,7 @@ center_lon = ST_X(ST_CENTROID($geometry_wgs84))
 | `ST_GeomFromText(wkt, srid=4326)` | WKT → Géométrie | `ST_GeomFromText('POINT(2.35 48.85)')` |
 | `ST_GeomFromGeoJSON(json)` | GeoJSON → WKT | `ST_GeomFromGeoJSON($geojson_column)` |
 | `ST_AsText(geometry)` | Géométrie → WKT | `ST_AsText($geometry)` |
-| `ST_AsGeoJSON(wkt)` | WKT → GeoJSON | `ST_AsGeoJSON($geometry_wgs84)` |
+| `ST_ASGEOJSON(wkt)` | WKT → GeoJSON | `ST_ASGEOJSON($geometry_wgs84)` |
 | `MAKE_POINT(lat, lon)` | Créer point | `MAKE_POINT(48.8584, 2.2945)` |
 
 **Exemple dans TableSchema:**
@@ -56,7 +56,7 @@ center_lon = ST_X(ST_CENTROID($geometry_wgs84))
 {
   id: 'geojson',
   type: 'Text',
-  formula: 'ST_AsGeoJSON($geometry_wgs84)'
+  formula: 'ST_ASGEOJSON($geometry_wgs84)'
 }
 ```
 
@@ -200,7 +200,7 @@ return { geometry: wkt, properties: {...} };
 area_km2 = ST_AREA($geometry_wgs84, 'km2')
 center_lat = ST_Y(ST_CENTROID($geometry_wgs84))
 center_lon = ST_X(ST_CENTROID($geometry_wgs84))
-geojson = ST_AsGeoJSON($geometry_wgs84)
+geojson = ST_ASGEOJSON($geometry_wgs84)
 ```
 
 **3. Affichage (widget lit et affiche):**
@@ -393,5 +393,5 @@ console.log('Record with ST_* calculations:', {
 2. ✅ **Créer colonnes formules** pour calculs répétés
 3. ✅ **Valider avec IS_VALID()** après import
 4. ✅ **Utiliser ST_SIMPLIFY()** pour géométries très détaillées
-5. ✅ **Cacher dans widget** les résultats ST_AsGeoJSON
+5. ✅ **Cacher dans widget** les résultats ST_ASGEOJSON
 6. ❌ **Jamais recalculer** côté widget ce que Grist peut faire

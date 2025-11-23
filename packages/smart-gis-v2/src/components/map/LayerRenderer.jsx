@@ -1,17 +1,25 @@
 /**
  * LayerRenderer - Renders individual geometries
+ *
+ * Reads Grist ST_ASGEOJSON results from `geojson` column
+ * (calculated by: geojson = ST_ASGEOJSON($geometry_wgs84))
  */
 
 import React, { useMemo } from 'react';
 import { Marker, Polyline, Polygon, Popup } from 'react-leaflet';
-import { parseWKT } from '../../utils/geometry/wktParser';
+import { parseGeoJSON } from '../../utils/geometry/geoJSONParser';
 import StateManager from '../../core/StateManager';
 
 const LayerRenderer = ({ layer }) => {
-  // Cache WKT parsing (expensive operation)
+  // Read GeoJSON from Grist ST_AsGeoJSON formula column
   const geometry = useMemo(() => {
-    return parseWKT(layer.geometry_wgs84 || layer.geometry);
-  }, [layer.geometry_wgs84, layer.geometry, layer.id]);
+    // Use `geojson` column (ST_AsGeoJSON result) if available
+    if (layer.geojson) {
+      return parseGeoJSON(layer.geojson);
+    }
+    // Fallback: empty geometry
+    return { type: null, coordinates: [] };
+  }, [layer.geojson, layer.id]);
 
   const style = useMemo(() => {
     try {
@@ -46,20 +54,52 @@ const LayerRenderer = ({ layer }) => {
     return (
       <Popup>
         <div className="feature-popup">
-          <h4>{layer.layer_name}</h4>
-          <dl>
-            {Object.entries(properties).map(([key, value]) => (
-              <React.Fragment key={key}>
-                <dt>{key}</dt>
-                <dd>{String(value)}</dd>
-              </React.Fragment>
-            ))}
-          </dl>
-          {layer.area_ha && (
-            <div className="metrics">
-              <strong>Surface:</strong> {layer.area_ha.toFixed(2)} ha
-            </div>
+          <h4>{layer.feature_name || layer.layer_name}</h4>
+          <p><em>{layer.layer_name}</em></p>
+
+          {/* Display properties */}
+          {Object.keys(properties).length > 0 && (
+            <dl>
+              {Object.entries(properties).slice(0, 5).map(([key, value]) => (
+                <React.Fragment key={key}>
+                  <dt>{key}</dt>
+                  <dd>{String(value)}</dd>
+                </React.Fragment>
+              ))}
+            </dl>
           )}
+
+          {/* Display ST_* calculated metrics (read from Grist formulas) */}
+          <div className="metrics">
+            {layer.geometry_type && (
+              <div><strong>Type:</strong> {layer.geometry_type}</div>
+            )}
+
+            {/* Polygon metrics */}
+            {layer.area_km2 && (
+              <div><strong>Surface:</strong> {layer.area_km2.toFixed(2)} km²</div>
+            )}
+            {layer.perimeter_km && (
+              <div><strong>Périmètre:</strong> {layer.perimeter_km.toFixed(2)} km</div>
+            )}
+
+            {/* LineString metrics */}
+            {layer.length_km && (
+              <div><strong>Longueur:</strong> {layer.length_km.toFixed(2)} km</div>
+            )}
+
+            {/* Center coordinates (all geometry types) */}
+            {layer.center_lat && layer.center_lon && (
+              <div>
+                <strong>Centre:</strong> {layer.center_lat.toFixed(6)}, {layer.center_lon.toFixed(6)}
+              </div>
+            )}
+
+            {/* Validation */}
+            {layer.is_valid_geom !== undefined && !layer.is_valid_geom && (
+              <div style={{ color: 'red' }}>⚠️ Géométrie invalide</div>
+            )}
+          </div>
         </div>
       </Popup>
     );
