@@ -7,6 +7,68 @@
 
 import { geoJSONToWKT } from '../utils/geometryConverters';
 
+/**
+ * Pagination helper for IGN WFS (max 5000 features per request)
+ * @param {string} baseUrl - Base WFS URL with all parameters except startIndex
+ * @param {number} maxTotal - Maximum total features to retrieve
+ * @param {number} pageSize - Features per request (max 5000)
+ * @returns {Promise<Array>} All features combined
+ */
+async function fetchWithPagination(baseUrl, maxTotal = 10000, pageSize = 5000) {
+  const allFeatures = [];
+  let startIndex = 0;
+  let hasMore = true;
+
+  console.log(`[Pagination] Starting paginated fetch (max ${maxTotal} features, ${pageSize} per page)`);
+
+  while (hasMore && allFeatures.length < maxTotal) {
+    // Add startIndex parameter
+    const url = `${baseUrl}&startIndex=${startIndex}`;
+
+    console.log(`[Pagination] Fetching page ${Math.floor(startIndex / pageSize) + 1} (startIndex=${startIndex})...`);
+
+    try {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
+      }
+
+      const geojson = await response.json();
+
+      if (!geojson.features || geojson.features.length === 0) {
+        // No more features
+        hasMore = false;
+        console.log(`[Pagination] No more features at startIndex=${startIndex}`);
+        break;
+      }
+
+      allFeatures.push(...geojson.features);
+      console.log(`[Pagination] Received ${geojson.features.length} features (total so far: ${allFeatures.length})`);
+
+      // If we got less than pageSize, there are no more features
+      if (geojson.features.length < pageSize) {
+        hasMore = false;
+        console.log(`[Pagination] Last page (received ${geojson.features.length} < ${pageSize})`);
+        break;
+      }
+
+      startIndex += pageSize;
+
+      // Small delay to respect API rate limits (30 req/s = ~33ms between requests)
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+    } catch (error) {
+      console.error(`[Pagination] Error at startIndex=${startIndex}:`, error);
+      throw error;
+    }
+  }
+
+  console.log(`[Pagination] Complete! Total features: ${allFeatures.length}`);
+  return allFeatures;
+}
+
 export const IMPORT_METHODS = {
   geojson: {
     id: 'geojson',
@@ -379,19 +441,85 @@ export const IMPORT_METHODS = {
             defaultValue: 'BDTOPO_V3:commune'
           },
           {
+            name: 'filter_mode',
+            label: 'Mode de filtrage',
+            type: 'choice',
+            options: [
+              { value: 'all', label: 'Tout (aucun filtre)' },
+              { value: 'name', label: 'Par nom (recherche texte)' },
+              { value: 'territory', label: 'Par territoire (codes INSEE)' },
+              { value: 'bbox', label: 'Par zone géographique (BBOX)' },
+              { value: 'advanced', label: 'Filtrage avancé (CQL)' }
+            ],
+            defaultValue: 'name',
+            help: 'Sélectionnez comment filtrer les résultats'
+          },
+          {
             name: 'search_text',
-            label: 'Rechercher (nom de commune, département...)',
+            label: '📝 Recherche par nom',
             type: 'text',
             placeholder: 'Ex: Paris, Lyon, Île-de-France...',
-            help: 'Laissez vide pour récupérer toutes les entités (attention: peut être long)'
+            help: 'Pour filter_mode=name uniquement'
+          },
+          {
+            name: 'region_code',
+            label: '🗺️ Code région INSEE (2 chiffres)',
+            type: 'text',
+            placeholder: 'Ex: 11 (Île-de-France), 84 (AURA), 93 (PACA)...',
+            help: 'Pour filter_mode=territory. Ex: 11=IdF, 84=AURA, 93=PACA'
+          },
+          {
+            name: 'departement_code',
+            label: '🏛️ Code département INSEE (2-3 chiffres)',
+            type: 'text',
+            placeholder: 'Ex: 75 (Paris), 69 (Rhône), 13 (Bouches-du-Rhône)...',
+            help: 'Pour filter_mode=territory. Filtrera par département'
+          },
+          {
+            name: 'commune_code',
+            label: '🏘️ Code commune INSEE (5 chiffres)',
+            type: 'text',
+            placeholder: 'Ex: 75056 (Paris), 69123 (Lyon), 13055 (Marseille)...',
+            help: 'Pour filter_mode=territory. Code INSEE complet de la commune'
+          },
+          {
+            name: 'bbox',
+            label: '📐 BBOX (ouest,sud,est,nord)',
+            type: 'text',
+            placeholder: 'Ex: 2.2,48.8,2.4,48.9 (Paris)',
+            help: 'Pour filter_mode=bbox. Format: minX,minY,maxX,maxY en WGS84'
+          },
+          {
+            name: 'cql_filter',
+            label: '⚙️ Filtre CQL personnalisé',
+            type: 'text',
+            placeholder: 'Ex: population > 100000 AND nom LIKE \'%ville%\'',
+            help: 'Pour filter_mode=advanced. Filtre CQL_FILTER complet'
+          },
+          {
+            name: 'sort_by',
+            label: '↕️ Trier par',
+            type: 'choice',
+            options: [
+              { value: '', label: 'Pas de tri (ordre par défaut)' },
+              { value: 'nom A', label: 'Nom (A→Z)' },
+              { value: 'nom D', label: 'Nom (Z→A)' },
+              { value: 'population D', label: 'Population (décroissant)' },
+              { value: 'population A', label: 'Population (croissant)' },
+              { value: 'superficie D', label: 'Superficie (décroissant)' },
+              { value: 'superficie A', label: 'Superficie (croissant)' }
+            ],
+            defaultValue: '',
+            help: 'Ordre de tri des résultats (si la couche a ces attributs)'
           },
           {
             name: 'max_features',
             label: 'Nombre max de résultats',
             type: 'number',
             min: 1,
-            max: 10000,
-            defaultValue: 1000
+            max: 50000,
+            defaultValue: 1000,
+            help: 'Si > 5000, utilisera la pagination automatique (plusieurs requêtes)'
           },
           {
             name: 'layer_name',
@@ -417,42 +545,110 @@ export const IMPORT_METHODS = {
     },
 
     fetch: async (config) => {
-      const { ign_layer, search_text, max_features } = config;
+      const {
+        ign_layer,
+        filter_mode = 'name',
+        search_text,
+        region_code,
+        departement_code,
+        commune_code,
+        bbox,
+        cql_filter,
+        sort_by,
+        max_features
+      } = config;
 
-      // Build WFS request
+      const requestedFeatures = max_features || 1000;
+      const pageSize = 5000; // IGN WFS max per request
+
+      // Build WFS request (without startIndex, will be added by pagination helper)
       const params = new URLSearchParams({
         service: 'WFS',
         version: '2.0.0',
         request: 'GetFeature',
         typeName: ign_layer,
         outputFormat: 'application/json',
-        count: max_features || 1000
+        count: pageSize
       });
 
-      // Add simple filter if search text provided
-      if (search_text && search_text.trim()) {
-        // Use simple LIKE filter on 'nom' property (exists in most layers)
-        // Escape single quotes in search text
+      // Build CQL filter based on mode
+      let finalCqlFilter = null;
+
+      if (filter_mode === 'name' && search_text && search_text.trim()) {
+        // Simple name search
         const escapedText = search_text.replace(/'/g, "''");
-        const cqlFilter = `nom LIKE '%${escapedText}%'`;
-        params.append('cql_filter', cqlFilter);
+        finalCqlFilter = `nom LIKE '%${escapedText}%'`;
+      }
+      else if (filter_mode === 'territory') {
+        // Hierarchical territory filtering by INSEE codes
+        const territoryFilters = [];
+
+        if (commune_code && commune_code.trim()) {
+          territoryFilters.push(`insee_com = '${commune_code.trim()}'`);
+        } else if (departement_code && departement_code.trim()) {
+          territoryFilters.push(`insee_dep = '${departement_code.trim()}'`);
+        } else if (region_code && region_code.trim()) {
+          territoryFilters.push(`insee_reg = '${region_code.trim()}'`);
+        }
+
+        if (territoryFilters.length > 0) {
+          finalCqlFilter = territoryFilters.join(' AND ');
+        }
+      }
+      else if (filter_mode === 'bbox' && bbox && bbox.trim()) {
+        // BBOX filtering (must be in CQL format for WFS 2.0.0)
+        const bboxParts = bbox.trim().split(',').map(s => s.trim());
+        if (bboxParts.length === 4) {
+          const [minX, minY, maxX, maxY] = bboxParts;
+          finalCqlFilter = `BBOX(geometry, ${minX}, ${minY}, ${maxX}, ${maxY}, 'EPSG:4326')`;
+        }
+      }
+      else if (filter_mode === 'advanced' && cql_filter && cql_filter.trim()) {
+        // Custom CQL filter
+        finalCqlFilter = cql_filter.trim();
       }
 
-      const url = `https://data.geopf.fr/wfs?${params.toString()}`;
-
-      const response = await fetch(url);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
+      // Add CQL filter if present
+      if (finalCqlFilter) {
+        params.append('cql_filter', finalCqlFilter);
       }
 
-      const geojson = await response.json();
-
-      if (!geojson.features || geojson.features.length === 0) {
-        throw new Error('Aucune donnée trouvée. Essayez sans filtre ou avec un autre nom.');
+      // Add sortBy if specified
+      if (sort_by && sort_by.trim()) {
+        params.append('sortBy', sort_by.trim());
       }
 
-      return geojson.features.map((feature, idx) => {
+      const baseUrl = `https://data.geopf.fr/wfs?${params.toString()}`;
+
+      console.log('[IGN Advanced] Base URL:', baseUrl);
+      console.log('[IGN Advanced] Filter mode:', filter_mode, '| CQL:', finalCqlFilter);
+      console.log('[IGN Advanced] Requested features:', requestedFeatures, '| Will use pagination:', requestedFeatures > pageSize);
+
+      // Fetch data (with pagination if needed)
+      let allFeatures;
+
+      if (requestedFeatures > pageSize) {
+        // Use pagination
+        allFeatures = await fetchWithPagination(baseUrl, requestedFeatures, pageSize);
+      } else {
+        // Single request
+        const response = await fetch(baseUrl);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+
+        const geojson = await response.json();
+        allFeatures = geojson.features || [];
+      }
+
+      if (allFeatures.length === 0) {
+        throw new Error('Aucune donnée trouvée. Vérifiez vos filtres ou essayez sans filtre.');
+      }
+
+      console.log(`[IGN Advanced] Total features received: ${allFeatures.length}`);
+
+      return allFeatures.map((feature, idx) => {
         const wkt = geoJSONToWKT(feature.geometry);
         if (!wkt) {
           console.warn(`[IGN Import] Failed to convert geometry for feature ${idx}`);
@@ -494,19 +690,68 @@ export const IMPORT_METHODS = {
             defaultValue: 'region'
           },
           {
+            name: 'filter_mode',
+            label: 'Mode de filtrage',
+            type: 'choice',
+            options: [
+              { value: 'all', label: 'Tout (aucun filtre)' },
+              { value: 'name', label: 'Par nom (recherche texte)' },
+              { value: 'territory', label: 'Par territoire (codes INSEE)' },
+              { value: 'bbox', label: 'Par zone géographique (BBOX)' }
+            ],
+            defaultValue: 'name',
+            help: 'Sélectionnez comment filtrer les résultats'
+          },
+          {
             name: 'search_text',
-            label: 'Rechercher (optionnel)',
+            label: '📝 Recherche par nom',
             type: 'text',
             placeholder: 'Ex: Île-de-France, Bretagne...',
-            help: 'Laissez vide pour tout charger'
+            help: 'Pour filter_mode=name uniquement'
+          },
+          {
+            name: 'region_code',
+            label: '🗺️ Code région INSEE (2 chiffres)',
+            type: 'text',
+            placeholder: 'Ex: 11 (Île-de-France), 84 (AURA), 93 (PACA)...',
+            help: 'Pour filter_mode=territory'
+          },
+          {
+            name: 'departement_code',
+            label: '🏛️ Code département INSEE (2-3 chiffres)',
+            type: 'text',
+            placeholder: 'Ex: 75 (Paris), 69 (Rhône), 13 (Bouches-du-Rhône)...',
+            help: 'Pour filter_mode=territory'
+          },
+          {
+            name: 'bbox',
+            label: '📐 BBOX (ouest,sud,est,nord)',
+            type: 'text',
+            placeholder: 'Ex: 2.2,48.8,2.4,48.9 (Paris)',
+            help: 'Pour filter_mode=bbox. Format: minX,minY,maxX,maxY en WGS84'
+          },
+          {
+            name: 'sort_by',
+            label: '↕️ Trier par',
+            type: 'choice',
+            options: [
+              { value: '', label: 'Pas de tri (ordre par défaut)' },
+              { value: 'nom A', label: 'Nom (A→Z)' },
+              { value: 'nom D', label: 'Nom (Z→A)' },
+              { value: 'population D', label: 'Population (décroissant)' },
+              { value: 'population A', label: 'Population (croissant)' }
+            ],
+            defaultValue: '',
+            help: 'Ordre de tri des résultats'
           },
           {
             name: 'max_features',
             label: 'Nombre max de résultats',
             type: 'number',
             min: 1,
-            max: 10000,
-            defaultValue: 1000
+            max: 50000,
+            defaultValue: 1000,
+            help: 'Si > 5000, utilisera la pagination automatique (plusieurs requêtes)'
           },
           {
             name: 'layer_name',
@@ -532,7 +777,19 @@ export const IMPORT_METHODS = {
     },
 
     fetch: async (config) => {
-      const { admin_level, search_text, max_features } = config;
+      const {
+        admin_level,
+        filter_mode = 'name',
+        search_text,
+        region_code,
+        departement_code,
+        bbox,
+        sort_by,
+        max_features
+      } = config;
+
+      const requestedFeatures = max_features || 1000;
+      const pageSize = 5000; // IGN WFS max per request
 
       // Build WFS request for COG-CARTO (lightweight version)
       const params = new URLSearchParams({
@@ -541,35 +798,78 @@ export const IMPORT_METHODS = {
         request: 'GetFeature',
         typeName: `ADMINEXPRESS-COG-CARTO.LATEST:${admin_level}`,
         outputFormat: 'application/json',
-        count: max_features || 1000
+        count: pageSize
       });
 
-      // Add simple filter if search text provided
-      if (search_text && search_text.trim()) {
+      // Build CQL filter based on mode
+      let finalCqlFilter = null;
+
+      if (filter_mode === 'name' && search_text && search_text.trim()) {
         const escapedText = search_text.replace(/'/g, "''");
-        const cqlFilter = `nom LIKE '%${escapedText}%'`;
-        params.append('cql_filter', cqlFilter);
+        finalCqlFilter = `nom LIKE '%${escapedText}%'`;
+      }
+      else if (filter_mode === 'territory') {
+        const territoryFilters = [];
+
+        if (departement_code && departement_code.trim()) {
+          territoryFilters.push(`insee_dep = '${departement_code.trim()}'`);
+        } else if (region_code && region_code.trim()) {
+          territoryFilters.push(`insee_reg = '${region_code.trim()}'`);
+        }
+
+        if (territoryFilters.length > 0) {
+          finalCqlFilter = territoryFilters.join(' AND ');
+        }
+      }
+      else if (filter_mode === 'bbox' && bbox && bbox.trim()) {
+        const bboxParts = bbox.trim().split(',').map(s => s.trim());
+        if (bboxParts.length === 4) {
+          const [minX, minY, maxX, maxY] = bboxParts;
+          finalCqlFilter = `BBOX(geometry, ${minX}, ${minY}, ${maxX}, ${maxY}, 'EPSG:4326')`;
+        }
       }
 
-      const url = `https://data.geopf.fr/wfs?${params.toString()}`;
-
-      console.log('[IGN Light] Fetching from COG-CARTO:', url);
-
-      const response = await fetch(url);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
+      // Add CQL filter if present
+      if (finalCqlFilter) {
+        params.append('cql_filter', finalCqlFilter);
       }
 
-      const geojson = await response.json();
-
-      if (!geojson.features || geojson.features.length === 0) {
-        throw new Error('Aucune donnée trouvée. Essayez sans filtre ou avec un autre nom.');
+      // Add sortBy if specified
+      if (sort_by && sort_by.trim()) {
+        params.append('sortBy', sort_by.trim());
       }
 
-      console.log(`[IGN Light] Received ${geojson.features.length} features from COG-CARTO`);
+      const baseUrl = `https://data.geopf.fr/wfs?${params.toString()}`;
 
-      return geojson.features.map((feature, idx) => {
+      console.log('[IGN Light Advanced] Base URL:', baseUrl);
+      console.log('[IGN Light Advanced] Filter mode:', filter_mode, '| CQL:', finalCqlFilter);
+      console.log('[IGN Light Advanced] Requested features:', requestedFeatures, '| Will use pagination:', requestedFeatures > pageSize);
+
+      // Fetch data (with pagination if needed)
+      let allFeatures;
+
+      if (requestedFeatures > pageSize) {
+        // Use pagination
+        allFeatures = await fetchWithPagination(baseUrl, requestedFeatures, pageSize);
+      } else {
+        // Single request
+        const response = await fetch(baseUrl);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+
+        const geojson = await response.json();
+        allFeatures = geojson.features || [];
+      }
+
+      if (allFeatures.length === 0) {
+        throw new Error('Aucune donnée trouvée. Vérifiez vos filtres ou essayez sans filtre.');
+      }
+
+      console.log(`[IGN Light Advanced] Total features received: ${allFeatures.length} from COG-CARTO`);
+
+      return allFeatures.map((feature, idx) => {
         const wkt = geoJSONToWKT(feature.geometry);
         if (!wkt) {
           console.warn(`[IGN Light] Failed to convert geometry for feature ${idx}`);
@@ -604,6 +904,19 @@ export const IMPORT_METHODS = {
         component: 'ImportConfig',
         fields: [
           {
+            name: 'filter_mode',
+            label: 'Mode de filtrage spatial',
+            type: 'choice',
+            options: [
+              { value: 'area_name', label: 'Par nom de zone (ville, pays...)' },
+              { value: 'area_id', label: 'Par ID de relation OSM (plus précis)' },
+              { value: 'bbox', label: 'Par BBOX (coordonnées)' },
+              { value: 'global', label: 'Global (attention: peut être très long!)' }
+            ],
+            defaultValue: 'area_name',
+            help: 'Comment délimiter la zone de recherche'
+          },
+          {
             name: 'osm_type',
             label: 'Type d\'élément OSM',
             type: 'choice',
@@ -634,11 +947,31 @@ export const IMPORT_METHODS = {
           },
           {
             name: 'place_name',
-            label: 'Nom du lieu (ville, département, pays...)',
+            label: '📍 Nom du lieu',
             type: 'text',
-            required: true,
             placeholder: 'Ex: Paris, Lyon, Île-de-France, France...',
-            help: 'Zone géographique où effectuer la recherche'
+            help: 'Pour filter_mode=area_name. Zone géographique de recherche'
+          },
+          {
+            name: 'area_id',
+            label: '🔢 ID de relation OSM',
+            type: 'text',
+            placeholder: 'Ex: 3600007444 (Île-de-France)',
+            help: 'Pour filter_mode=area_id. Plus précis que nom (trouvez l\'ID sur openstreetmap.org)'
+          },
+          {
+            name: 'bbox',
+            label: '📐 BBOX (sud,ouest,nord,est)',
+            type: 'text',
+            placeholder: 'Ex: 48.8,2.2,48.9,2.4 (Paris)',
+            help: 'Pour filter_mode=bbox. Format: minLat,minLon,maxLat,maxLon'
+          },
+          {
+            name: 'additional_tags',
+            label: '🏷️ Tags additionnels (optionnel)',
+            type: 'text',
+            placeholder: 'Ex: ["wheelchair"="yes"]["name"~".*école.*"]',
+            help: 'Filtres supplémentaires en syntaxe Overpass. Combiné avec AND'
           },
           {
             name: 'timeout',
@@ -669,26 +1002,73 @@ export const IMPORT_METHODS = {
       if (!config.osm_type) {
         return { valid: false, error: 'Aucun type OSM sélectionné' };
       }
-      if (!config.place_name || !config.place_name.trim()) {
-        return { valid: false, error: 'Nom du lieu requis' };
+
+      const { filter_mode, place_name, area_id, bbox } = config;
+
+      if (filter_mode === 'area_name' && (!place_name || !place_name.trim())) {
+        return { valid: false, error: 'Nom du lieu requis pour filter_mode=area_name' };
       }
+      if (filter_mode === 'area_id' && (!area_id || !area_id.trim())) {
+        return { valid: false, error: 'ID de relation requis pour filter_mode=area_id' };
+      }
+      if (filter_mode === 'bbox' && (!bbox || !bbox.trim())) {
+        return { valid: false, error: 'BBOX requis pour filter_mode=bbox' };
+      }
+
       return { valid: true };
     },
 
     fetch: async (config) => {
-      const { osm_type, place_name, timeout } = config;
+      const {
+        filter_mode = 'area_name',
+        osm_type,
+        place_name,
+        area_id,
+        bbox,
+        additional_tags,
+        timeout
+      } = config;
 
       // Parse OSM type (e.g., "amenity=school" → tag="amenity", value="school")
       const [tag, value] = osm_type.split('=');
 
+      // Build spatial filter
+      let spatialFilter = '';
+      let areaDefinition = '';
+
+      if (filter_mode === 'area_name' && place_name) {
+        areaDefinition = `area[name="${place_name}"]->.searchArea;`;
+        spatialFilter = '(area.searchArea)';
+      }
+      else if (filter_mode === 'area_id' && area_id) {
+        // Convert relation ID to area ID (add 3600000000)
+        const relationId = area_id.trim().replace(/^3600/, '');
+        const areaIdNum = `3600${relationId}`;
+        areaDefinition = `area(${areaIdNum})->.searchArea;`;
+        spatialFilter = '(area.searchArea)';
+      }
+      else if (filter_mode === 'bbox' && bbox) {
+        // BBOX format: minLat,minLon,maxLat,maxLon
+        spatialFilter = `(${bbox.trim()})`;
+      }
+      else if (filter_mode === 'global') {
+        spatialFilter = ''; // No spatial filter
+      }
+
+      // Build tag filter
+      const tagFilter = `["${tag}"="${value}"]${additional_tags || ''}`;
+
+      // Build Overpass query
       let overpassQuery = `[out:json][timeout:${timeout || 25}];
-area[name="${place_name}"]->.searchArea;
+${areaDefinition}
 (
-  node["${tag}"="${value}"](area.searchArea);
-  way["${tag}"="${value}"](area.searchArea);
-  relation["${tag}"="${value}"](area.searchArea);
+  node${tagFilter}${spatialFilter};
+  way${tagFilter}${spatialFilter};
+  relation${tagFilter}${spatialFilter};
 );
 out geom;`;
+
+      console.log('[OSM Advanced] Overpass query:', overpassQuery);
 
       const response = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
@@ -702,8 +1082,10 @@ out geom;`;
       const osmData = await response.json();
 
       if (!osmData.elements || osmData.elements.length === 0) {
-        throw new Error('Aucune donnée OSM trouvée pour cette recherche');
+        throw new Error('Aucune donnée OSM trouvée. Vérifiez vos filtres.');
       }
+
+      console.log(`[OSM Advanced] Received ${osmData.elements.length} elements`);
 
       // Convert OSM elements to GeoJSON features
       const features = osmData.elements.map((element, idx) => {
@@ -756,6 +1138,8 @@ out geom;`;
       if (features.length === 0) {
         throw new Error('Aucune géométrie valide trouvée');
       }
+
+      console.log(`[OSM Advanced] Converted ${features.length} valid features`);
 
       return features;
     }
