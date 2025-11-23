@@ -427,15 +427,28 @@ html, body {
 .component-list {
     display: flex;
     flex-direction: column;
+    text-align: left;
+}
+
+.component-list ul,
+.component-list ol {
+    list-style-position: outside;
+    padding-left: 1.5em;
+    text-align: left;
+    margin-left: 0;
 }
 
 .component-list ul {
     list-style-type: disc;
-    padding-left: 1.5em;
+}
+
+.component-list ol {
+    list-style-type: decimal;
 }
 
 .component-list li {
     margin: 0.3em 0;
+    text-align: left;
 }
 
 .component-table {
