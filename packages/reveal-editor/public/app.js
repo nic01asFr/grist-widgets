@@ -145,11 +145,13 @@ async function loadData() {
             order: components.order?.[i] || 0,
             type: components.type?.[i] || 'text',
             content: components.content?.[i],
+            url: components.url?.[i],
             position: components.position?.[i] || 'center',
             width: components.width?.[i],
             height: components.height?.[i],
             style_preset: components.style_preset?.[i],
             color: components.color?.[i],
+            background: components.background?.[i],
             font_size: components.font_size?.[i],
             x_canvas: components.x_canvas?.[i],
             y_canvas: components.y_canvas?.[i]
@@ -544,64 +546,8 @@ function updatePropertiesPanel() {
 
     const comp = appState.selectedComponent;
 
-    container.innerHTML = `
-        <div class="property-group">
-            <h4>Type</h4>
-            <p style="margin: 0;">${comp.type}</p>
-        </div>
-
-        <div class="property-group">
-            <h4>Position</h4>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>X (px)</label>
-                    <input type="number" id="prop-x-canvas" value="${comp.x_canvas !== undefined ? comp.x_canvas : ''}">
-                </div>
-                <div class="form-group">
-                    <label>Y (px)</label>
-                    <input type="number" id="prop-y-canvas" value="${comp.y_canvas !== undefined ? comp.y_canvas : ''}">
-                </div>
-            </div>
-        </div>
-
-        <div class="property-group">
-            <h4>Taille</h4>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Largeur (px)</label>
-                    <input type="number" id="prop-width" value="${comp.width || ''}">
-                </div>
-                <div class="form-group">
-                    <label>Hauteur (px)</label>
-                    <input type="number" id="prop-height" value="${comp.height || ''}">
-                </div>
-            </div>
-        </div>
-
-        ${comp.type === 'text' ? `
-        <div class="property-group">
-            <h4>Texte</h4>
-            <div class="form-group">
-                <label>Contenu</label>
-                <textarea id="prop-content" rows="3">${comp.content || ''}</textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Taille (px)</label>
-                    <input type="number" id="prop-font-size" value="${comp.font_size || '24'}">
-                </div>
-                <div class="form-group">
-                    <label>Couleur</label>
-                    <input type="color" id="prop-color" value="${comp.color || '#ffffff'}">
-                </div>
-            </div>
-        </div>
-        ` : ''}
-
-        <button class="btn-primary" style="width: 100%;" onclick="saveProperties()">
-            💾 Appliquer
-        </button>
-    `;
+    // Utilise la fonction du fichier properties-panels.js
+    container.innerHTML = getPropertiesHTML(comp);
 }
 
 function clearPropertiesPanel() {
@@ -617,6 +563,7 @@ window.saveProperties = async function() {
     if (!appState.selectedComponent) return;
 
     const updates = {};
+    const type = appState.selectedComponent.type;
 
     // Taille (valeurs numériques)
     const widthValue = document.getElementById('prop-width')?.value;
@@ -631,22 +578,56 @@ window.saveProperties = async function() {
     if (yCanvas !== '') updates.y_canvas = parseInt(yCanvas);
 
     // Propriétés spécifiques au type
-    if (appState.selectedComponent.type === 'text') {
-        updates.content = document.getElementById('prop-content')?.value;
-        const fontSizeValue = document.getElementById('prop-font-size')?.value;
-        if (fontSizeValue !== '') updates.font_size = parseInt(fontSizeValue);
-        updates.color = document.getElementById('prop-color')?.value;
+    const contentElem = document.getElementById('prop-content');
+    const urlElem = document.getElementById('prop-url');
+    const colorElem = document.getElementById('prop-color');
+    const backgroundElem = document.getElementById('prop-background');
+    const fontSizeElem = document.getElementById('prop-font-size');
+
+    // Content (pour la plupart des types)
+    if (contentElem) {
+        updates.content = contentElem.value;
     }
+
+    // URL (pour image, video, iframe, button)
+    if (urlElem) {
+        updates.url = urlElem.value;
+    }
+
+    // Couleur (pour text, code, list, quote, table, shape, button)
+    if (colorElem) {
+        updates.color = colorElem.value;
+    }
+
+    // Background (pour button)
+    if (backgroundElem) {
+        updates.background = backgroundElem.value;
+    }
+
+    // Font size (pour text, list, quote)
+    if (fontSizeElem) {
+        const fontSize = fontSizeElem.value;
+        if (fontSize !== '') updates.font_size = parseInt(fontSize);
+    }
+
+    console.log(`💾 Saving properties for ${type}:`, updates);
 
     try {
         await appState.docApi.applyUserActions([
             ['UpdateRecord', CONFIG.TABLES.COMPONENTS, appState.selectedComponent.id, updates]
         ]);
 
+        // Mettre à jour l'objet local
+        Object.assign(appState.selectedComponent, updates);
+
+        // Recharger et rafraîchir l'affichage
         await loadData();
         loadSlide(appState.currentSlide.id);
+
+        console.log('✅ Properties saved successfully');
     } catch (error) {
-        console.error('Error saving properties:', error);
+        console.error('❌ Error saving properties:', error);
+        alert('Erreur lors de la sauvegarde des propriétés');
     }
 };
 
@@ -997,7 +978,7 @@ function debounce(func, wait) {
 // TABLE CREATION
 // ========================================
 
-// Ensure x_canvas and y_canvas columns exist
+// Ensure x_canvas, y_canvas, url and background columns exist
 async function ensureCanvasColumns() {
     try {
         const tables = await appState.docApi.fetchTable('_grist_Tables');
@@ -1022,12 +1003,20 @@ async function ensureCanvasColumns() {
             columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'y_canvas', { type: 'Numeric', label: 'Y Canvas (px)' }]);
         }
 
+        if (!columnNames.includes('url')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'url', { type: 'Text', label: 'URL' }]);
+        }
+
+        if (!columnNames.includes('background')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'background', { type: 'Text', label: 'Couleur fond' }]);
+        }
+
         if (columnsToAdd.length > 0) {
-            console.log('Adding missing canvas columns:', columnsToAdd);
+            console.log('Adding missing columns:', columnsToAdd);
             await appState.docApi.applyUserActions(columnsToAdd);
         }
     } catch (error) {
-        console.error('Error ensuring canvas columns:', error);
+        console.error('Error ensuring columns:', error);
     }
 }
 
@@ -1069,11 +1058,13 @@ window.createMissingTables = async function() {
                 { id: 'order', fields: { type: 'Int', label: 'Ordre' } },
                 { id: 'type', fields: { type: 'Choice', label: 'Type', widgetOptions: JSON.stringify({ choices: CONFIG.COMPONENT_TYPES }) } },
                 { id: 'content', fields: { type: 'Text', label: 'Contenu' } },
+                { id: 'url', fields: { type: 'Text', label: 'URL' } },
                 { id: 'position', fields: { type: 'Choice', label: 'Position', widgetOptions: JSON.stringify({ choices: ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'] }) } },
                 { id: 'width', fields: { type: 'Numeric', label: 'Largeur (px)' } },
                 { id: 'height', fields: { type: 'Numeric', label: 'Hauteur (px)' } },
                 { id: 'style_preset', fields: { type: 'Text', label: 'Style' } },
                 { id: 'color', fields: { type: 'Text', label: 'Couleur' } },
+                { id: 'background', fields: { type: 'Text', label: 'Couleur fond' } },
                 { id: 'font_size', fields: { type: 'Numeric', label: 'Taille police (px)' } },
                 { id: 'x_canvas', fields: { type: 'Numeric', label: 'X Canvas (px)' } },
                 { id: 'y_canvas', fields: { type: 'Numeric', label: 'Y Canvas (px)' } }
@@ -1241,7 +1232,7 @@ function createCodeObject(component) {
         top: coords.y,
         width: Number(component.width) || 400,
         fontSize: 16,
-        fill: '#00ff00',
+        fill: component.color || '#00ff00',
         backgroundColor: '#1e1e1e',
         fontFamily: 'monospace',
         editable: false
@@ -1282,7 +1273,7 @@ function createButtonObject(component) {
     const coords = getComponentCoords(component);
     const text = new fabric.Text(component.content || 'Button', {
         fontSize: 18,
-        fill: '#ffffff',
+        fill: component.color || '#ffffff',
         fontFamily: 'Arial',
         originX: 'center',
         originY: 'center'
@@ -1291,7 +1282,7 @@ function createButtonObject(component) {
     const rect = new fabric.Rect({
         width: Number(component.width) || 150,
         height: Number(component.height) || 50,
-        fill: '#4CAF50',
+        fill: component.background || '#4CAF50',
         rx: 6,
         ry: 6,
         originX: 'center',
@@ -1315,7 +1306,7 @@ function createTableObject(component) {
         width: Number(component.width) || 300,
         height: Number(component.height) || 150,
         fill: 'transparent',
-        stroke: '#666',
+        stroke: component.color || '#666',
         strokeWidth: 2
     });
 }
