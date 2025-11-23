@@ -79,16 +79,13 @@
     <!-- Reveal.js container -->
     <div class="reveal">
         <div class="slides">
-            <!-- Slides will be dynamically generated here -->
-            <section>
-                <h1>🎨 Reveal.js Builder</h1>
-                <h3>Créez vos présentations dans Grist</h3>
-                <p style="font-size: 0.8em; opacity: 0.7;">
-                    1. Créez une présentation dans la table Presentations<br>
-                    2. Ajoutez des slides dans la table Slides<br>
-                    3. Ajoutez des composants dans la table Components<br>
-                    4. Activez la présentation (toggle "active")
-                </p>
+            <!-- Slide de chargement - sera remplacée par les vraies slides -->
+            <section data-loading-slide>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 2em;">
+                    <div class="spinner" style="border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #4CAF50; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;"></div>
+                    <h3 style="margin: 0;">Chargement de la présentation...</h3>
+                    <p style="font-size: 0.8em; opacity: 0.7; margin: 0;">Connexion à Grist en cours</p>
+                </div>
             </section>
         </div>
     </div>
