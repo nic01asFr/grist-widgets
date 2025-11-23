@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import GristAPI from '../../core/GristAPI';
 import StateManager from '../../core/StateManager';
+import DynamicFilterBuilder from './DynamicFilterBuilder';
 import './ImportWizard.css';
 
 const ImportWizard = ({ method, onClose, onComplete }) => {
@@ -24,6 +25,7 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [previewFeatures, setPreviewFeatures] = useState([]);
+  const [dynamicCqlFilter, setDynamicCqlFilter] = useState('');
 
   const steps = method.steps || [];
   const currentStep = steps[currentStepIndex];
@@ -362,6 +364,8 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
           {currentStep.id === 'config' && (
             <div className="step-content">
               <h4>Configuration</h4>
+
+              {/* Standard config fields */}
               {currentStep.fields.map(field => (
                 <div key={field.name} className="param-field">
                   <label>
@@ -398,6 +402,18 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
                   )}
                 </div>
               ))}
+
+              {/* Dynamic filter builder for WFS services */}
+              {method.supportsDynamicFilters && (config.typeName || config.ign_layer) && (
+                <DynamicFilterBuilder
+                  serviceUrl={method.wfsServiceUrl}
+                  typeName={config.typeName || config.ign_layer}
+                  onFilterChange={(cqlFilter) => {
+                    setDynamicCqlFilter(cqlFilter);
+                    handleConfigChange('cql_filter', cqlFilter);
+                  }}
+                />
+              )}
             </div>
           )}
         </div>

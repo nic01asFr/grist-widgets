@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import GristAPI from './core/GristAPI';
 import StateManager from './core/StateManager';
+import SelectionManager from './services/SelectionManager';
 import { initializeSystemTables } from './core/TableSchemas';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
@@ -41,7 +42,12 @@ const SmartGISWidget = () => {
         console.log('✅ All system tables initialized successfully');
       }
 
-      // 3. Load workspace data if available
+      // 3. Initialize SelectionManager for bidirectional sync with Grist
+      console.log('🔗 Initializing SelectionManager...');
+      SelectionManager.initialize('GIS_WorkSpace');
+      console.log('✓ SelectionManager initialized');
+
+      // 4. Load workspace data if available
       try {
         const workspaceData = await GristAPI.fetchTable('GIS_WorkSpace');
 
@@ -61,7 +67,7 @@ const SmartGISWidget = () => {
         StateManager.setState('layers.workspace', [], 'Empty workspace');
       }
 
-      // 4. Mark as ready
+      // 5. Mark as ready
       setIsReady(true);
       console.log('✅ Smart-GIS v2 ready');
 
