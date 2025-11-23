@@ -44,6 +44,15 @@ const SmartGISWidget = () => {
       // 3. Load workspace data if available
       try {
         const workspaceData = await GristAPI.fetchTable('GIS_WorkSpace');
+
+        // DEBUG: Log first record to see structure
+        if (workspaceData.length > 0) {
+          console.log('📊 Sample workspace record:', workspaceData[0]);
+          console.log('📊 Record keys:', Object.keys(workspaceData[0]));
+          console.log('📊 Has geojson column?', 'geojson' in workspaceData[0]);
+          console.log('📊 geojson value type:', typeof workspaceData[0].geojson);
+        }
+
         StateManager.setState('layers.workspace', workspaceData, 'Load workspace');
         StateManager.setState('data.currentTable', 'GIS_WorkSpace', 'Set current table');
         console.log(`✓ Loaded ${workspaceData.length} features from GIS_WorkSpace`);
