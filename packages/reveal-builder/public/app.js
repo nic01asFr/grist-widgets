@@ -398,12 +398,18 @@ function renderComponent(component, positionOverride = null) {
     // Construire les styles
     const styles = {};
 
+    // Appliquer preset D'ABORD (sera écrasé par les propriétés spécifiques du composant)
+    Object.assign(styles, preset);
+
     // Positionnement absolu si x_canvas/y_canvas sont définis
     if (component.x_canvas !== undefined && component.x_canvas !== null &&
         component.y_canvas !== undefined && component.y_canvas !== null) {
         styles.position = 'absolute';
         styles.left = `${component.x_canvas}px`;
         styles.top = `${component.y_canvas}px`;
+        console.log(`📍 Component ${component.type} positioned at (${component.x_canvas}, ${component.y_canvas})`);
+    } else {
+        console.log(`⚠️ Component ${component.type} missing x_canvas/y_canvas, using grid position: ${position}`);
     }
 
     if (component.width && component.width !== 'auto') {
@@ -420,12 +426,10 @@ function renderComponent(component, positionOverride = null) {
         styles.fontSize = typeof fontSize === 'number' ? `${fontSize}px` : fontSize;
     }
 
+    // Propriétés du composant ÉCRASENT le preset
     if (component.color) styles.color = component.color;
     if (component.background) styles.background = component.background;
     if (component.align) styles.textAlign = component.align;
-
-    // Appliquer preset
-    Object.assign(styles, preset);
 
     // Padding
     const paddingMap = { small: '0.5em', medium: '1em', large: '2em' };
@@ -719,7 +723,9 @@ async function loadPresentations() {
             border_radius: components.border_radius?.[i],
             shadow: components.shadow?.[i],
             animation: components.animation?.[i],
-            custom_css: components.custom_css?.[i]
+            custom_css: components.custom_css?.[i],
+            x_canvas: components.x_canvas?.[i],      // AJOUT CRITIQUE
+            y_canvas: components.y_canvas?.[i]       // AJOUT CRITIQUE
         }));
 
         // Build presentation
