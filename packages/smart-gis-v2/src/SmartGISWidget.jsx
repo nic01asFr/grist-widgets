@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import GristAPI from './core/GristAPI';
 import StateManager from './core/StateManager';
+import { initializeGISTable } from './core/TableSchema';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
 import MapView from './components/map/MapView';
@@ -31,14 +32,25 @@ const SmartGISWidget = () => {
       // 2. Load system tables if they exist
       const tables = await GristAPI.listTables();
 
-      // 3. Load workspace data if table exists
+      // 3. Initialize GIS_WorkSpace table schema (create or add missing columns)
+      if (tables.includes('GIS_WorkSpace')) {
+        console.log('🔧 Ensuring GIS_WorkSpace has all required columns...');
+        const schemaResult = await initializeGISTable(GristAPI.docApi, 'GIS_WorkSpace');
+        if (schemaResult.success) {
+          console.log(`✓ ${schemaResult.message}`);
+        } else {
+          console.warn(`⚠️ Schema initialization warning: ${schemaResult.message}`);
+        }
+      }
+
+      // 4. Load workspace data
       if (tables.includes('GIS_WorkSpace')) {
         const workspaceData = await GristAPI.fetchTable('GIS_WorkSpace');
         StateManager.setState('layers.workspace', workspaceData, 'Load workspace');
         StateManager.setState('data.currentTable', 'GIS_WorkSpace', 'Set current table');
       }
 
-      // 4. Mark as ready
+      // 5. Mark as ready
       setIsReady(true);
       console.log('✅ Smart-GIS v2 ready');
 

@@ -180,13 +180,16 @@ const ImportWizard = ({ method, onClose, onComplete }) => {
       const layerName = config.layer_name || 'Import';
 
       // Prepare records for Grist
-      // Only include ESSENTIAL columns that are guaranteed to exist
-      // Other fields (geometry_type, is_visible, z_index, feature_name) may not exist
+      // Use complete schema (columns ensured by TableSchema.initializeGISTable at startup)
       const records = parsedData.map((feature, idx) => ({
         layer_name: layerName,
         geometry_wgs84: feature.geometry,
-        // Store all original properties as JSON string
-        properties: JSON.stringify(feature.properties || {})
+        properties: JSON.stringify(feature.properties || {}),
+        geometry_type: detectGeometryType(feature.geometry),
+        is_visible: true,
+        z_index: 100,
+        feature_name: feature.properties?.name || feature.properties?.nom || `Feature ${idx + 1}`,
+        import_session: Date.now() // Unique session ID for this import
       }));
 
       // Add to Grist
