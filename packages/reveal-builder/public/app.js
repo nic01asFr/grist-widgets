@@ -619,12 +619,18 @@ function buildPresentation(presentation, slides, components) {
     document.getElementById('presentation-title').textContent = presentation.title || 'Sans titre';
     document.getElementById('slide-count').textContent = `${sortedSlides.length} slide${sortedSlides.length > 1 ? 's' : ''}`;
 
-    // Réinitialiser Reveal.js
+    // Réinitialiser Reveal.js et afficher quand prêt
     requestAnimationFrame(() => {
         if (typeof Reveal !== 'undefined') {
             Reveal.sync();
             Reveal.layout();
             console.log('✅ Reveal.js synced');
+
+            // Afficher les slides maintenant qu'elles sont prêtes
+            requestAnimationFrame(() => {
+                document.querySelector('.reveal').classList.add('ready');
+                console.log('✅ Slides visibles');
+            });
         }
     });
 }
@@ -947,6 +953,10 @@ function initializeRevealJS() {
 
         Reveal.on('ready', () => {
             console.log('🎬 Reveal.js ready');
+            // Afficher les slides une fois Reveal.js prêt
+            requestAnimationFrame(() => {
+                document.querySelector('.reveal').classList.add('ready');
+            });
         });
 
         Reveal.on('slidechanged', (event) => {
