@@ -407,8 +407,6 @@ function renderComponent(component, positionOverride = null, slideLayout = 'cont
     // POSITIONNEMENT MODERNE avec Flexbox/Grid
     // Pour layout "custom" uniquement: utiliser position absolute (grille 12x12)
     // Pour les autres layouts: le positionnement est géré par flex/grid dans le CSS
-    const slideLayout = component._slideLayout || 'custom';
-
     if (slideLayout === 'custom') {
         // Layout custom: position absolute avec coordonnées (ancien système)
         if (component.x_percent !== undefined && component.x_percent !== null &&
