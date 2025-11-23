@@ -466,6 +466,130 @@ export const IMPORT_METHODS = {
     }
   },
 
+  ign_admin_light: {
+    id: 'ign_admin_light',
+    label: 'IGN Admin (Optimisé)',
+    icon: '🇫🇷⚡',
+    description: 'Limites administratives légères - 95% plus petit que BDTOPO!',
+    color: '#10b981',
+
+    steps: [
+      {
+        id: 'config',
+        label: 'Configuration',
+        component: 'ImportConfig',
+        fields: [
+          {
+            name: 'admin_level',
+            label: 'Niveau administratif',
+            type: 'choice',
+            required: true,
+            options: [
+              { value: 'region', label: '🗺️ Régions (18) - ~8 MB au lieu de 178 MB!' },
+              { value: 'departement', label: '🏛️ Départements (101)' },
+              { value: 'commune', label: '🏘️ Communes (35k) - Version simplifiée' },
+              { value: 'arrondissement', label: '🏙️ Arrondissements' },
+              { value: 'epci', label: '🤝 EPCI (intercommunalités)' }
+            ],
+            defaultValue: 'region'
+          },
+          {
+            name: 'search_text',
+            label: 'Rechercher (optionnel)',
+            type: 'text',
+            placeholder: 'Ex: Île-de-France, Bretagne...',
+            help: 'Laissez vide pour tout charger'
+          },
+          {
+            name: 'max_features',
+            label: 'Nombre max de résultats',
+            type: 'number',
+            min: 1,
+            max: 10000,
+            defaultValue: 1000
+          },
+          {
+            name: 'layer_name',
+            label: 'Nom du layer dans Grist',
+            type: 'text',
+            required: true,
+            defaultValue: 'Import IGN Light'
+          }
+        ]
+      },
+      {
+        id: 'preview',
+        label: 'Aperçu',
+        component: 'PreviewData'
+      }
+    ],
+
+    validate: (config) => {
+      if (!config.admin_level) {
+        return { valid: false, error: 'Aucun niveau administratif sélectionné' };
+      }
+      return { valid: true };
+    },
+
+    fetch: async (config) => {
+      const { admin_level, search_text, max_features } = config;
+
+      // Build WFS request for COG-CARTO (lightweight version)
+      const params = new URLSearchParams({
+        service: 'WFS',
+        version: '2.0.0',
+        request: 'GetFeature',
+        typeName: `ADMINEXPRESS-COG-CARTO.LATEST:${admin_level}`,
+        outputFormat: 'application/json',
+        count: max_features || 1000
+      });
+
+      // Add simple filter if search text provided
+      if (search_text && search_text.trim()) {
+        const escapedText = search_text.replace(/'/g, "''");
+        const cqlFilter = `nom LIKE '%${escapedText}%'`;
+        params.append('cql_filter', cqlFilter);
+      }
+
+      const url = `https://data.geopf.fr/wfs?${params.toString()}`;
+
+      console.log('[IGN Light] Fetching from COG-CARTO:', url);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
+      }
+
+      const geojson = await response.json();
+
+      if (!geojson.features || geojson.features.length === 0) {
+        throw new Error('Aucune donnée trouvée. Essayez sans filtre ou avec un autre nom.');
+      }
+
+      console.log(`[IGN Light] Received ${geojson.features.length} features from COG-CARTO`);
+
+      return geojson.features.map((feature, idx) => {
+        const wkt = geoJSONToWKT(feature.geometry);
+        if (!wkt) {
+          console.warn(`[IGN Light] Failed to convert geometry for feature ${idx}`);
+        }
+
+        // Calculate rough size for monitoring
+        const sizeKB = (JSON.stringify(feature.geometry).length / 1024).toFixed(1);
+        if (idx === 0) {
+          console.log(`[IGN Light] Sample feature size: ${sizeKB} KB (COG-CARTO optimized)`);
+        }
+
+        return {
+          geometry: wkt,
+          properties: feature.properties || {},
+          feature_index: idx
+        };
+      });
+    }
+  },
+
   osm_overpass: {
     id: 'osm_overpass',
     label: 'OpenStreetMap',
