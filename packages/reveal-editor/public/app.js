@@ -927,8 +927,15 @@ const SLIDE_TEMPLATES = [
         background_color: '#667eea',
         components: [
             {
+                type: 'shape',
+                x_percent: 50, y_percent: 15,
+                width_percent: 30, height_percent: 3,
+                color: '#ffd700',
+                position: 'center'
+            },
+            {
                 type: 'text',
-                x_percent: 50, y_percent: 35,
+                x_percent: 50, y_percent: 38,
                 width_percent: 70, height_percent: 15,
                 content: 'Grist Reveal.js Builder',
                 font_size: 56,
@@ -937,11 +944,20 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 55,
+                x_percent: 50, y_percent: 58,
                 width_percent: 60, height_percent: 10,
                 content: 'Créez des présentations interactives directement dans Grist',
                 font_size: 24,
                 color: '#e0e7ff',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 85,
+                width_percent: 50, height_percent: 6,
+                content: 'Éditeur visuel • 11 composants • Export Reveal.js',
+                font_size: 16,
+                color: '#b8c5f2',
                 position: 'center'
             }
         ]
@@ -953,12 +969,44 @@ const SLIDE_TEMPLATES = [
         background_color: '#1a1a1a',
         components: [
             {
+                type: 'shape',
+                x_percent: 15, y_percent: 30,
+                width_percent: 8, height_percent: 12,
+                color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 15, y_percent: 30,
+                width_percent: 8, height_percent: 12,
+                content: '"',
+                font_size: 120,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
                 type: 'quote',
-                x_percent: 50, y_percent: 45,
-                width_percent: 70, height_percent: 20,
+                x_percent: 50, y_percent: 48,
+                width_percent: 70, height_percent: 22,
                 content: '"La simplicité est la sophistication suprême."\n\n— Leonardo da Vinci',
                 font_size: 32,
                 color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'shape',
+                x_percent: 85, y_percent: 65,
+                width_percent: 8, height_percent: 12,
+                color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 85, y_percent: 65,
+                width_percent: 8, height_percent: 12,
+                content: '"',
+                font_size: 120,
+                color: '#ffffff',
                 position: 'center'
             }
         ]
@@ -973,7 +1021,7 @@ const SLIDE_TEMPLATES = [
                 type: 'text',
                 x_percent: 5, y_percent: 8,
                 width_percent: 90, height_percent: 10,
-                content: '## Exemple de code Python',
+                content: '## Intégration Grist API',
                 font_size: 32,
                 color: '#ffffff',
                 position: 'center'
@@ -981,19 +1029,19 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'code',
                 x_percent: 5, y_percent: 25,
-                width_percent: 90, height_percent: 35,
-                content: 'def hello_world():\n    print("Hello, Grist!")\n    return True\n\nhello_world()',
+                width_percent: 90, height_percent: 40,
+                content: '// Récupérer les données depuis Grist\ngrist.ready();\ngrist.onRecords(records => {\n  records.forEach(record => {\n    const value = grist.selectedRecord.get("column");\n    console.log(value);\n  });\n});',
                 font_size: 18,
                 color: '#00ff00',
                 position: 'center'
             },
             {
                 type: 'text',
-                x_percent: 5, y_percent: 70,
-                width_percent: 90, height_percent: 8,
-                content: 'Syntaxe colorée automatique avec highlight.js',
+                x_percent: 5, y_percent: 72,
+                width_percent: 90, height_percent: 10,
+                content: 'Syntaxe colorée automatique • Édition en temps réel',
                 font_size: 20,
-                color: '#aaaaaa',
+                color: '#888888',
                 position: 'center'
             }
         ]
@@ -1032,7 +1080,23 @@ const SLIDE_TEMPLATES = [
         components: [
             {
                 type: 'text',
-                x_percent: 25, y_percent: 12,
+                x_percent: 50, y_percent: 5,
+                width_percent: 90, height_percent: 8,
+                content: '## Transformation',
+                font_size: 32,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
+                type: 'shape',
+                x_percent: 50, y_percent: 50,
+                width_percent: 1, height_percent: 60,
+                color: '#444444',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 25, y_percent: 18,
                 width_percent: 35, height_percent: 10,
                 content: '### ❌ Avant',
                 font_size: 28,
@@ -1041,7 +1105,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'list',
-                x_percent: 10, y_percent: 30,
+                x_percent: 10, y_percent: 35,
                 width_percent: 35, height_percent: 40,
                 content: 'Processus manuel\nErreurs fréquentes\nPas de collaboration\nPas de traçabilité',
                 font_size: 20,
@@ -1050,7 +1114,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                x_percent: 75, y_percent: 12,
+                x_percent: 75, y_percent: 18,
                 width_percent: 35, height_percent: 10,
                 content: '### ✅ Après',
                 font_size: 28,
@@ -1059,7 +1123,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'list',
-                x_percent: 60, y_percent: 30,
+                x_percent: 60, y_percent: 35,
                 width_percent: 35, height_percent: 40,
                 content: 'Automatisation complète\nZéro erreur\nCollaboration temps réel\nHistorique complet',
                 font_size: 20,
@@ -1075,8 +1139,15 @@ const SLIDE_TEMPLATES = [
         background_color: '#667eea',
         components: [
             {
+                type: 'shape',
+                x_percent: 50, y_percent: 50,
+                width_percent: 65, height_percent: 45,
+                color: '#5568d3',
+                position: 'center'
+            },
+            {
                 type: 'text',
-                x_percent: 50, y_percent: 30,
+                x_percent: 50, y_percent: 32,
                 width_percent: 70, height_percent: 12,
                 content: '## Prêt à commencer ?',
                 font_size: 48,
@@ -1084,10 +1155,19 @@ const SLIDE_TEMPLATES = [
                 position: 'center'
             },
             {
+                type: 'text',
+                x_percent: 50, y_percent: 45,
+                width_percent: 60, height_percent: 8,
+                content: 'Créez des présentations professionnelles en quelques minutes',
+                font_size: 20,
+                color: '#e0e7ff',
+                position: 'center'
+            },
+            {
                 type: 'button',
-                x_percent: 50, y_percent: 55,
-                width_percent: 25, height_percent: 10,
-                content: 'Démarrer maintenant',
+                x_percent: 50, y_percent: 60,
+                width_percent: 28, height_percent: 11,
+                content: '🚀 Démarrer maintenant',
                 color: '#ffffff',
                 background: '#4CAF50',
                 url: 'https://grist.com',
@@ -1095,11 +1175,11 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 75,
+                x_percent: 50, y_percent: 78,
                 width_percent: 60, height_percent: 8,
                 content: 'Gratuit pour toujours • Aucune carte bancaire requise',
-                font_size: 18,
-                color: '#e0e7ff',
+                font_size: 16,
+                color: '#b8c5f2',
                 position: 'center'
             }
         ]
@@ -1121,18 +1201,50 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'chart',
-                x_percent: 50, y_percent: 50,
-                width_percent: 80, height_percent: 60,
+                x_percent: 50, y_percent: 48,
+                width_percent: 75, height_percent: 50,
                 color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'shape',
+                x_percent: 15, y_percent: 28,
+                width_percent: 18, height_percent: 10,
+                color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 15, y_percent: 28,
+                width_percent: 18, height_percent: 10,
+                content: '📈 +150%',
+                font_size: 28,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
+                type: 'shape',
+                x_percent: 85, y_percent: 28,
+                width_percent: 18, height_percent: 10,
+                color: '#2196F3',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 85, y_percent: 28,
+                width_percent: 18, height_percent: 10,
+                content: '👥 10K+',
+                font_size: 28,
+                color: '#ffffff',
                 position: 'center'
             },
             {
                 type: 'text',
                 x_percent: 50, y_percent: 85,
                 width_percent: 80, height_percent: 8,
-                content: '+150% de croissance cette année',
-                font_size: 20,
-                color: '#4CAF50',
+                content: 'Performance exceptionnelle • Croissance soutenue',
+                font_size: 18,
+                color: '#888888',
                 position: 'center'
             }
         ]
@@ -1147,18 +1259,38 @@ const SLIDE_TEMPLATES = [
                 type: 'text',
                 x_percent: 50, y_percent: 5,
                 width_percent: 90, height_percent: 8,
-                content: '## 11 types de composants',
-                font_size: 32,
+                content: '## 11 types de composants disponibles',
+                font_size: 28,
                 color: '#ffffff',
                 position: 'center'
             },
-            { type: 'text', x_percent: 15, y_percent: 20, width_percent: 20, height_percent: 6, content: 'Texte', font_size: 16, color: '#4CAF50', position: 'center' },
-            { type: 'shape', x_percent: 15, y_percent: 30, width_percent: 10, height_percent: 8, color: '#2196F3', position: 'center' },
-            { type: 'list', x_percent: 40, y_percent: 25, width_percent: 20, height_percent: 15, content: 'Item 1\nItem 2\nItem 3', font_size: 14, color: '#ffffff', position: 'center' },
-            { type: 'button', x_percent: 70, y_percent: 27, width_percent: 15, height_percent: 7, content: 'Bouton', color: '#ffffff', background: '#F44336', position: 'center' },
-            { type: 'code', x_percent: 15, y_percent: 50, width_percent: 35, height_percent: 20, content: '// Code\nconst x = 42;', font_size: 12, color: '#00ff00', position: 'center' },
-            { type: 'quote', x_percent: 60, y_percent: 55, width_percent: 35, height_percent: 15, content: '"Citation"', font_size: 14, color: '#FFC107', position: 'center' },
-            { type: 'table', x_percent: 30, y_percent: 80, width_percent: 40, height_percent: 15, color: '#9C27B0', position: 'center' }
+            // Ligne 1: Texte, Shape, Liste
+            { type: 'text', x_percent: 15, y_percent: 22, width_percent: 20, height_percent: 8, content: '📝 Texte riche', font_size: 18, color: '#4CAF50', position: 'center' },
+            { type: 'shape', x_percent: 40, y_percent: 22, width_percent: 12, height_percent: 10, color: '#2196F3', position: 'center' },
+            { type: 'text', x_percent: 40, y_percent: 22, width_percent: 12, height_percent: 10, content: '🔲 Shape', font_size: 14, color: '#ffffff', position: 'center' },
+            { type: 'list', x_percent: 70, y_percent: 20, width_percent: 22, height_percent: 12, content: '📋 Liste\n• Item 1\n• Item 2', font_size: 14, color: '#FFC107', position: 'left' },
+            // Ligne 2: Bouton, Code, Quote
+            { type: 'button', x_percent: 15, y_percent: 42, width_percent: 18, height_percent: 8, content: '🔘 Bouton CTA', color: '#ffffff', background: '#F44336', position: 'center' },
+            { type: 'code', x_percent: 40, y_percent: 40, width_percent: 22, height_percent: 12, content: '💻 Code\nconst x = 42;\nreturn x;', font_size: 12, color: '#00ff00', position: 'center' },
+            { type: 'quote', x_percent: 72, y_percent: 42, width_percent: 24, height_percent: 10, content: '💬 "Citation inspirante"', font_size: 14, color: '#9C27B0', position: 'center' },
+            // Ligne 3: Image, Video, Chart, Table
+            { type: 'image', x_percent: 12, y_percent: 62, width_percent: 15, height_percent: 18, url: '', position: 'center' },
+            { type: 'text', x_percent: 12, y_percent: 67, width_percent: 15, height_percent: 8, content: '🖼️ Image', font_size: 14, color: '#888888', position: 'center' },
+            { type: 'video', x_percent: 32, y_percent: 62, width_percent: 15, height_percent: 18, url: '', position: 'center' },
+            { type: 'text', x_percent: 32, y_percent: 67, width_percent: 15, height_percent: 8, content: '📹 Vidéo', font_size: 14, color: '#888888', position: 'center' },
+            { type: 'chart', x_percent: 52, y_percent: 62, width_percent: 15, height_percent: 18, color: '#4CAF50', position: 'center' },
+            { type: 'text', x_percent: 52, y_percent: 67, width_percent: 15, height_percent: 8, content: '📊 Chart', font_size: 14, color: '#888888', position: 'center' },
+            { type: 'table', x_percent: 72, y_percent: 62, width_percent: 15, height_percent: 18, color: '#2196F3', position: 'center' },
+            { type: 'text', x_percent: 72, y_percent: 67, width_percent: 15, height_percent: 8, content: '📋 Table', font_size: 14, color: '#888888', position: 'center' },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 88,
+                width_percent: 80, height_percent: 6,
+                content: 'Chaque composant est entièrement personnalisable',
+                font_size: 16,
+                color: '#666666',
+                position: 'center'
+            }
         ]
     },
     {
@@ -1209,17 +1341,73 @@ const SLIDE_TEMPLATES = [
                 color: '#ffffff',
                 position: 'center'
             },
+            // Étape 1
             { type: 'shape', x_percent: 17, y_percent: 35, width_percent: 12, height_percent: 17, color: '#4CAF50', position: 'center' },
             { type: 'text', x_percent: 17, y_percent: 38, width_percent: 12, height_percent: 8, content: '1', font_size: 48, color: '#ffffff', position: 'center' },
             { type: 'text', x_percent: 17, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Créer\n\nAjoutez votre contenu dans Grist', font_size: 18, color: '#ffffff', position: 'center' },
-
+            // Flèche 1→2
+            { type: 'text', x_percent: 33, y_percent: 43, width_percent: 8, height_percent: 6, content: '→', font_size: 40, color: '#888888', position: 'center' },
+            // Étape 2
             { type: 'shape', x_percent: 50, y_percent: 35, width_percent: 12, height_percent: 17, color: '#2196F3', position: 'center' },
             { type: 'text', x_percent: 50, y_percent: 38, width_percent: 12, height_percent: 8, content: '2', font_size: 48, color: '#ffffff', position: 'center' },
             { type: 'text', x_percent: 50, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Éditer\n\nPersonnalisez avec l\'éditeur visuel', font_size: 18, color: '#ffffff', position: 'center' },
-
+            // Flèche 2→3
+            { type: 'text', x_percent: 66, y_percent: 43, width_percent: 8, height_percent: 6, content: '→', font_size: 40, color: '#888888', position: 'center' },
+            // Étape 3
             { type: 'shape', x_percent: 83, y_percent: 35, width_percent: 12, height_percent: 17, color: '#F44336', position: 'center' },
             { type: 'text', x_percent: 83, y_percent: 38, width_percent: 12, height_percent: 8, content: '3', font_size: 48, color: '#ffffff', position: 'center' },
             { type: 'text', x_percent: 83, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Présenter\n\nAffichez votre présentation', font_size: 18, color: '#ffffff', position: 'center' }
+        ]
+    },
+    {
+        name: '🙏 Page de conclusion',
+        description: 'Merci et contact',
+        layout: 'content',
+        background_color: '#667eea',
+        components: [
+            {
+                type: 'shape',
+                x_percent: 50, y_percent: 25,
+                width_percent: 20, height_percent: 3,
+                color: '#ffd700',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 38,
+                width_percent: 70, height_percent: 12,
+                content: '## Merci !',
+                font_size: 56,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 55,
+                width_percent: 60, height_percent: 8,
+                content: 'Créez vos présentations dès maintenant',
+                font_size: 24,
+                color: '#e0e7ff',
+                position: 'center'
+            },
+            {
+                type: 'list',
+                x_percent: 50, y_percent: 70,
+                width_percent: 50, height_percent: 15,
+                content: '📧 contact@example.com\n🌐 grist.com\n💬 @GristLabs',
+                font_size: 18,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 90,
+                width_percent: 60, height_percent: 6,
+                content: 'Propulsé par Grist + Reveal.js + Fabric.js',
+                font_size: 14,
+                color: '#b8c5f2',
+                position: 'center'
+            }
         ]
     }
 ];
