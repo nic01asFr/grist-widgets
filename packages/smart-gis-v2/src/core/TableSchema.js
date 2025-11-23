@@ -62,39 +62,48 @@ export async function ensureTableColumns(docApi, tableName, schema = GIS_WORKSPA
   const errors = [];
 
   try {
+    console.log(`[TableSchema] 🔍 Checking columns for table: ${tableName}`);
+
+    if (!docApi) {
+      throw new Error('docApi is null or undefined');
+    }
+
     // Get existing columns
     const existingColumns = await getTableColumns(docApi, tableName);
 
     console.log(`[TableSchema] Existing columns in ${tableName}:`, existingColumns);
+    console.log(`[TableSchema] Required columns:`, schema.columns.map(c => c.id));
 
     // Add missing columns
     for (const col of schema.columns) {
       if (!existingColumns.includes(col.id)) {
+        console.log(`[TableSchema] ⏳ Adding missing column: ${col.id} (${col.type})`);
         try {
+          // Simple AddColumn without options first
           await docApi.applyUserActions([
-            ['AddColumn', tableName, col.id, {
-              type: col.type,
-              label: col.label || col.id
-            }]
+            ['AddColumn', tableName, col.id, { type: col.type }]
           ]);
           added.push(col.id);
-          console.log(`[TableSchema] ✓ Added column: ${col.id}`);
+          console.log(`[TableSchema] ✓ Successfully added column: ${col.id}`);
         } catch (err) {
           errors.push(`${col.id}: ${err.message}`);
           console.error(`[TableSchema] ✗ Failed to add column ${col.id}:`, err);
+          console.error(`[TableSchema] Error details:`, err);
         }
+      } else {
+        console.log(`[TableSchema] ✓ Column already exists: ${col.id}`);
       }
     }
 
     if (added.length > 0) {
-      console.log(`[TableSchema] Added ${added.length} columns to ${tableName}`);
+      console.log(`[TableSchema] ✅ Added ${added.length} columns to ${tableName}:`, added);
     } else {
-      console.log(`[TableSchema] All columns already exist in ${tableName}`);
+      console.log(`[TableSchema] ✅ All columns already exist in ${tableName}`);
     }
 
     return { added, errors };
   } catch (error) {
-    console.error('[TableSchema] Error ensuring table columns:', error);
+    console.error('[TableSchema] ❌ Error ensuring table columns:', error);
     return { added, errors: [error.message] };
   }
 }
