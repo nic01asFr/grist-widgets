@@ -886,11 +886,13 @@ function initializeRevealJS() {
             transition: 'slide',
             keyboard: true,
             overview: true,
-            center: true,
+            center: false,  // Désactivé pour correspondance exacte avec l'éditeur
             touch: true,
             controls: true,
             progress: true,
-            margin: 0.04,
+            margin: 0,      // Pas de marge pour correspondance exacte avec l'éditeur
+            width: 960,     // Dimensions exactes
+            height: 700,    // Dimensions exactes
             minScale: 0.2,
             maxScale: 2.0
         });
