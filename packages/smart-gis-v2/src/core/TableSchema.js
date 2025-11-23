@@ -7,19 +7,101 @@
 
 /**
  * Schéma standard pour GIS_WorkSpace
+ *
  * Colonnes essentielles pour stocker les données géographiques
+ * Utilise les fonctions ST_* de Grist pour tous les calculs géométriques
+ *
+ * Voir: https://github.com/nic01asFr/grist-core/tree/feature/sqlite-extensions
  */
 export const GIS_WORKSPACE_SCHEMA = {
   tableName: 'GIS_WorkSpace',
   columns: [
+    // === Données de base ===
     { id: 'layer_name', type: 'Text', label: 'Layer Name' },
     { id: 'geometry_wgs84', type: 'Text', label: 'Geometry (WKT)' },
     { id: 'properties', type: 'Text', label: 'Properties (JSON)' },
-    { id: 'geometry_type', type: 'Text', label: 'Geometry Type' },
-    { id: 'is_visible', type: 'Bool', label: 'Visible' },
-    { id: 'z_index', type: 'Int', label: 'Z-Index' },
     { id: 'feature_name', type: 'Text', label: 'Feature Name' },
-    { id: 'import_session', type: 'Int', label: 'Import Session' }
+    { id: 'import_session', type: 'Int', label: 'Import Session' },
+
+    // === Colonnes calculées (formules Grist ST_*) ===
+    // Ces colonnes utilisent les fonctions géospatiales de Grist
+    // Le widget les LIT, ne les CALCULE PAS
+
+    // Type de géométrie (calculé par ST_*)
+    {
+      id: 'geometry_type',
+      type: 'Text',
+      label: 'Geometry Type',
+      formula: 'GEOMETRY_TYPE($geometry_wgs84)'
+    },
+
+    // Centroïde (point central)
+    {
+      id: 'centroid',
+      type: 'Text',
+      label: 'Centroid (WKT)',
+      formula: 'ST_CENTROID($geometry_wgs84)'
+    },
+
+    // Latitude du centroïde
+    {
+      id: 'center_lat',
+      type: 'Numeric',
+      label: 'Center Latitude',
+      formula: 'ST_Y(ST_CENTROID($geometry_wgs84))'
+    },
+
+    // Longitude du centroïde
+    {
+      id: 'center_lon',
+      type: 'Numeric',
+      label: 'Center Longitude',
+      formula: 'ST_X(ST_CENTROID($geometry_wgs84))'
+    },
+
+    // Aire (km²) - pour polygones
+    {
+      id: 'area_km2',
+      type: 'Numeric',
+      label: 'Area (km²)',
+      formula: 'ST_AREA($geometry_wgs84, "km2") if GEOMETRY_TYPE($geometry_wgs84) in ["Polygon", "MultiPolygon"] else None'
+    },
+
+    // Périmètre (km) - pour polygones
+    {
+      id: 'perimeter_km',
+      type: 'Numeric',
+      label: 'Perimeter (km)',
+      formula: 'ST_PERIMETER($geometry_wgs84, "km") if GEOMETRY_TYPE($geometry_wgs84) in ["Polygon", "MultiPolygon"] else None'
+    },
+
+    // Longueur (km) - pour lignes
+    {
+      id: 'length_km',
+      type: 'Numeric',
+      label: 'Length (km)',
+      formula: 'ST_LENGTH($geometry_wgs84, "km") if GEOMETRY_TYPE($geometry_wgs84) in ["LineString", "MultiLineString"] else None'
+    },
+
+    // Validation géométrie
+    {
+      id: 'is_valid_geom',
+      type: 'Bool',
+      label: 'Valid Geometry',
+      formula: 'IS_VALID($geometry_wgs84)'
+    },
+
+    // GeoJSON (pour export/API)
+    {
+      id: 'geojson',
+      type: 'Text',
+      label: 'GeoJSON',
+      formula: 'ST_AsGeoJSON($geometry_wgs84)'
+    },
+
+    // === Affichage et style ===
+    { id: 'is_visible', type: 'Bool', label: 'Visible' },
+    { id: 'z_index', type: 'Int', label: 'Z-Index' }
   ]
 };
 
@@ -79,10 +161,20 @@ export async function ensureTableColumns(docApi, tableName, schema = GIS_WORKSPA
       if (!existingColumns.includes(col.id)) {
         console.log(`[TableSchema] ⏳ Adding missing column: ${col.id} (${col.type})`);
         try {
-          // Simple AddColumn without options first
+          // Préparer les options de colonne
+          const colInfo = { type: col.type };
+
+          // Ajouter la formule si elle existe (pour colonnes calculées ST_*)
+          if (col.formula) {
+            colInfo.formula = col.formula;
+            console.log(`[TableSchema]   → With formula: ${col.formula}`);
+          }
+
+          // Créer la colonne
           await docApi.applyUserActions([
-            ['AddColumn', tableName, col.id, { type: col.type }]
+            ['AddColumn', tableName, col.id, colInfo]
           ]);
+
           added.push(col.id);
           console.log(`[TableSchema] ✓ Successfully added column: ${col.id}`);
         } catch (err) {
