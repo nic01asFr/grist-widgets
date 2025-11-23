@@ -917,309 +917,599 @@ window.saveButtonEdit = async function() {
 };
 
 // ========================================
-// TEMPLATES
-// ========================================
+// TEMPLATES DEMONSTRATION COMPLETE
+// Démontre TOUS les layouts et TOUS les composants
 const SLIDE_TEMPLATES = [
+    // ========================================
+    // 1. LAYOUT: TITLE
+    // ========================================
     {
-        name: '🎬 Page de titre',
-        description: 'Titre principal avec sous-titre',
-        layout: 'content',
+        name: '1️⃣ Layout: Title',
+        description: 'Layout page de titre',
+        layout: 'title',
         background_color: '#667eea',
         components: [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 35,
-                width_percent: 70, height_percent: 15,
-                content: 'Grist Reveal.js Builder',
+                width_percent: 80, height_percent: 18,
+                content: '# Démonstration Complète',
+                font_size: 64,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 65,
+                width_percent: 70, height_percent: 12,
+                content: '9 Layouts • 11 Composants • 9 Positions',
+                font_size: 28,
+                color: '#e0e7ff',
+                position: 'center'
+            }
+        ]
+    },
+
+    // ========================================
+    // 2. LAYOUT: CONTENT
+    // ========================================
+    {
+        name: '2️⃣ Layout: Content',
+        description: 'Layout contenu simple',
+        layout: 'content',
+        background_color: '#2a2a2a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 20,
+                width_percent: 90, height_percent: 12,
+                content: '## Layout: Content',
+                font_size: 36,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 50,
+                width_percent: 80, height_percent: 30,
+                content: 'Ce layout permet un contenu centré simple.\n\nIdéal pour un message unique et percutant.',
+                font_size: 24,
+                color: '#cccccc',
+                position: 'center'
+            }
+        ]
+    },
+
+    // ========================================
+    // 3. LAYOUT: TWO-COLUMN
+    // ========================================
+    {
+        name: '3️⃣ Layout: Two-Column',
+        description: 'Layout deux colonnes',
+        layout: 'two-column',
+        background_color: '#1a1a1a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 10,
+                width_percent: 90, height_percent: 10,
+                content: '## Layout: Two-Column',
+                font_size: 32,
+                color: '#ffffff',
+                position: 'center'
+            },
+            // Colonne gauche
+            {
+                type: 'text',
+                x_percent: 25, y_percent: 28,
+                width_percent: 40, height_percent: 8,
+                content: '### Colonne Gauche',
+                font_size: 24,
+                color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'list',
+                x_percent: 10, y_percent: 45,
+                width_percent: 35, height_percent: 40,
+                content: '✓ Point 1\n✓ Point 2\n✓ Point 3\n✓ Point 4\n✓ Point 5',
+                font_size: 20,
+                color: '#cccccc',
+                position: 'left'
+            },
+            // Colonne droite
+            {
+                type: 'text',
+                x_percent: 75, y_percent: 28,
+                width_percent: 40, height_percent: 8,
+                content: '### Colonne Droite',
+                font_size: 24,
+                color: '#2196F3',
+                position: 'center'
+            },
+            {
+                type: 'chart',
+                x_percent: 75, y_percent: 60,
+                width_percent: 35, height_percent: 35,
+                color: '#2196F3',
+                position: 'center'
+            }
+        ]
+    },
+
+    // ========================================
+    // 4. LAYOUT: THREE-COLUMN
+    // ========================================
+    {
+        name: '4️⃣ Layout: Three-Column',
+        description: 'Layout trois colonnes',
+        layout: 'three-column',
+        background_color: '#2a2a2a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 8,
+                width_percent: 90, height_percent: 8,
+                content: '## Layout: Three-Column',
+                font_size: 28,
+                color: '#ffffff',
+                position: 'center'
+            },
+            // Colonne 1
+            {
+                type: 'shape',
+                x_percent: 17, y_percent: 32,
+                width_percent: 18, height_percent: 20,
+                color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 17, y_percent: 35,
+                width_percent: 18, height_percent: 10,
+                content: '1',
                 font_size: 56,
                 color: '#ffffff',
                 position: 'center'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 55,
-                width_percent: 60, height_percent: 10,
-                content: 'Créez des présentations interactives directement dans Grist',
-                font_size: 24,
-                color: '#e0e7ff',
-                position: 'center'
-            }
-        ]
-    },
-    {
-        name: '💬 Citation inspirante',
-        description: 'Grande citation avec auteur',
-        layout: 'content',
-        background_color: '#1a1a1a',
-        components: [
-            {
-                type: 'quote',
-                x_percent: 50, y_percent: 45,
-                width_percent: 70, height_percent: 20,
-                content: '"La simplicité est la sophistication suprême."\n\n— Leonardo da Vinci',
-                font_size: 32,
-                color: '#4CAF50',
-                position: 'center'
-            }
-        ]
-    },
-    {
-        name: '💻 Code avec explication',
-        description: 'Bloc de code et texte explicatif',
-        layout: 'content',
-        background_color: '#2a2a2a',
-        components: [
-            {
-                type: 'text',
-                x_percent: 5, y_percent: 8,
-                width_percent: 90, height_percent: 10,
-                content: '## Exemple de code Python',
-                font_size: 32,
-                color: '#ffffff',
-                position: 'center'
-            },
-            {
-                type: 'code',
-                x_percent: 5, y_percent: 25,
-                width_percent: 90, height_percent: 35,
-                content: 'def hello_world():\n    print("Hello, Grist!")\n    return True\n\nhello_world()',
+                x_percent: 17, y_percent: 60,
+                width_percent: 25, height_percent: 18,
+                content: '### Créer\n\nAjoutez contenu',
                 font_size: 18,
-                color: '#00ff00',
+                color: '#cccccc',
+                position: 'center'
+            },
+            // Colonne 2
+            {
+                type: 'shape',
+                x_percent: 50, y_percent: 32,
+                width_percent: 18, height_percent: 20,
+                color: '#2196F3',
                 position: 'center'
             },
             {
                 type: 'text',
-                x_percent: 5, y_percent: 70,
-                width_percent: 90, height_percent: 8,
-                content: 'Syntaxe colorée automatique avec highlight.js',
-                font_size: 20,
-                color: '#aaaaaa',
-                position: 'center'
-            }
-        ]
-    },
-    {
-        name: '📋 Liste de fonctionnalités',
-        description: 'Titre et liste à puces',
-        layout: 'content',
-        background_color: '#764ba2',
-        components: [
-            {
-                type: 'text',
-                x_percent: 10, y_percent: 10,
-                width_percent: 80, height_percent: 12,
-                content: '## Fonctionnalités principales',
-                font_size: 40,
+                x_percent: 50, y_percent: 35,
+                width_percent: 18, height_percent: 10,
+                content: '2',
+                font_size: 56,
                 color: '#ffffff',
                 position: 'center'
             },
             {
-                type: 'list',
-                x_percent: 15, y_percent: 35,
-                width_percent: 70, height_percent: 50,
-                content: '11 types de composants disponibles\nPositionnement précis en pourcentages\nÉdition visuelle avec Fabric.js\nSynchronisation temps réel avec Grist\nExport en présentation Reveal.js\nSupport des animations et transitions',
-                font_size: 24,
-                color: '#ffffff',
-                position: 'center'
-            }
-        ]
-    },
-    {
-        name: '🔄 Deux colonnes comparaison',
-        description: 'Avant/Après ou comparaison',
-        layout: 'content',
-        background_color: '#1a1a1a',
-        components: [
-            {
                 type: 'text',
-                x_percent: 25, y_percent: 12,
-                width_percent: 35, height_percent: 10,
-                content: '### ❌ Avant',
-                font_size: 28,
+                x_percent: 50, y_percent: 60,
+                width_percent: 25, height_percent: 18,
+                content: '### Éditer\n\nPersonnalisez',
+                font_size: 18,
+                color: '#cccccc',
+                position: 'center'
+            },
+            // Colonne 3
+            {
+                type: 'shape',
+                x_percent: 83, y_percent: 32,
+                width_percent: 18, height_percent: 20,
                 color: '#F44336',
                 position: 'center'
             },
             {
-                type: 'list',
-                x_percent: 10, y_percent: 30,
-                width_percent: 35, height_percent: 40,
-                content: 'Processus manuel\nErreurs fréquentes\nPas de collaboration\nPas de traçabilité',
-                font_size: 20,
-                color: '#ffcccc',
-                position: 'left'
-            },
-            {
                 type: 'text',
-                x_percent: 75, y_percent: 12,
-                width_percent: 35, height_percent: 10,
-                content: '### ✅ Après',
-                font_size: 28,
-                color: '#4CAF50',
+                x_percent: 83, y_percent: 35,
+                width_percent: 18, height_percent: 10,
+                content: '3',
+                font_size: 56,
+                color: '#ffffff',
                 position: 'center'
             },
             {
-                type: 'list',
-                x_percent: 60, y_percent: 30,
-                width_percent: 35, height_percent: 40,
-                content: 'Automatisation complète\nZéro erreur\nCollaboration temps réel\nHistorique complet',
-                font_size: 20,
-                color: '#ccffcc',
-                position: 'right'
+                type: 'text',
+                x_percent: 83, y_percent: 60,
+                width_percent: 25, height_percent: 18,
+                content: '### Présenter\n\nAffichez',
+                font_size: 18,
+                color: '#cccccc',
+                position: 'center'
             }
         ]
     },
+
+    // ========================================
+    // 5. LAYOUT: SIDEBAR-LEFT
+    // ========================================
     {
-        name: '🎯 Call-to-Action',
-        description: 'CTA avec bouton',
-        layout: 'content',
-        background_color: '#667eea',
+        name: '5️⃣ Layout: Sidebar-Left',
+        description: 'Layout sidebar gauche',
+        layout: 'sidebar-left',
+        background_color: '#1a1a1a',
         components: [
             {
                 type: 'text',
-                x_percent: 50, y_percent: 30,
-                width_percent: 70, height_percent: 12,
-                content: '## Prêt à commencer ?',
-                font_size: 48,
+                x_percent: 50, y_percent: 8,
+                width_percent: 90, height_percent: 8,
+                content: '## Layout: Sidebar-Left',
+                font_size: 28,
                 color: '#ffffff',
+                position: 'center'
+            },
+            // Sidebar gauche
+            {
+                type: 'shape',
+                x_percent: 18, y_percent: 50,
+                width_percent: 28, height_percent: 68,
+                color: '#2a2a2a',
                 position: 'center'
             },
             {
-                type: 'button',
-                x_percent: 50, y_percent: 55,
-                width_percent: 25, height_percent: 10,
-                content: 'Démarrer maintenant',
-                color: '#ffffff',
-                background: '#4CAF50',
-                url: 'https://grist.com',
-                position: 'center'
+                type: 'list',
+                x_percent: 18, y_percent: 50,
+                width_percent: 25, height_percent: 60,
+                content: '📌 Navigation\n\n• Section 1\n• Section 2\n• Section 3\n• Section 4\n• Section 5',
+                font_size: 16,
+                color: '#4CAF50',
+                position: 'left'
             },
+            // Contenu principal
             {
                 type: 'text',
-                x_percent: 50, y_percent: 75,
-                width_percent: 60, height_percent: 8,
-                content: 'Gratuit pour toujours • Aucune carte bancaire requise',
-                font_size: 18,
-                color: '#e0e7ff',
-                position: 'center'
+                x_percent: 65, y_percent: 38,
+                width_percent: 55, height_percent: 50,
+                content: '### Contenu Principal\n\nLe sidebar à gauche peut contenir un menu, une table des matières, ou des informations contextuelles.\n\nLe contenu principal occupe l\'espace restant.',
+                font_size: 20,
+                color: '#cccccc',
+                position: 'left'
             }
         ]
     },
+
+    // ========================================
+    // 6. LAYOUT: SIDEBAR-RIGHT
+    // ========================================
     {
-        name: '📊 Données et graphique',
-        description: 'Espace pour graphique et texte',
-        layout: 'content',
+        name: '6️⃣ Layout: Sidebar-Right',
+        description: 'Layout sidebar droite',
+        layout: 'sidebar-right',
         background_color: '#2a2a2a',
         components: [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 10,
-                content: '## Croissance utilisateurs 2024',
-                font_size: 36,
+                width_percent: 90, height_percent: 8,
+                content: '## Layout: Sidebar-Right',
+                font_size: 28,
                 color: '#ffffff',
                 position: 'center'
             },
+            // Contenu principal (code)
             {
-                type: 'chart',
-                x_percent: 50, y_percent: 50,
-                width_percent: 80, height_percent: 60,
-                color: '#4CAF50',
+                type: 'code',
+                x_percent: 32, y_percent: 45,
+                width_percent: 52, height_percent: 55,
+                content: '// Exemple d\'intégration\ngrist.ready();\n\ngrist.onRecords(records => {\n  records.forEach(rec => {\n    const data = rec.fields;\n    processData(data);\n  });\n});\n\nfunction processData(data) {\n  console.log(data);\n}',
+                font_size: 16,
+                color: '#00ff00',
+                position: 'center'
+            },
+            // Sidebar droite
+            {
+                type: 'shape',
+                x_percent: 82, y_percent: 50,
+                width_percent: 28, height_percent: 68,
+                color: '#1a1a1a',
                 position: 'center'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 85,
-                width_percent: 80, height_percent: 8,
-                content: '+150% de croissance cette année',
-                font_size: 20,
-                color: '#4CAF50',
-                position: 'center'
+                x_percent: 82, y_percent: 50,
+                width_percent: 25, height_percent: 60,
+                content: '💡 Notes\n\nLe sidebar à droite est parfait pour:\n\n• Annotations\n• Explications\n• Références\n• Liens utiles',
+                font_size: 15,
+                color: '#FFC107',
+                position: 'left'
             }
         ]
     },
+
+    // ========================================
+    // 7. LAYOUT: GRID-2X2
+    // ========================================
     {
-        name: '🎨 Showcase composants',
-        description: 'Démo de tous les types',
-        layout: 'content',
+        name: '7️⃣ Layout: Grid-2x2',
+        description: 'Layout grille 2x2',
+        layout: 'grid-2x2',
         background_color: '#1a1a1a',
         components: [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 5,
-                width_percent: 90, height_percent: 8,
-                content: '## 11 types de composants',
-                font_size: 32,
+                width_percent: 90, height_percent: 6,
+                content: '## Layout: Grid-2x2',
+                font_size: 24,
                 color: '#ffffff',
                 position: 'center'
             },
-            { type: 'text', x_percent: 15, y_percent: 20, width_percent: 20, height_percent: 6, content: 'Texte', font_size: 16, color: '#4CAF50', position: 'center' },
-            { type: 'shape', x_percent: 15, y_percent: 30, width_percent: 10, height_percent: 8, color: '#2196F3', position: 'center' },
-            { type: 'list', x_percent: 40, y_percent: 25, width_percent: 20, height_percent: 15, content: 'Item 1\nItem 2\nItem 3', font_size: 14, color: '#ffffff', position: 'center' },
-            { type: 'button', x_percent: 70, y_percent: 27, width_percent: 15, height_percent: 7, content: 'Bouton', color: '#ffffff', background: '#F44336', position: 'center' },
-            { type: 'code', x_percent: 15, y_percent: 50, width_percent: 35, height_percent: 20, content: '// Code\nconst x = 42;', font_size: 12, color: '#00ff00', position: 'center' },
-            { type: 'quote', x_percent: 60, y_percent: 55, width_percent: 35, height_percent: 15, content: '"Citation"', font_size: 14, color: '#FFC107', position: 'center' },
-            { type: 'table', x_percent: 30, y_percent: 80, width_percent: 40, height_percent: 15, color: '#9C27B0', position: 'center' }
+            // Case 1 (top-left)
+            {
+                type: 'shape',
+                x_percent: 25, y_percent: 32,
+                width_percent: 40, height_percent: 32,
+                color: '#4CAF50',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 25, y_percent: 32,
+                width_percent: 35, height_percent: 28,
+                content: '📊\n\nGraphique\nCase 1',
+                font_size: 22,
+                color: '#ffffff',
+                position: 'center'
+            },
+            // Case 2 (top-right)
+            {
+                type: 'shape',
+                x_percent: 75, y_percent: 32,
+                width_percent: 40, height_percent: 32,
+                color: '#2196F3',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 75, y_percent: 32,
+                width_percent: 35, height_percent: 28,
+                content: '📈\n\nDonnées\nCase 2',
+                font_size: 22,
+                color: '#ffffff',
+                position: 'center'
+            },
+            // Case 3 (bottom-left)
+            {
+                type: 'shape',
+                x_percent: 25, y_percent: 72,
+                width_percent: 40, height_percent: 32,
+                color: '#F44336',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 25, y_percent: 72,
+                width_percent: 35, height_percent: 28,
+                content: '💻\n\nCode\nCase 3',
+                font_size: 22,
+                color: '#ffffff',
+                position: 'center'
+            },
+            // Case 4 (bottom-right)
+            {
+                type: 'shape',
+                x_percent: 75, y_percent: 72,
+                width_percent: 40, height_percent: 32,
+                color: '#FFC107',
+                position: 'center'
+            },
+            {
+                type: 'text',
+                x_percent: 75, y_percent: 72,
+                width_percent: 35, height_percent: 28,
+                content: '🎯\n\nRésultats\nCase 4',
+                font_size: 22,
+                color: '#ffffff',
+                position: 'center'
+            }
         ]
     },
+
+    // ========================================
+    // 8. LAYOUT: FULL
+    // ========================================
     {
-        name: '📹 Vidéo avec description',
-        description: 'Zone vidéo et texte',
-        layout: 'content',
+        name: '8️⃣ Layout: Full',
+        description: 'Layout plein écran',
+        layout: 'full',
         background_color: '#000000',
         components: [
             {
-                type: 'text',
-                x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 10,
-                content: '## Tutoriel vidéo',
-                font_size: 36,
-                color: '#ffffff',
-                position: 'center'
-            },
-            {
                 type: 'video',
-                x_percent: 50, y_percent: 45,
-                width_percent: 70, height_percent: 50,
+                x_percent: 50, y_percent: 50,
+                width_percent: 100, height_percent: 100,
                 url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
                 position: 'center'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 85,
-                width_percent: 70, height_percent: 8,
-                content: 'Apprenez à créer vos premières présentations',
+                x_percent: 50, y_percent: 92,
+                width_percent: 80, height_percent: 6,
+                content: 'Layout Full - Médias plein écran',
                 font_size: 20,
-                color: '#aaaaaa',
+                color: '#ffffff',
                 position: 'center'
             }
         ]
     },
+
+    // ========================================
+    // 9. LAYOUT: CUSTOM
+    // ========================================
     {
-        name: '🎓 Process en 3 étapes',
-        description: 'Timeline ou processus',
-        layout: 'content',
+        name: '9️⃣ Layout: Custom',
+        description: 'Layout personnalisé',
+        layout: 'custom',
         background_color: '#2a2a2a',
         components: [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 10,
-                content: '## Comment ça marche ?',
-                font_size: 36,
+                width_percent: 90, height_percent: 8,
+                content: '## Layout: Custom',
+                font_size: 28,
                 color: '#ffffff',
                 position: 'center'
             },
-            { type: 'shape', x_percent: 17, y_percent: 35, width_percent: 12, height_percent: 17, color: '#4CAF50', position: 'center' },
-            { type: 'text', x_percent: 17, y_percent: 38, width_percent: 12, height_percent: 8, content: '1', font_size: 48, color: '#ffffff', position: 'center' },
-            { type: 'text', x_percent: 17, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Créer\n\nAjoutez votre contenu dans Grist', font_size: 18, color: '#ffffff', position: 'center' },
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 45,
+                width_percent: 70, height_percent: 30,
+                content: 'Le layout custom permet une disposition totalement libre.\n\nVous positionnez chaque élément exactement où vous voulez.',
+                font_size: 22,
+                color: '#cccccc',
+                position: 'center'
+            }
+        ]
+    },
 
-            { type: 'shape', x_percent: 50, y_percent: 35, width_percent: 12, height_percent: 17, color: '#2196F3', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 38, width_percent: 12, height_percent: 8, content: '2', font_size: 48, color: '#ffffff', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Éditer\n\nPersonnalisez avec l\'éditeur visuel', font_size: 18, color: '#ffffff', position: 'center' },
+    // ========================================
+    // 10. TOUS LES 11 COMPOSANTS
+    // ========================================
+    {
+        name: '🎨 Tous les composants (1/2)',
+        description: '11 types de composants',
+        layout: 'content',
+        background_color: '#1a1a1a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 4,
+                width_percent: 90, height_percent: 6,
+                content: '## 11 Types de Composants Disponibles',
+                font_size: 24,
+                color: '#ffffff',
+                position: 'center'
+            },
+            // Ligne 1: Text, Image, Code, List
+            { type: 'text', x_percent: 12, y_percent: 18, width_percent: 18, height_percent: 8, content: '1. Text', font_size: 16, color: '#4CAF50', position: 'top-left' },
+            { type: 'shape', x_percent: 12, y_percent: 25, width_percent: 10, height_percent: 8, color: '#4CAF50', position: 'center' },
 
-            { type: 'shape', x_percent: 83, y_percent: 35, width_percent: 12, height_percent: 17, color: '#F44336', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 38, width_percent: 12, height_percent: 8, content: '3', font_size: 48, color: '#ffffff', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Présenter\n\nAffichez votre présentation', font_size: 18, color: '#ffffff', position: 'center' }
+            { type: 'text', x_percent: 31, y_percent: 18, width_percent: 18, height_percent: 8, content: '2. Image', font_size: 16, color: '#2196F3', position: 'top' },
+            { type: 'image', x_percent: 31, y_percent: 25, width_percent: 12, height_percent: 10, url: '', position: 'center' },
+
+            { type: 'text', x_percent: 50, y_percent: 18, width_percent: 18, height_percent: 8, content: '3. Code', font_size: 16, color: '#00ff00', position: 'top' },
+            { type: 'code', x_percent: 50, y_percent: 25, width_percent: 18, height_percent: 10, content: '// JS\nconst x=1;', font_size: 10, color: '#00ff00', position: 'center' },
+
+            { type: 'text', x_percent: 72, y_percent: 18, width_percent: 18, height_percent: 8, content: '4. List', font_size: 16, color: '#FFC107', position: 'top-right' },
+            { type: 'list', x_percent: 72, y_percent: 25, width_percent: 16, height_percent: 10, content: '• A\n• B\n• C', font_size: 12, color: '#FFC107', position: 'left' },
+
+            // Ligne 2: Table, Quote, Video, Iframe
+            { type: 'text', x_percent: 12, y_percent: 42, width_percent: 18, height_percent: 8, content: '5. Table', font_size: 16, color: '#9C27B0', position: 'left' },
+            { type: 'table', x_percent: 12, y_percent: 49, width_percent: 14, height_percent: 12, color: '#9C27B0', position: 'center' },
+
+            { type: 'text', x_percent: 31, y_percent: 42, width_percent: 18, height_percent: 8, content: '6. Quote', font_size: 16, color: '#E91E63', position: 'center' },
+            { type: 'quote', x_percent: 31, y_percent: 49, width_percent: 18, height_percent: 12, content: '"Citation"', font_size: 12, color: '#E91E63', position: 'center' },
+
+            { type: 'text', x_percent: 50, y_percent: 42, width_percent: 18, height_percent: 8, content: '7. Video', font_size: 16, color: '#FF5722', position: 'center' },
+            { type: 'video', x_percent: 50, y_percent: 49, width_percent: 16, height_percent: 12, url: '', position: 'center' },
+
+            { type: 'text', x_percent: 72, y_percent: 42, width_percent: 18, height_percent: 8, content: '8. Iframe', font_size: 16, color: '#3F51B5', position: 'right' },
+            { type: 'iframe', x_percent: 72, y_percent: 49, width_percent: 16, height_percent: 12, url: 'https://example.com', position: 'center' },
+
+            // Ligne 3: Chart, Shape, Button
+            { type: 'text', x_percent: 25, y_percent: 70, width_percent: 18, height_percent: 8, content: '9. Chart', font_size: 16, color: '#009688', position: 'bottom-left' },
+            { type: 'chart', x_percent: 25, y_percent: 80, width_percent: 16, height_percent: 14, color: '#009688', position: 'center' },
+
+            { type: 'text', x_percent: 50, y_percent: 70, width_percent: 18, height_percent: 8, content: '10. Shape', font_size: 16, color: '#607D8B', position: 'bottom' },
+            { type: 'shape', x_percent: 50, y_percent: 80, width_percent: 12, height_percent: 10, color: '#607D8B', position: 'center' },
+
+            { type: 'text', x_percent: 75, y_percent: 70, width_percent: 18, height_percent: 8, content: '11. Button', font_size: 16, color: '#F44336', position: 'bottom-right' },
+            { type: 'button', x_percent: 75, y_percent: 80, width_percent: 18, height_percent: 9, content: 'Click!', color: '#ffffff', background: '#F44336', url: '', position: 'center' }
+        ]
+    },
+
+    // ========================================
+    // 11. DEMO DES 9 POSITIONS
+    // ========================================
+    {
+        name: '📍 Les 9 Positions',
+        description: 'Démonstration positions',
+        layout: 'content',
+        background_color: '#2a2a2a',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 5,
+                width_percent: 90, height_percent: 6,
+                content: '## 9 Positions Disponibles',
+                font_size: 24,
+                color: '#ffffff',
+                position: 'center'
+            },
+            // Grille 3x3 pour montrer les positions
+            { type: 'shape', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 18, color: '#F44336', position: 'center' },
+            { type: 'text', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-left', font_size: 16, color: '#ffffff', position: 'top-left' },
+
+            { type: 'shape', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 18, color: '#E91E63', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top', font_size: 16, color: '#ffffff', position: 'top' },
+
+            { type: 'shape', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 18, color: '#9C27B0', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-right', font_size: 16, color: '#ffffff', position: 'top-right' },
+
+            { type: 'shape', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 18, color: '#3F51B5', position: 'center' },
+            { type: 'text', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 18, content: 'left', font_size: 16, color: '#ffffff', position: 'left' },
+
+            { type: 'shape', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 18, color: '#2196F3', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 18, content: 'center', font_size: 16, color: '#ffffff', position: 'center' },
+
+            { type: 'shape', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 18, color: '#009688', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 18, content: 'right', font_size: 16, color: '#ffffff', position: 'right' },
+
+            { type: 'shape', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 18, color: '#4CAF50', position: 'center' },
+            { type: 'text', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-left', font_size: 16, color: '#ffffff', position: 'bottom-left' },
+
+            { type: 'shape', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 18, color: '#8BC34A', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom', font_size: 16, color: '#ffffff', position: 'bottom' },
+
+            { type: 'shape', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 18, color: '#FFC107', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-right', font_size: 16, color: '#ffffff', position: 'bottom-right' }
+        ]
+    },
+
+    // ========================================
+    // 12. PAGE DE FIN
+    // ========================================
+    {
+        name: '🏁 Fin de la démo',
+        description: 'Page de conclusion',
+        layout: 'title',
+        background_color: '#667eea',
+        components: [
+            {
+                type: 'text',
+                x_percent: 50, y_percent: 35,
+                width_percent: 80, height_percent: 18,
+                content: '## Démonstration Complète',
+                font_size: 56,
+                color: '#ffffff',
+                position: 'center'
+            },
+            {
+                type: 'list',
+                x_percent: 50, y_percent: 65,
+                width_percent: 60, height_percent: 20,
+                content: '✅ 9 Layouts différents\n✅ 11 Types de composants\n✅ 9 Positions disponibles\n✅ Personnalisation complète',
+                font_size: 20,
+                color: '#e0e7ff',
+                position: 'center'
+            }
         ]
     }
 ];
