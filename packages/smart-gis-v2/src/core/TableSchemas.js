@@ -175,14 +175,17 @@ export const SYSTEM_SCHEMAS = {
  */
 export async function getTableColumns(docApi, tableName) {
   try {
-    const tables = await docApi.fetchTable('_grist_Tables');
+    const tablesData = await docApi.fetchTable('_grist_Tables');
+    // Convert from columnar format { id: [...], tableId: [...] } to array of objects
+    const tables = convertColumnarToArray(tablesData);
     const table = tables.find(t => t.tableId === tableName);
 
     if (!table) {
       return [];
     }
 
-    const columns = await docApi.fetchTable('_grist_Tables_column');
+    const columnsData = await docApi.fetchTable('_grist_Tables_column');
+    const columns = convertColumnarToArray(columnsData);
     return columns
       .filter(col => col.parentId === table.id)
       .map(col => col.colId);
@@ -190,6 +193,35 @@ export async function getTableColumns(docApi, tableName) {
     console.error(`[TableSchemas] Error fetching columns for ${tableName}:`, error);
     return [];
   }
+}
+
+/**
+ * Convert columnar Grist data to array of objects
+ * Input:  { id: [1,2], tableId: ['A','B'] }
+ * Output: [{ id: 1, tableId: 'A' }, { id: 2, tableId: 'B' }]
+ */
+function convertColumnarToArray(data) {
+  if (!data || typeof data !== 'object') return [];
+  if (Array.isArray(data)) return data;
+
+  const columns = Object.keys(data);
+  if (columns.length === 0) return [];
+
+  const firstCol = data[columns[0]];
+  if (!Array.isArray(firstCol)) return [];
+
+  const rowCount = firstCol.length;
+  const result = [];
+
+  for (let i = 0; i < rowCount; i++) {
+    const row = {};
+    columns.forEach(col => {
+      row[col] = data[col][i];
+    });
+    result.push(row);
+  }
+
+  return result;
 }
 
 /**
@@ -300,7 +332,8 @@ export async function initializeSystemTables(docApi, tableNames = null) {
 
     try {
       // Check if table exists
-      const tables = await docApi.fetchTable('_grist_Tables');
+      const tablesData = await docApi.fetchTable('_grist_Tables');
+      const tables = convertColumnarToArray(tablesData);
       const tableExists = tables.some(t => t.tableId === tableName);
 
       if (!tableExists) {
