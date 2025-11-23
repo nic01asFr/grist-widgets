@@ -32,6 +32,16 @@ body {
     z-index: 1;
 }
 
+.reveal .slides {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 960px;
+    height: 700px;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%) scale(1.07571);
+}
+
 .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
     text-transform: none;
 }
