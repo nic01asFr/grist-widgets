@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import GristAPI from './core/GristAPI';
 import StateManager from './core/StateManager';
-import { initializeGISTable } from './core/TableSchema';
+import { initializeSystemTables } from './core/TableSchemas';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
 import MapView from './components/map/MapView';
@@ -29,47 +29,30 @@ const SmartGISWidget = () => {
       // 1. Initialize Grist API
       await GristAPI.initialize();
 
-      // 2. Load system tables if they exist
-      const tables = await GristAPI.listTables();
+      // 2. Initialize all system tables (GIS_WorkSpace, Agent_Queries)
+      //    - Creates tables if they don't exist
+      //    - Adds missing columns (including ST_* formula columns)
+      console.log('📋 Initializing system tables...');
+      const initResult = await initializeSystemTables(GristAPI.docApi);
 
-      // 3. Initialize GIS_WorkSpace table (create if needed, ensure columns)
-      let hasWorkspace = tables.includes('GIS_WorkSpace');
-
-      if (!hasWorkspace) {
-        console.log('📋 Creating GIS_WorkSpace table...');
-        try {
-          await GristAPI.docApi.applyUserActions([
-            ['AddTable', 'GIS_WorkSpace', [
-              { id: 'layer_name', type: 'Text' }
-            ]]
-          ]);
-          console.log('✓ GIS_WorkSpace table created');
-          hasWorkspace = true;
-        } catch (err) {
-          console.error('❌ Failed to create GIS_WorkSpace:', err);
-          throw new Error('Cannot create GIS_WorkSpace table. Please create it manually.');
-        }
+      if (!initResult.success) {
+        console.warn('⚠️ Some system tables had initialization issues:', initResult.results);
+      } else {
+        console.log('✅ All system tables initialized successfully');
       }
 
-      // 4. Ensure all required columns exist (including ST_* formula columns)
-      if (hasWorkspace) {
-        console.log('🔧 Ensuring GIS_WorkSpace has all required columns...');
-        const schemaResult = await initializeGISTable(GristAPI.docApi, 'GIS_WorkSpace');
-        if (schemaResult.success) {
-          console.log(`✓ ${schemaResult.message}`);
-        } else {
-          console.warn(`⚠️ Schema initialization warning: ${schemaResult.message}`);
-        }
-      }
-
-      // 5. Load workspace data
-      if (hasWorkspace) {
+      // 3. Load workspace data if available
+      try {
         const workspaceData = await GristAPI.fetchTable('GIS_WorkSpace');
         StateManager.setState('layers.workspace', workspaceData, 'Load workspace');
         StateManager.setState('data.currentTable', 'GIS_WorkSpace', 'Set current table');
+        console.log(`✓ Loaded ${workspaceData.length} features from GIS_WorkSpace`);
+      } catch (err) {
+        console.warn('⚠️ Could not load workspace data (table may be empty):', err.message);
+        StateManager.setState('layers.workspace', [], 'Empty workspace');
       }
 
-      // 6. Mark as ready
+      // 4. Mark as ready
       setIsReady(true);
       console.log('✅ Smart-GIS v2 ready');
 
