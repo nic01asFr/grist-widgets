@@ -201,9 +201,9 @@ body {
 /* Content Layout */
 .layout-content {
     position: relative;
-    width: 960px;
-    height: 700px;
-    margin: 0 auto;
+    width: 100%;
+    height: 100%;
+    margin: 0;
 }
 
 /* Two Column Layout */
