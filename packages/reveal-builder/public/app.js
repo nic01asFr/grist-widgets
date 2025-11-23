@@ -210,9 +210,15 @@ const COMPONENT_RENDERERS = {
 
         // Utiliser highlight.js si disponible, sinon fallback
         if (typeof hljs !== 'undefined') {
-            const highlighted = hljs.highlightAuto(c.content, [language]).value;
-            return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+            try {
+                const highlighted = hljs.highlightAuto(c.content, [language]).value;
+                return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+            } catch (error) {
+                console.warn('Error with hljs, using fallback:', error);
+                return `<pre><code class="language-${language}">${escapeHTML(c.content)}</code></pre>`;
+            }
         } else {
+            console.log('⚠️ hljs not available, using plain code block');
             // Fallback sans coloration syntaxique
             return `<pre><code class="language-${language}">${escapeHTML(c.content)}</code></pre>`;
         }
@@ -1048,7 +1054,10 @@ document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
 // INITIALIZATION
 // ========================================
 console.log('🚀 Reveal.js Builder starting...');
-console.log('📝 Version: 1.0.0');
+console.log('📝 Version: 1.1.0 (with hljs fallback)');
+console.log('📚 hljs available:', typeof hljs !== 'undefined');
+console.log('📊 Chart available:', typeof Chart !== 'undefined');
+console.log('📝 marked available:', typeof marked !== 'undefined');
 
 waitForReveal();
 initializeGristAPI();
