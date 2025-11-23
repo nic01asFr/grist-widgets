@@ -614,17 +614,29 @@ window.saveProperties = async function() {
     const updates = {};
     const type = appState.selectedComponent.type;
 
-    // Taille (valeurs numériques)
-    const widthValue = document.getElementById('prop-width')?.value;
-    const heightValue = document.getElementById('prop-height')?.value;
-    if (widthValue !== '') updates.width = parseInt(widthValue);
-    if (heightValue !== '') updates.height = parseInt(heightValue);
+    // Position et taille EN POURCENTAGES (interface principale)
+    const xPercentValue = document.getElementById('prop-x-percent')?.value;
+    const yPercentValue = document.getElementById('prop-y-percent')?.value;
+    const widthPercentValue = document.getElementById('prop-width-percent')?.value;
+    const heightPercentValue = document.getElementById('prop-height-percent')?.value;
 
-    // Position canvas
-    const xCanvas = document.getElementById('prop-x-canvas')?.value;
-    const yCanvas = document.getElementById('prop-y-canvas')?.value;
-    if (xCanvas !== '') updates.x_canvas = parseInt(xCanvas);
-    if (yCanvas !== '') updates.y_canvas = parseInt(yCanvas);
+    // Convertir pourcentages → pixels pour le canvas
+    if (xPercentValue !== '') {
+        updates.x_canvas = Math.round((parseFloat(xPercentValue) / 100) * CONFIG.CANVAS.WIDTH);
+        updates.x_percent = parseFloat(xPercentValue);
+    }
+    if (yPercentValue !== '') {
+        updates.y_canvas = Math.round((parseFloat(yPercentValue) / 100) * CONFIG.CANVAS.HEIGHT);
+        updates.y_percent = parseFloat(yPercentValue);
+    }
+    if (widthPercentValue !== '') {
+        updates.width = Math.round((parseFloat(widthPercentValue) / 100) * CONFIG.CANVAS.WIDTH);
+        updates.width_percent = parseFloat(widthPercentValue);
+    }
+    if (heightPercentValue !== '') {
+        updates.height = Math.round((parseFloat(heightPercentValue) / 100) * CONFIG.CANVAS.HEIGHT);
+        updates.height_percent = parseFloat(heightPercentValue);
+    }
 
     // Propriétés spécifiques au type
     const contentElem = document.getElementById('prop-content');
