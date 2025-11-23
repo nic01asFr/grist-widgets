@@ -445,10 +445,15 @@ function getComponentCoords(component) {
 }
 
 // Convertir position textuelle en coordonnées selon le layout
+// IMPORTANT: Ces calculs doivent correspondre EXACTEMENT au CSS du builder (reveal-builder/public/styles.css)
 function getPositionCoordsForLayout(position, layout) {
     const CANVAS_WIDTH = 960;
     const CANVAS_HEIGHT = 700;
-    const PADDING = 40;
+
+    // Variables CSS du builder (en px, 1em ≈ 16px dans le contexte Reveal.js)
+    const SPACING_SM = 8;   // var(--spacing-sm): 0.5em
+    const SPACING_MD = 16;  // var(--spacing-md): 1em
+    const SPACING_LG = 32;  // var(--spacing-lg): 2em
 
     // Layout custom: positions centrées absolues
     if (layout === 'custom') {
@@ -466,69 +471,77 @@ function getPositionCoordsForLayout(position, layout) {
         return positions[position] || positions['center'];
     }
 
-    // Layout two-column: diviser en 2 zones
+    // Layout two-column: grid-template-columns: 1fr 1fr; gap: var(--spacing-lg) (32px)
     if (layout === 'two-column') {
-        const colWidth = (CANVAS_WIDTH - PADDING * 3) / 2;
+        const gap = SPACING_LG; // 32px
+        const colWidth = (CANVAS_WIDTH - gap) / 2;
+
         if (position === 'left') {
-            return { x: PADDING + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: colWidth / 2, y: CANVAS_HEIGHT / 2 };
         }
         if (position === 'right') {
-            return { x: PADDING * 2 + colWidth + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: colWidth + gap + colWidth / 2, y: CANVAS_HEIGHT / 2 };
         }
         return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
     }
 
-    // Layout three-column: diviser en 3 zones
+    // Layout three-column: grid-template-columns: 1fr 1fr 1fr; gap: var(--spacing-md) (16px)
     if (layout === 'three-column') {
-        const colWidth = (CANVAS_WIDTH - PADDING * 4) / 3;
+        const gap = SPACING_MD; // 16px
+        const colWidth = (CANVAS_WIDTH - gap * 2) / 3;
+
         if (position === 'col-1' || position === 'left') {
-            return { x: PADDING + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: colWidth / 2, y: CANVAS_HEIGHT / 2 };
         }
         if (position === 'col-2' || position === 'center') {
-            return { x: PADDING * 2 + colWidth + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: colWidth + gap + colWidth / 2, y: CANVAS_HEIGHT / 2 };
         }
         if (position === 'col-3' || position === 'right') {
-            return { x: PADDING * 3 + colWidth * 2 + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: (colWidth + gap) * 2 + colWidth / 2, y: CANVAS_HEIGHT / 2 };
         }
         return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
     }
 
-    // Layout sidebar-left: 30% / 70%
+    // Layout sidebar-left: grid-template-columns: 30% 70%; gap: var(--spacing-lg) (32px)
     if (layout === 'sidebar-left') {
-        const sidebarWidth = CANVAS_WIDTH * 0.3;
-        const mainWidth = CANVAS_WIDTH * 0.7;
+        const gap = SPACING_LG; // 32px
+        const col1Width = (CANVAS_WIDTH - gap) * 0.3;
+        const col2Width = (CANVAS_WIDTH - gap) * 0.7;
+
         if (position === 'col-1' || position === 'left') {
-            return { x: sidebarWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: col1Width / 2, y: CANVAS_HEIGHT / 2 };
         }
         if (position === 'col-2' || position === 'right') {
-            return { x: sidebarWidth + mainWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: col1Width + gap + col2Width / 2, y: CANVAS_HEIGHT / 2 };
         }
         return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
     }
 
-    // Layout sidebar-right: 70% / 30%
+    // Layout sidebar-right: grid-template-columns: 70% 30%; gap: var(--spacing-lg) (32px)
     if (layout === 'sidebar-right') {
-        const mainWidth = CANVAS_WIDTH * 0.7;
-        const sidebarWidth = CANVAS_WIDTH * 0.3;
+        const gap = SPACING_LG; // 32px
+        const col1Width = (CANVAS_WIDTH - gap) * 0.7;
+        const col2Width = (CANVAS_WIDTH - gap) * 0.3;
+
         if (position === 'col-1' || position === 'left') {
-            return { x: mainWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: col1Width / 2, y: CANVAS_HEIGHT / 2 };
         }
         if (position === 'col-2' || position === 'right') {
-            return { x: mainWidth + sidebarWidth / 2, y: CANVAS_HEIGHT / 2 };
+            return { x: col1Width + gap + col2Width / 2, y: CANVAS_HEIGHT / 2 };
         }
         return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
     }
 
-    // Layout grid-2x2: grille 2x2
+    // Layout grid-2x2: grid 1fr 1fr / 1fr 1fr; gap: var(--spacing-md) (16px)
     if (layout === 'grid-2x2') {
-        const cellWidth = (CANVAS_WIDTH - PADDING * 3) / 2;
-        const cellHeight = (CANVAS_HEIGHT - PADDING * 3) / 2;
-        // Les composants sont ajoutés dans l'ordre: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
-        // On utilise le center pour tous et on laisse l'ordre gérer le placement
+        const gap = SPACING_MD; // 16px
+        const cellWidth = (CANVAS_WIDTH - gap) / 2;
+        const cellHeight = (CANVAS_HEIGHT - gap) / 2;
+        // Les composants sont centrés dans l'ensemble (le CSS les répartit automatiquement)
         return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
     }
 
-    // Layouts title, content, full: positions standards centrées
+    // Layouts title, content, full: flex column center
     const positions = {
         'top-left': { x: 100, y: 80 },
         'top': { x: CANVAS_WIDTH / 2, y: 100 },
