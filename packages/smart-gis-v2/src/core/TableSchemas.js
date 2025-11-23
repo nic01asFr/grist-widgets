@@ -253,20 +253,24 @@ export async function ensureTableColumns(docApi, tableName, schema) {
       if (!existingColumns.includes(col.id)) {
         console.log(`[TableSchemas] ⏳ Adding missing column: ${col.id} (${col.type})`);
         try {
-          const colInfo = { type: col.type };
-
-          // Add formula if exists
-          if (col.formula) {
-            colInfo.formula = col.formula;
-            console.log(`[TableSchemas]   → With formula: ${col.formula}`);
-          }
-
-          // Add label/description if exists
-          if (col.label) colInfo.label = col.label;
-
+          // Step 1: Create column (regular or formula)
           await docApi.applyUserActions([
-            ['AddColumn', tableName, col.id, colInfo]
+            ['AddColumn', tableName, col.id, {
+              type: col.type,
+              label: col.label
+            }]
           ]);
+
+          // Step 2: If formula column, convert it
+          if (col.formula) {
+            console.log(`[TableSchemas]   → Converting to formula: ${col.formula}`);
+            await docApi.applyUserActions([
+              ['ModifyColumn', tableName, col.id, {
+                isFormula: true,
+                formula: col.formula
+              }]
+            ]);
+          }
 
           added.push(col.id);
           console.log(`[TableSchemas] ✓ Successfully added column: ${col.id}`);
@@ -368,14 +372,23 @@ export async function initializeSystemTables(docApi, tableNames = null) {
         for (const col of formulaColumns) {
           try {
             console.log(`[TableSchemas] ⏳ Adding formula column: ${col.id}`);
+
+            // Step 2a: Create empty column first
             await docApi.applyUserActions([
               ['AddColumn', tableName, col.id, {
                 type: col.type,
-                isFormula: true,
-                formula: col.formula,
                 label: col.label
               }]
             ]);
+
+            // Step 2b: Convert to formula column
+            await docApi.applyUserActions([
+              ['ModifyColumn', tableName, col.id, {
+                isFormula: true,
+                formula: col.formula
+              }]
+            ]);
+
             console.log(`[TableSchemas] ✓ Added formula column: ${col.id}`);
           } catch (err) {
             console.error(`[TableSchemas] ✗ Failed to add formula column ${col.id}:`, err);
