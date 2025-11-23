@@ -339,131 +339,6 @@ export const IMPORT_METHODS = {
     }
   },
 
-  wfs: {
-    id: 'wfs',
-    label: 'WFS (Web Feature Service)',
-    icon: '🌐',
-    description: 'Connexion à un service WFS (IGN, OSM, etc.)',
-    color: '#f59e0b',
-
-    steps: [
-      {
-        id: 'catalog',
-        label: 'Sélectionner une source',
-        component: 'WFSCatalog',
-        catalogs: [
-          {
-            id: 'ign',
-            name: 'IGN Géoplateforme',
-            baseUrl: 'https://data.geopf.fr/wfs',
-            layers: [
-              { id: 'BDTOPO_V3:commune', name: 'Communes' },
-              { id: 'BDTOPO_V3:departement', name: 'Départements' },
-              { id: 'BDTOPO_V3:region', name: 'Régions' },
-              { id: 'ADMINEXPRESS-COG-CARTO.LATEST:arrondissement', name: 'Arrondissements' },
-              { id: 'BDTOPO_V3:batiment', name: 'Bâtiments' },
-              { id: 'BDTOPO_V3:route', name: 'Routes' },
-              { id: 'BDTOPO_V3:cours_d_eau', name: 'Cours d\'eau' }
-            ]
-          },
-          {
-            id: 'osm',
-            name: 'OpenStreetMap (Overpass)',
-            baseUrl: 'https://overpass-api.de/api/interpreter',
-            note: 'Requiert une bbox et un type de feature'
-          }
-        ]
-      },
-      {
-        id: 'filters',
-        label: 'Filtres spatiaux',
-        component: 'WFSFilters',
-        fields: [
-          {
-            name: 'bbox',
-            label: 'Zone géographique (bbox)',
-            type: 'bbox_picker',
-            help: 'Cliquer sur la carte pour définir une zone'
-          },
-          {
-            name: 'max_features',
-            label: 'Nombre max de features',
-            type: 'number',
-            min: 1,
-            max: 10000,
-            defaultValue: 1000
-          }
-        ]
-      },
-      {
-        id: 'preview',
-        label: 'Aperçu',
-        component: 'PreviewData'
-      },
-      {
-        id: 'config',
-        label: 'Configuration',
-        component: 'ImportConfig',
-        fields: [
-          {
-            name: 'layer_name',
-            label: 'Nom du layer',
-            type: 'text',
-            required: true,
-            defaultValue: 'Import WFS'
-          }
-        ]
-      }
-    ],
-
-    validate: (config) => {
-      if (!config.catalog) {
-        return { valid: false, error: 'Aucun catalogue sélectionné' };
-      }
-      if (!config.layer) {
-        return { valid: false, error: 'Aucune couche sélectionnée' };
-      }
-      return { valid: true };
-    },
-
-    fetch: async (config) => {
-      const { catalog, layer, bbox, max_features } = config;
-
-      // Build WFS GetFeature request
-      const params = new URLSearchParams({
-        service: 'WFS',
-        version: '2.0.0',
-        request: 'GetFeature',
-        typeName: layer,
-        outputFormat: 'application/json',
-        count: max_features || 1000
-      });
-
-      if (bbox) {
-        params.append('bbox', bbox.join(','));
-      }
-
-      const url = `${catalog.baseUrl}?${params.toString()}`;
-
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Erreur WFS: ${response.status} ${response.statusText}`);
-      }
-
-      const geojson = await response.json();
-
-      if (!geojson.features || geojson.features.length === 0) {
-        throw new Error('Aucune feature trouvée dans la zone spécifiée');
-      }
-
-      return geojson.features.map((feature, idx) => ({
-        geometry: JSON.stringify(feature.geometry),
-        properties: feature.properties || {},
-        feature_index: idx
-      }));
-    }
-  },
-
   ign_geoplateforme: {
     id: 'ign_geoplateforme',
     label: 'IGN Géoplateforme',
@@ -545,9 +420,12 @@ export const IMPORT_METHODS = {
         count: max_features || 1000
       });
 
-      // Add filter if search text provided
+      // Add simple filter if search text provided
       if (search_text && search_text.trim()) {
-        const cqlFilter = `nom ILIKE '%${search_text}%' OR nom_com ILIKE '%${search_text}%' OR nom_dep ILIKE '%${search_text}%' OR nom_reg ILIKE '%${search_text}%'`;
+        // Use simple LIKE filter on 'nom' property (exists in most layers)
+        // Escape single quotes in search text
+        const escapedText = search_text.replace(/'/g, "''");
+        const cqlFilter = `nom LIKE '%${escapedText}%'`;
         params.append('cql_filter', cqlFilter);
       }
 
@@ -555,13 +433,14 @@ export const IMPORT_METHODS = {
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Erreur IGN: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Erreur IGN (${response.status}): ${errorText.substring(0, 200)}`);
       }
 
       const geojson = await response.json();
 
       if (!geojson.features || geojson.features.length === 0) {
-        throw new Error('Aucune donnée trouvée pour cette recherche');
+        throw new Error('Aucune donnée trouvée. Essayez sans filtre ou avec un autre nom.');
       }
 
       return geojson.features.map((feature, idx) => ({
