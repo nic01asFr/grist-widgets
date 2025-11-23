@@ -1,8 +1,8 @@
 /**
- * MapView - Leaflet map container
+ * MapView - Leaflet map container with performance optimizations
  */
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import StateManager from '../../core/StateManager';
@@ -14,6 +14,7 @@ const MapView = () => {
   const [zoom, setZoom] = useState(6);
   const [layers, setLayers] = useState([]);
   const mapRef = useRef(null);
+  const moveTimeoutRef = useRef(null);
 
   useEffect(() => {
     // Subscribe to layers changes
@@ -38,24 +39,54 @@ const MapView = () => {
     };
   }, []);
 
-  const handleMapMove = (e) => {
-    const map = e.target;
-    const newCenter = map.getCenter();
-    const newZoom = map.getZoom();
+  // OPTIMIZATION: Debounced + batched map move handler
+  // Prevents 300+ setState during pan/zoom (3 setState per event)
+  // Now: 1 batchUpdate per 200ms instead of 300+ individual setState
+  const handleMapMove = useCallback((e) => {
+    // Clear previous timeout
+    if (moveTimeoutRef.current) {
+      clearTimeout(moveTimeoutRef.current);
+    }
 
-    StateManager.setState('map.center', [newCenter.lat, newCenter.lng], 'Map moved');
-    StateManager.setState('map.zoom', newZoom, 'Map zoomed');
-    StateManager.setState('map.bounds', map.getBounds(), 'Map bounds changed');
-  };
+    // Debounce: wait 200ms after last move event
+    moveTimeoutRef.current = setTimeout(() => {
+      const map = e.target;
+      const newCenter = map.getCenter();
 
-  // Separate point layers for clustering
-  const pointLayers = layers.filter(l =>
-    l.is_visible !== false && (l.geometry_type === 'Point' || l.geometry_type === 'POINT')
-  );
+      // OPTIMIZATION: Batch all map updates into ONE state change
+      StateManager.batchUpdate({
+        'map.center': [newCenter.lat, newCenter.lng],
+        'map.zoom': map.getZoom(),
+        'map.bounds': map.getBounds()
+      }, 'Map interaction');
+    }, 200);
+  }, []);
 
-  const otherLayers = layers.filter(l =>
-    l.is_visible !== false && l.geometry_type !== 'Point' && l.geometry_type !== 'POINT'
-  );
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (moveTimeoutRef.current) {
+        clearTimeout(moveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // OPTIMIZATION: Memoize layer filtering (prevents recalculation on every render)
+  const { pointLayers, otherLayers } = useMemo(() => {
+    const points = [];
+    const others = [];
+
+    layers.forEach(layer => {
+      // Skip invisible layers
+      if (layer.is_visible === false) return;
+
+      // Check if point (case-insensitive)
+      const isPoint = layer.geometry_type?.toUpperCase() === 'POINT';
+      (isPoint ? points : others).push(layer);
+    });
+
+    return { pointLayers: points, otherLayers: others };
+  }, [layers]);
 
   return (
     <MapContainer

@@ -105,6 +105,52 @@ class StateManager {
   }
 
   /**
+   * OPTIMIZATION: Batch multiple state updates into one
+   * Reduces history snapshots and notifications
+   *
+   * @param {Object} updates - { 'path1': value1, 'path2': value2, ... }
+   * @param {string} description - Description for history
+   *
+   * Example:
+   * StateManager.batchUpdate({
+   *   'map.center': [48.8, 2.3],
+   *   'map.zoom': 12,
+   *   'map.bounds': bounds
+   * }, 'Map interaction');
+   */
+  batchUpdate(updates, description = 'Batch update') {
+    // Save current state to history ONCE
+    if (this.historyIndex < this.history.length - 1) {
+      this.history = this.history.slice(0, this.historyIndex + 1);
+    }
+
+    this.history.push({
+      state: JSON.parse(JSON.stringify(this.state)),
+      timestamp: Date.now(),
+      description
+    });
+
+    this.historyIndex++;
+
+    if (this.history.length > this.maxHistory) {
+      this.history.shift();
+      this.historyIndex--;
+    }
+
+    // Apply all updates
+    const updatedPaths = new Set();
+    Object.entries(updates).forEach(([path, value]) => {
+      this._updatePath(path, value);
+      updatedPaths.add(path);
+    });
+
+    // Notify subscribers ONCE per path
+    updatedPaths.forEach(path => {
+      this._notifySubscribers(path);
+    });
+  }
+
+  /**
    * Update path in state
    * @private
    */
