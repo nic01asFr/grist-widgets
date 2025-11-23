@@ -353,12 +353,13 @@ body {
 #canvas-container {
     flex: 1;
     position: relative;
-    overflow: auto;
+    overflow: hidden; /* Pas de scroll, on scale le contenu */
     background: var(--color-bg-dark);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
+    min-height: 0; /* Important pour flex */
 }
 
 /* Cadre visuel pour montrer les limites exactes de la slide */
@@ -372,6 +373,8 @@ body {
         0 0 40px rgba(0, 0, 0, 0.8),
         inset 0 0 0 1px rgba(255, 255, 255, 0.05);
     background: var(--color-bg-secondary);
+    transform-origin: center center;
+    /* Le scale sera ajusté dynamiquement par JS si nécessaire */
 }
 
 .canvas-frame-label {
