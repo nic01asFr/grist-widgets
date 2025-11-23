@@ -929,18 +929,20 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 35,
-                width_percent: 70,
+                width_percent: 70, height_percent: 15,
                 content: 'Grist Reveal.js Builder',
                 font_size: 56,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
             {
                 type: 'text',
                 x_percent: 50, y_percent: 55,
-                width_percent: 60,
+                width_percent: 60, height_percent: 10,
                 content: 'Créez des présentations interactives directement dans Grist',
                 font_size: 24,
-                color: '#e0e7ff'
+                color: '#e0e7ff',
+                position: 'center'
             }
         ]
     },
@@ -953,10 +955,11 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'quote',
                 x_percent: 50, y_percent: 45,
-                width_percent: 70,
+                width_percent: 70, height_percent: 20,
                 content: '"La simplicité est la sophistication suprême."\n\n— Leonardo da Vinci',
                 font_size: 32,
-                color: '#4CAF50'
+                color: '#4CAF50',
+                position: 'center'
             }
         ]
     },
@@ -969,10 +972,11 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 5, y_percent: 8,
-                width_percent: 90,
+                width_percent: 90, height_percent: 10,
                 content: '## Exemple de code Python',
                 font_size: 32,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
             {
                 type: 'code',
@@ -980,15 +984,17 @@ const SLIDE_TEMPLATES = [
                 width_percent: 90, height_percent: 35,
                 content: 'def hello_world():\n    print("Hello, Grist!")\n    return True\n\nhello_world()',
                 font_size: 18,
-                color: '#00ff00'
+                color: '#00ff00',
+                position: 'center'
             },
             {
                 type: 'text',
                 x_percent: 5, y_percent: 70,
-                width_percent: 90,
+                width_percent: 90, height_percent: 8,
                 content: 'Syntaxe colorée automatique avec highlight.js',
                 font_size: 20,
-                color: '#aaaaaa'
+                color: '#aaaaaa',
+                position: 'center'
             }
         ]
     },
@@ -1001,18 +1007,20 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 10, y_percent: 10,
-                width_percent: 80,
+                width_percent: 80, height_percent: 12,
                 content: '## Fonctionnalités principales',
                 font_size: 40,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
             {
                 type: 'list',
                 x_percent: 15, y_percent: 35,
-                width_percent: 70,
+                width_percent: 70, height_percent: 50,
                 content: '11 types de composants disponibles\nPositionnement précis en pourcentages\nÉdition visuelle avec Fabric.js\nSynchronisation temps réel avec Grist\nExport en présentation Reveal.js\nSupport des animations et transitions',
                 font_size: 24,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             }
         ]
     },
@@ -1025,34 +1033,38 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 25, y_percent: 12,
-                width_percent: 35,
+                width_percent: 35, height_percent: 10,
                 content: '### ❌ Avant',
                 font_size: 28,
-                color: '#F44336'
+                color: '#F44336',
+                position: 'center'
             },
             {
                 type: 'list',
                 x_percent: 10, y_percent: 30,
-                width_percent: 35,
+                width_percent: 35, height_percent: 40,
                 content: 'Processus manuel\nErreurs fréquentes\nPas de collaboration\nPas de traçabilité',
                 font_size: 20,
-                color: '#ffcccc'
+                color: '#ffcccc',
+                position: 'left'
             },
             {
                 type: 'text',
                 x_percent: 75, y_percent: 12,
-                width_percent: 35,
+                width_percent: 35, height_percent: 10,
                 content: '### ✅ Après',
                 font_size: 28,
-                color: '#4CAF50'
+                color: '#4CAF50',
+                position: 'center'
             },
             {
                 type: 'list',
                 x_percent: 60, y_percent: 30,
-                width_percent: 35,
+                width_percent: 35, height_percent: 40,
                 content: 'Automatisation complète\nZéro erreur\nCollaboration temps réel\nHistorique complet',
                 font_size: 20,
-                color: '#ccffcc'
+                color: '#ccffcc',
+                position: 'right'
             }
         ]
     },
@@ -1065,10 +1077,11 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 30,
-                width_percent: 70,
+                width_percent: 70, height_percent: 12,
                 content: '## Prêt à commencer ?',
                 font_size: 48,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
             {
                 type: 'button',
@@ -1077,15 +1090,17 @@ const SLIDE_TEMPLATES = [
                 content: 'Démarrer maintenant',
                 color: '#ffffff',
                 background: '#4CAF50',
-                url: 'https://grist.com'
+                url: 'https://grist.com',
+                position: 'center'
             },
             {
                 type: 'text',
                 x_percent: 50, y_percent: 75,
-                width_percent: 60,
+                width_percent: 60, height_percent: 8,
                 content: 'Gratuit pour toujours • Aucune carte bancaire requise',
                 font_size: 18,
-                color: '#e0e7ff'
+                color: '#e0e7ff',
+                position: 'center'
             }
         ]
     },
@@ -1098,24 +1113,27 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 8,
-                width_percent: 90,
+                width_percent: 90, height_percent: 10,
                 content: '## Croissance utilisateurs 2024',
                 font_size: 36,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
             {
                 type: 'chart',
                 x_percent: 50, y_percent: 50,
                 width_percent: 80, height_percent: 60,
-                color: '#4CAF50'
+                color: '#4CAF50',
+                position: 'center'
             },
             {
                 type: 'text',
                 x_percent: 50, y_percent: 85,
-                width_percent: 80,
+                width_percent: 80, height_percent: 8,
                 content: '+150% de croissance cette année',
                 font_size: 20,
-                color: '#4CAF50'
+                color: '#4CAF50',
+                position: 'center'
             }
         ]
     },
@@ -1128,18 +1146,19 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 5,
-                width_percent: 90,
+                width_percent: 90, height_percent: 8,
                 content: '## 11 types de composants',
                 font_size: 32,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
-            { type: 'text', x_percent: 15, y_percent: 20, width_percent: 20, content: 'Texte', font_size: 16, color: '#4CAF50' },
-            { type: 'shape', x_percent: 15, y_percent: 30, width_percent: 10, height_percent: 8, color: '#2196F3' },
-            { type: 'list', x_percent: 40, y_percent: 25, width_percent: 20, content: 'Item 1\nItem 2\nItem 3', font_size: 14, color: '#ffffff' },
-            { type: 'button', x_percent: 70, y_percent: 27, width_percent: 15, height_percent: 7, content: 'Bouton', color: '#ffffff', background: '#F44336' },
-            { type: 'code', x_percent: 15, y_percent: 50, width_percent: 35, height_percent: 20, content: '// Code\nconst x = 42;', font_size: 12, color: '#00ff00' },
-            { type: 'quote', x_percent: 60, y_percent: 55, width_percent: 35, content: '"Citation"', font_size: 14, color: '#FFC107' },
-            { type: 'table', x_percent: 30, y_percent: 80, width_percent: 40, height_percent: 15, color: '#9C27B0' }
+            { type: 'text', x_percent: 15, y_percent: 20, width_percent: 20, height_percent: 6, content: 'Texte', font_size: 16, color: '#4CAF50', position: 'center' },
+            { type: 'shape', x_percent: 15, y_percent: 30, width_percent: 10, height_percent: 8, color: '#2196F3', position: 'center' },
+            { type: 'list', x_percent: 40, y_percent: 25, width_percent: 20, height_percent: 15, content: 'Item 1\nItem 2\nItem 3', font_size: 14, color: '#ffffff', position: 'center' },
+            { type: 'button', x_percent: 70, y_percent: 27, width_percent: 15, height_percent: 7, content: 'Bouton', color: '#ffffff', background: '#F44336', position: 'center' },
+            { type: 'code', x_percent: 15, y_percent: 50, width_percent: 35, height_percent: 20, content: '// Code\nconst x = 42;', font_size: 12, color: '#00ff00', position: 'center' },
+            { type: 'quote', x_percent: 60, y_percent: 55, width_percent: 35, height_percent: 15, content: '"Citation"', font_size: 14, color: '#FFC107', position: 'center' },
+            { type: 'table', x_percent: 30, y_percent: 80, width_percent: 40, height_percent: 15, color: '#9C27B0', position: 'center' }
         ]
     },
     {
@@ -1151,24 +1170,27 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 8,
-                width_percent: 90,
+                width_percent: 90, height_percent: 10,
                 content: '## Tutoriel vidéo',
                 font_size: 36,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
             {
                 type: 'video',
                 x_percent: 50, y_percent: 45,
                 width_percent: 70, height_percent: 50,
-                url: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+                url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+                position: 'center'
             },
             {
                 type: 'text',
                 x_percent: 50, y_percent: 85,
-                width_percent: 70,
+                width_percent: 70, height_percent: 8,
                 content: 'Apprenez à créer vos premières présentations',
                 font_size: 20,
-                color: '#aaaaaa'
+                color: '#aaaaaa',
+                position: 'center'
             }
         ]
     },
@@ -1181,22 +1203,23 @@ const SLIDE_TEMPLATES = [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 8,
-                width_percent: 90,
+                width_percent: 90, height_percent: 10,
                 content: '## Comment ça marche ?',
                 font_size: 36,
-                color: '#ffffff'
+                color: '#ffffff',
+                position: 'center'
             },
-            { type: 'shape', x_percent: 17, y_percent: 35, width_percent: 12, height_percent: 17, color: '#4CAF50' },
-            { type: 'text', x_percent: 17, y_percent: 38, width_percent: 12, content: '1', font_size: 48, color: '#ffffff' },
-            { type: 'text', x_percent: 17, y_percent: 60, width_percent: 25, content: '### Créer\n\nAjoutez votre contenu dans Grist', font_size: 18, color: '#ffffff' },
+            { type: 'shape', x_percent: 17, y_percent: 35, width_percent: 12, height_percent: 17, color: '#4CAF50', position: 'center' },
+            { type: 'text', x_percent: 17, y_percent: 38, width_percent: 12, height_percent: 8, content: '1', font_size: 48, color: '#ffffff', position: 'center' },
+            { type: 'text', x_percent: 17, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Créer\n\nAjoutez votre contenu dans Grist', font_size: 18, color: '#ffffff', position: 'center' },
 
-            { type: 'shape', x_percent: 50, y_percent: 35, width_percent: 12, height_percent: 17, color: '#2196F3' },
-            { type: 'text', x_percent: 50, y_percent: 38, width_percent: 12, content: '2', font_size: 48, color: '#ffffff' },
-            { type: 'text', x_percent: 50, y_percent: 60, width_percent: 25, content: '### Éditer\n\nPersonnalisez avec l\'éditeur visuel', font_size: 18, color: '#ffffff' },
+            { type: 'shape', x_percent: 50, y_percent: 35, width_percent: 12, height_percent: 17, color: '#2196F3', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 38, width_percent: 12, height_percent: 8, content: '2', font_size: 48, color: '#ffffff', position: 'center' },
+            { type: 'text', x_percent: 50, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Éditer\n\nPersonnalisez avec l\'éditeur visuel', font_size: 18, color: '#ffffff', position: 'center' },
 
-            { type: 'shape', x_percent: 83, y_percent: 35, width_percent: 12, height_percent: 17, color: '#F44336' },
-            { type: 'text', x_percent: 83, y_percent: 38, width_percent: 12, content: '3', font_size: 48, color: '#ffffff' },
-            { type: 'text', x_percent: 83, y_percent: 60, width_percent: 25, content: '### Présenter\n\nAffichez votre présentation', font_size: 18, color: '#ffffff' }
+            { type: 'shape', x_percent: 83, y_percent: 35, width_percent: 12, height_percent: 17, color: '#F44336', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 38, width_percent: 12, height_percent: 8, content: '3', font_size: 48, color: '#ffffff', position: 'center' },
+            { type: 'text', x_percent: 83, y_percent: 60, width_percent: 25, height_percent: 15, content: '### Présenter\n\nAffichez votre présentation', font_size: 18, color: '#ffffff', position: 'center' }
         ]
     }
 ];
@@ -1607,12 +1630,12 @@ window.createMissingTables = async function() {
                 { id: 'content', fields: { type: 'Text', label: 'Contenu' } },
                 { id: 'url', fields: { type: 'Text', label: 'URL' } },
                 { id: 'position', fields: { type: 'Choice', label: 'Position', widgetOptions: JSON.stringify({ choices: ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'] }) } },
-                { id: 'width', fields: { type: 'Numeric', label: 'Largeur (px)' } },
-                { id: 'height', fields: { type: 'Numeric', label: 'Hauteur (px)' } },
+                { id: 'width', fields: { type: 'Int', label: 'Largeur (px)' } },
+                { id: 'height', fields: { type: 'Int', label: 'Hauteur (px)' } },
                 { id: 'style_preset', fields: { type: 'Text', label: 'Style' } },
                 { id: 'color', fields: { type: 'Text', label: 'Couleur' } },
                 { id: 'background', fields: { type: 'Text', label: 'Couleur fond' } },
-                { id: 'font_size', fields: { type: 'Numeric', label: 'Taille police (px)' } },
+                { id: 'font_size', fields: { type: 'Int', label: 'Taille police (px)' } },
                 { id: 'x_canvas', fields: { type: 'Numeric', label: 'X Canvas (px)' } },
                 { id: 'y_canvas', fields: { type: 'Numeric', label: 'Y Canvas (px)' } },
                 { id: 'x_percent', fields: { type: 'Numeric', label: 'X (%)' } },
