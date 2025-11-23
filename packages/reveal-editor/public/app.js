@@ -354,15 +354,28 @@ function addComponentToCanvas(component) {
 
 function createTextObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Calculer les dimensions à partir des pourcentages si disponibles
+    let width = 300; // défaut
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
 
     const text = new fabric.Textbox(component.content || 'Double-clic pour éditer', {
         left: coords.x,
         top: coords.y,
-        width: Number(component.width) || 300,
+        width: width,
         fontSize: Number(component.font_size) || 24,
         fill: component.color || '#ffffff',
         fontFamily: 'Arial',
-        editable: false
+        editable: false,
+        textAlign: component.align || 'left',
+        originX: 'center',
+        originY: 'center'
     });
 
     // Double-click to edit
@@ -375,44 +388,157 @@ function createTextObject(component) {
 
 // Helper: obtenir coordonnées d'un composant
 function getComponentCoords(component) {
-    // Priorité 1: coordonnées canvas sauvegardées
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Priorité 1: coordonnées canvas sauvegardées (si l'utilisateur a déplacé manuellement)
     if (component.x_canvas !== undefined && component.y_canvas !== undefined) {
         return { x: component.x_canvas, y: component.y_canvas };
     }
-    // Priorité 2: position prédéfinie
-    return getPositionCoords(component.position || 'center');
+
+    // Priorité 2: layout custom avec x_percent/y_percent
+    if (component.x_percent !== undefined && component.y_percent !== undefined) {
+        return {
+            x: (component.x_percent / 100) * CANVAS_WIDTH,
+            y: (component.y_percent / 100) * CANVAS_HEIGHT
+        };
+    }
+
+    // Priorité 3: position basée sur le layout actuel
+    const layout = appState.currentSlide?.layout || 'content';
+    return getPositionCoordsForLayout(component.position || 'center', layout);
 }
 
-// Convertir position textuelle en coordonnées (pour canvas 960x700)
-function getPositionCoords(position) {
+// Convertir position textuelle en coordonnées selon le layout
+function getPositionCoordsForLayout(position, layout) {
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+    const PADDING = 40;
+
+    // Layout custom: positions centrées absolues
+    if (layout === 'custom') {
+        const positions = {
+            'top-left': { x: 100, y: 80 },
+            'top': { x: CANVAS_WIDTH / 2, y: 80 },
+            'top-right': { x: CANVAS_WIDTH - 100, y: 80 },
+            'left': { x: 100, y: CANVAS_HEIGHT / 2 },
+            'center': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
+            'right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT / 2 },
+            'bottom-left': { x: 100, y: CANVAS_HEIGHT - 80 },
+            'bottom': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT - 80 },
+            'bottom-right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 80 }
+        };
+        return positions[position] || positions['center'];
+    }
+
+    // Layout two-column: diviser en 2 zones
+    if (layout === 'two-column') {
+        const colWidth = (CANVAS_WIDTH - PADDING * 3) / 2;
+        if (position === 'left') {
+            return { x: PADDING + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'right') {
+            return { x: PADDING * 2 + colWidth + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout three-column: diviser en 3 zones
+    if (layout === 'three-column') {
+        const colWidth = (CANVAS_WIDTH - PADDING * 4) / 3;
+        if (position === 'col-1' || position === 'left') {
+            return { x: PADDING + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-2' || position === 'center') {
+            return { x: PADDING * 2 + colWidth + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-3' || position === 'right') {
+            return { x: PADDING * 3 + colWidth * 2 + colWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout sidebar-left: 30% / 70%
+    if (layout === 'sidebar-left') {
+        const sidebarWidth = CANVAS_WIDTH * 0.3;
+        const mainWidth = CANVAS_WIDTH * 0.7;
+        if (position === 'col-1' || position === 'left') {
+            return { x: sidebarWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-2' || position === 'right') {
+            return { x: sidebarWidth + mainWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout sidebar-right: 70% / 30%
+    if (layout === 'sidebar-right') {
+        const mainWidth = CANVAS_WIDTH * 0.7;
+        const sidebarWidth = CANVAS_WIDTH * 0.3;
+        if (position === 'col-1' || position === 'left') {
+            return { x: mainWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        if (position === 'col-2' || position === 'right') {
+            return { x: mainWidth + sidebarWidth / 2, y: CANVAS_HEIGHT / 2 };
+        }
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layout grid-2x2: grille 2x2
+    if (layout === 'grid-2x2') {
+        const cellWidth = (CANVAS_WIDTH - PADDING * 3) / 2;
+        const cellHeight = (CANVAS_HEIGHT - PADDING * 3) / 2;
+        // Les composants sont ajoutés dans l'ordre: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
+        // On utilise le center pour tous et on laisse l'ordre gérer le placement
+        return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    }
+
+    // Layouts title, content, full: positions standards centrées
     const positions = {
-        'top-left': { x: 80, y: 80 },
-        'top': { x: 430, y: 80 },
-        'top-right': { x: 780, y: 80 },
-        'left': { x: 80, y: 325 },
-        'center': { x: 430, y: 325 },
-        'right': { x: 780, y: 325 },
-        'bottom-left': { x: 80, y: 570 },
-        'bottom': { x: 430, y: 570 },
-        'bottom-right': { x: 780, y: 570 }
+        'top-left': { x: 100, y: 80 },
+        'top': { x: CANVAS_WIDTH / 2, y: 100 },
+        'top-right': { x: CANVAS_WIDTH - 100, y: 80 },
+        'left': { x: 100, y: CANVAS_HEIGHT / 2 },
+        'center': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
+        'right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT / 2 },
+        'bottom-left': { x: 100, y: CANVAS_HEIGHT - 80 },
+        'bottom': { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT - 100 },
+        'bottom-right': { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 80 }
     };
     return positions[position] || positions['center'];
 }
 
 function createImageObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
     const imageUrl = component.url || component.attachment;
+
+    // Calculer dimensions à partir des pourcentages
+    let width = 200, height = 150; // défauts
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
+    if (component.height_percent !== undefined && component.height_percent !== null) {
+        height = (component.height_percent / 100) * CANVAS_HEIGHT;
+    } else if (component.height) {
+        height = Number(component.height);
+    }
 
     if (!imageUrl) {
         // Placeholder si pas d'URL
         return new fabric.Rect({
             left: coords.x,
             top: coords.y,
-            width: Number(component.width) || 200,
-            height: Number(component.height) || 150,
+            width: width,
+            height: height,
             fill: '#333',
             stroke: '#666',
-            strokeWidth: 2
+            strokeWidth: 2,
+            originX: 'center',
+            originY: 'center'
         });
     }
 
@@ -420,12 +546,14 @@ function createImageObject(component) {
     const placeholder = new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: Number(component.width) || 200,
-        height: Number(component.height) || 150,
+        width: width,
+        height: height,
         fill: '#333',
         stroke: '#666',
         strokeWidth: 2,
-        opacity: 0.5
+        opacity: 0.5,
+        originX: 'center',
+        originY: 'center'
     });
 
     // Charger l'image réelle
@@ -435,8 +563,10 @@ function createImageObject(component) {
         img.set({
             left: coords.x,
             top: coords.y,
-            scaleX: (Number(component.width) || 200) / img.width,
-            scaleY: (Number(component.height) || 150) / img.height
+            scaleX: width / img.width,
+            scaleY: height / img.height,
+            originX: 'center',
+            originY: 'center'
         });
 
         img.componentData = component;
@@ -456,25 +586,61 @@ function createImageObject(component) {
 
 function createShapeObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Calculer dimensions à partir des pourcentages
+    let width = 100, height = 100; // défauts
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
+    if (component.height_percent !== undefined && component.height_percent !== null) {
+        height = (component.height_percent / 100) * CANVAS_HEIGHT;
+    } else if (component.height) {
+        height = Number(component.height);
+    }
+
     return new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: Number(component.width) || 100,
-        height: Number(component.height) || 100,
-        fill: component.color || '#4CAF50'
+        width: width,
+        height: height,
+        fill: component.color || '#4CAF50',
+        originX: 'center',
+        originY: 'center'
     });
 }
 
 function createPlaceholderObject(component) {
     const coords = getComponentCoords(component);
+    const CANVAS_WIDTH = 960;
+    const CANVAS_HEIGHT = 700;
+
+    // Calculer dimensions à partir des pourcentages
+    let width = 150, height = 100; // défauts
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        width = (component.width_percent / 100) * CANVAS_WIDTH;
+    } else if (component.width) {
+        width = Number(component.width);
+    }
+    if (component.height_percent !== undefined && component.height_percent !== null) {
+        height = (component.height_percent / 100) * CANVAS_HEIGHT;
+    } else if (component.height) {
+        height = Number(component.height);
+    }
+
     return new fabric.Rect({
         left: coords.x,
         top: coords.y,
-        width: 150,
-        height: 100,
+        width: width,
+        height: height,
         fill: '#2196F3',
         stroke: '#1976D2',
-        strokeWidth: 2
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center'
     });
 }
 
@@ -988,7 +1154,7 @@ const SLIDE_TEMPLATES = [
             // Colonne gauche
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 15,
                 content: '### Colonne Gauche',
                 font_size: 24,
                 color: '#4CAF50',
@@ -996,7 +1162,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'list',
-                width_percent: 80,
+                width_percent: 80, height_percent: 50,
                 content: '✓ Point 1\n✓ Point 2\n✓ Point 3\n✓ Point 4\n✓ Point 5',
                 font_size: 20,
                 color: '#cccccc',
@@ -1005,7 +1171,7 @@ const SLIDE_TEMPLATES = [
             // Colonne droite
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 15,
                 content: '### Colonne Droite',
                 font_size: 24,
                 color: '#2196F3',
@@ -1013,7 +1179,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'chart',
-                width_percent: 80, height_percent: 35,
+                width_percent: 80, height_percent: 50,
                 color: '#2196F3',
                 position: 'right'
             }
@@ -1038,7 +1204,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 60,
+                width_percent: 60, height_percent: 15,
                 content: '1',
                 font_size: 56,
                 color: '#ffffff',
@@ -1046,7 +1212,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 25,
                 content: '### Créer\n\nAjoutez contenu',
                 font_size: 18,
                 color: '#cccccc',
@@ -1061,7 +1227,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 60,
+                width_percent: 60, height_percent: 15,
                 content: '2',
                 font_size: 56,
                 color: '#ffffff',
@@ -1069,7 +1235,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 25,
                 content: '### Éditer\n\nPersonnalisez',
                 font_size: 18,
                 color: '#cccccc',
@@ -1084,7 +1250,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 60,
+                width_percent: 60, height_percent: 15,
                 content: '3',
                 font_size: 56,
                 color: '#ffffff',
@@ -1092,7 +1258,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 25,
                 content: '### Présenter\n\nAffichez',
                 font_size: 18,
                 color: '#cccccc',
@@ -1119,7 +1285,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'list',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '📌 Navigation\n\n• Section 1\n• Section 2\n• Section 3\n• Section 4\n• Section 5',
                 font_size: 16,
                 color: '#4CAF50',
@@ -1128,7 +1294,7 @@ const SLIDE_TEMPLATES = [
             // Contenu principal (col-2)
             {
                 type: 'text',
-                width_percent: 85,
+                width_percent: 85, height_percent: 60,
                 content: '### Contenu Principal\n\nLe sidebar à gauche peut contenir un menu, une table des matières, ou des informations contextuelles.\n\nLe contenu principal occupe l\'espace restant.',
                 font_size: 20,
                 color: '#cccccc',
@@ -1149,7 +1315,7 @@ const SLIDE_TEMPLATES = [
             // Contenu principal (col-1)
             {
                 type: 'code',
-                width_percent: 85,
+                width_percent: 85, height_percent: 60,
                 content: '// Exemple d\'intégration\ngrist.ready();\n\ngrist.onRecords(records => {\n  records.forEach(rec => {\n    const data = rec.fields;\n    processData(data);\n  });\n});\n\nfunction processData(data) {\n  console.log(data);\n}',
                 font_size: 16,
                 color: '#00ff00',
@@ -1164,7 +1330,7 @@ const SLIDE_TEMPLATES = [
             },
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '💡 Notes\n\nLe sidebar à droite est parfait pour:\n\n• Annotations\n• Explications\n• Références\n• Liens utiles',
                 font_size: 15,
                 color: '#FFC107',
@@ -1185,41 +1351,45 @@ const SLIDE_TEMPLATES = [
             // Case 1 (top-left)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '📊\n\nGraphique\nCase 1',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#4CAF50',
+                padding: 'medium',
                 position: 'center'
             },
             // Case 2 (top-right)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '📈\n\nDonnées\nCase 2',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#2196F3',
+                padding: 'medium',
                 position: 'center'
             },
             // Case 3 (bottom-left)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '💻\n\nCode\nCase 3',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#F44336',
+                padding: 'medium',
                 position: 'center'
             },
             // Case 4 (bottom-right)
             {
                 type: 'text',
-                width_percent: 80,
+                width_percent: 80, height_percent: 70,
                 content: '🎯\n\nRésultats\nCase 4',
                 font_size: 22,
                 color: '#ffffff',
                 background: '#FFC107',
+                padding: 'medium',
                 position: 'center'
             }
         ]
@@ -1262,21 +1432,19 @@ const SLIDE_TEMPLATES = [
         components: [
             {
                 type: 'text',
-                x_percent: 50, y_percent: 8,
-                width_percent: 90, height_percent: 8,
+                x_percent: 50, y_percent: 15,
+                width_percent: 80, height_percent: 12,
                 content: '## Layout: Custom',
                 font_size: 28,
-                color: '#ffffff',
-                position: 'center'
+                color: '#ffffff'
             },
             {
                 type: 'text',
-                x_percent: 50, y_percent: 45,
+                x_percent: 50, y_percent: 50,
                 width_percent: 70, height_percent: 30,
-                content: 'Le layout custom permet une disposition totalement libre.\n\nVous positionnez chaque élément exactement où vous voulez.',
-                font_size: 22,
-                color: '#cccccc',
-                position: 'center'
+                content: 'Le layout custom permet une disposition totalement libre.\n\nVous positionnez chaque élément exactement où vous voulez avec x_percent et y_percent.',
+                font_size: 20,
+                color: '#cccccc'
             }
         ]
     },
@@ -1286,31 +1454,30 @@ const SLIDE_TEMPLATES = [
     // ========================================
     {
         name: '📍 Les 9 Positions',
-        description: 'Démonstration positions',
+        description: 'Démonstration positions (custom layout)',
         layout: 'custom',
         background_color: '#2a2a2a',
         components: [
             {
                 type: 'text',
                 x_percent: 50, y_percent: 8,
-                width_percent: 90,
+                width_percent: 80, height_percent: 10,
                 content: '## 9 Positions Disponibles',
                 font_size: 24,
-                color: '#ffffff',
-                position: 'top'
+                color: '#ffffff'
             },
-            // Grille 3x3 pour montrer les positions (custom layout avec positionnement précis)
-            { type: 'text', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-left', font_size: 18, color: '#ffffff', background: '#F44336', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top', font_size: 18, color: '#ffffff', background: '#E91E63', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 18, content: 'top-right', font_size: 18, color: '#ffffff', background: '#9C27B0', position: 'center' },
+            // Grille 3x3 - en custom layout, on utilise x_percent/y_percent, pas position
+            { type: 'text', x_percent: 17, y_percent: 25, width_percent: 22, height_percent: 16, content: 'top-left', font_size: 16, color: '#ffffff', background: '#F44336', padding: 'medium' },
+            { type: 'text', x_percent: 50, y_percent: 25, width_percent: 22, height_percent: 16, content: 'top', font_size: 16, color: '#ffffff', background: '#E91E63', padding: 'medium' },
+            { type: 'text', x_percent: 83, y_percent: 25, width_percent: 22, height_percent: 16, content: 'top-right', font_size: 16, color: '#ffffff', background: '#9C27B0', padding: 'medium' },
 
-            { type: 'text', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 18, content: 'left', font_size: 18, color: '#ffffff', background: '#3F51B5', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 18, content: 'center', font_size: 18, color: '#ffffff', background: '#2196F3', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 18, content: 'right', font_size: 18, color: '#ffffff', background: '#009688', position: 'center' },
+            { type: 'text', x_percent: 17, y_percent: 50, width_percent: 22, height_percent: 16, content: 'left', font_size: 16, color: '#ffffff', background: '#3F51B5', padding: 'medium' },
+            { type: 'text', x_percent: 50, y_percent: 50, width_percent: 22, height_percent: 16, content: 'center', font_size: 16, color: '#ffffff', background: '#2196F3', padding: 'medium' },
+            { type: 'text', x_percent: 83, y_percent: 50, width_percent: 22, height_percent: 16, content: 'right', font_size: 16, color: '#ffffff', background: '#009688', padding: 'medium' },
 
-            { type: 'text', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-left', font_size: 18, color: '#ffffff', background: '#4CAF50', position: 'center' },
-            { type: 'text', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom', font_size: 18, color: '#ffffff', background: '#8BC34A', position: 'center' },
-            { type: 'text', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 18, content: 'bottom-right', font_size: 18, color: '#ffffff', background: '#FFC107', position: 'center' }
+            { type: 'text', x_percent: 17, y_percent: 75, width_percent: 22, height_percent: 16, content: 'bottom-left', font_size: 16, color: '#ffffff', background: '#4CAF50', padding: 'medium' },
+            { type: 'text', x_percent: 50, y_percent: 75, width_percent: 22, height_percent: 16, content: 'bottom', font_size: 16, color: '#ffffff', background: '#8BC34A', padding: 'medium' },
+            { type: 'text', x_percent: 83, y_percent: 75, width_percent: 22, height_percent: 16, content: 'bottom-right', font_size: 16, color: '#ffffff', background: '#FFC107', padding: 'medium' }
         ]
     },
 

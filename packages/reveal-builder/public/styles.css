@@ -19,16 +19,20 @@
 /* ========================================
    BASE
    ======================================== */
-body {
+html, body {
     margin: 0;
     padding: 0;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
 }
 
 .reveal {
     width: 100%;
-    height: 100vh;
-    position: relative;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
     z-index: 1;
 }
 
@@ -423,15 +427,28 @@ body {
 .component-list {
     display: flex;
     flex-direction: column;
+    text-align: left;
+}
+
+.component-list ul,
+.component-list ol {
+    list-style-position: outside;
+    padding-left: 1.5em;
+    text-align: left;
+    margin-left: 0;
 }
 
 .component-list ul {
     list-style-type: disc;
-    padding-left: 1.5em;
+}
+
+.component-list ol {
+    list-style-type: decimal;
 }
 
 .component-list li {
     margin: 0.3em 0;
+    text-align: left;
 }
 
 .component-table {
@@ -687,11 +704,48 @@ body {
 }
 
 /* ========================================
-   RESPONSIVE
+   RESPONSIVE - VUE TABLETTE PAR DÉFAUT
    ======================================== */
-@media (max-width: 768px) {
+
+/* Vue tablette - optimisée pour Grist (900px-1200px) */
+@media (max-width: 1200px) {
     .reveal {
-        font-size: 0.9em;
+        font-size: 0.95em;
+    }
+
+    #status-bar {
+        font-size: 0.7em;
+        padding: 0.4em 0.7em;
+    }
+
+    .status-item span {
+        display: inline;
+    }
+
+    /* Ajuster les layouts multi-colonnes pour tablette */
+    .layout-two-column {
+        gap: var(--spacing-md);
+    }
+
+    .layout-three-column {
+        gap: var(--spacing-sm);
+    }
+
+    .layout-sidebar-left .sidebar,
+    .layout-sidebar-right .sidebar {
+        padding: var(--spacing-sm);
+    }
+
+    /* Composants plus compacts */
+    .component {
+        padding: var(--spacing-sm);
+    }
+}
+
+/* Petite tablette (768px-900px) */
+@media (max-width: 900px) {
+    .reveal {
+        font-size: 0.85em;
     }
 
     #status-bar {
@@ -699,16 +753,59 @@ body {
         padding: 0.3em 0.5em;
     }
 
+    /* Simplifier les multi-colonnes */
+    .layout-three-column {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--spacing-sm);
+    }
+
+    .layout-three-column .column:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Mobile - simplification maximale */
+@media (max-width: 768px) {
+    .reveal {
+        font-size: 0.8em;
+    }
+
+    #status-bar {
+        font-size: 0.6em;
+        padding: 0.3em 0.4em;
+        flex-wrap: wrap;
+    }
+
+    .status-actions {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 0.3em;
+    }
+
+    /* Passer en une colonne */
     .layout-two-column,
     .layout-three-column,
     .layout-sidebar-left,
     .layout-sidebar-right {
         grid-template-columns: 1fr;
+        gap: var(--spacing-sm);
     }
 
     .layout-grid-2x2 {
         grid-template-columns: 1fr;
         grid-template-rows: auto;
+    }
+
+    /* Composants plus compacts */
+    .component {
+        font-size: 0.9em;
+        padding: var(--spacing-sm);
+    }
+
+    .component-text p,
+    .component-list ul,
+    .component-table {
+        margin: 0.3em 0;
     }
 }
 
