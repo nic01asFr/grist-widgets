@@ -1163,7 +1163,7 @@ const debouncedSaveComponent = debounce(async (component) => {
             height: component.height
         };
 
-        // Ajouter x_canvas et y_canvas si définis
+        // Ajouter x_canvas et y_canvas si définis (pour l'éditeur)
         if (component.x_canvas !== undefined) {
             updates.x_canvas = component.x_canvas;
         }
@@ -1171,7 +1171,24 @@ const debouncedSaveComponent = debounce(async (component) => {
             updates.y_canvas = component.y_canvas;
         }
 
-        console.log(`💾 Saving component ${component.id} at (${updates.x_canvas}, ${updates.y_canvas})`);
+        // Calculer automatiquement les pourcentages (pour le visualisateur)
+        if (component.x_canvas !== undefined && CONFIG.CANVAS.WIDTH) {
+            updates.x_percent = (component.x_canvas / CONFIG.CANVAS.WIDTH) * 100;
+        }
+        if (component.y_canvas !== undefined && CONFIG.CANVAS.HEIGHT) {
+            updates.y_percent = (component.y_canvas / CONFIG.CANVAS.HEIGHT) * 100;
+        }
+        if (component.width !== undefined && CONFIG.CANVAS.WIDTH) {
+            updates.width_percent = (component.width / CONFIG.CANVAS.WIDTH) * 100;
+        }
+        if (component.height !== undefined && CONFIG.CANVAS.HEIGHT) {
+            updates.height_percent = (component.height / CONFIG.CANVAS.HEIGHT) * 100;
+        }
+
+        console.log(`💾 Saving component ${component.id}:`, {
+            pixels: `(${updates.x_canvas}, ${updates.y_canvas}) ${updates.width}x${updates.height}`,
+            percent: `(${updates.x_percent?.toFixed(1)}%, ${updates.y_percent?.toFixed(1)}%) ${updates.width_percent?.toFixed(1)}%x${updates.height_percent?.toFixed(1)}%`
+        });
 
         await appState.docApi.applyUserActions([
             ['UpdateRecord', CONFIG.TABLES.COMPONENTS, component.id, updates]
@@ -1197,7 +1214,7 @@ function debounce(func, wait) {
 // TABLE CREATION
 // ========================================
 
-// Ensure x_canvas, y_canvas, url and background columns exist
+// Ensure all positioning columns exist (pixels and percentages)
 async function ensureCanvasColumns() {
     try {
         const tables = await appState.docApi.fetchTable('_grist_Tables');
@@ -1214,24 +1231,38 @@ async function ensureCanvasColumns() {
 
         const columnsToAdd = [];
 
+        // Colonnes pixels (pour l'éditeur)
         if (!columnNames.includes('x_canvas')) {
             columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'x_canvas', { type: 'Numeric', label: 'X Canvas (px)' }]);
         }
-
         if (!columnNames.includes('y_canvas')) {
             columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'y_canvas', { type: 'Numeric', label: 'Y Canvas (px)' }]);
         }
 
+        // Colonnes pourcentages (pour le visualisateur)
+        if (!columnNames.includes('x_percent')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'x_percent', { type: 'Numeric', label: 'X (%)' }]);
+        }
+        if (!columnNames.includes('y_percent')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'y_percent', { type: 'Numeric', label: 'Y (%)' }]);
+        }
+        if (!columnNames.includes('width_percent')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'width_percent', { type: 'Numeric', label: 'Largeur (%)' }]);
+        }
+        if (!columnNames.includes('height_percent')) {
+            columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'height_percent', { type: 'Numeric', label: 'Hauteur (%)' }]);
+        }
+
+        // Autres colonnes
         if (!columnNames.includes('url')) {
             columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'url', { type: 'Text', label: 'URL' }]);
         }
-
         if (!columnNames.includes('background')) {
             columnsToAdd.push(['AddColumn', CONFIG.TABLES.COMPONENTS, 'background', { type: 'Text', label: 'Couleur fond' }]);
         }
 
         if (columnsToAdd.length > 0) {
-            console.log('Adding missing columns:', columnsToAdd);
+            console.log('📊 Adding missing columns:', columnsToAdd.map(c => c[2]));
             await appState.docApi.applyUserActions(columnsToAdd);
         }
     } catch (error) {
@@ -1286,7 +1317,11 @@ window.createMissingTables = async function() {
                 { id: 'background', fields: { type: 'Text', label: 'Couleur fond' } },
                 { id: 'font_size', fields: { type: 'Numeric', label: 'Taille police (px)' } },
                 { id: 'x_canvas', fields: { type: 'Numeric', label: 'X Canvas (px)' } },
-                { id: 'y_canvas', fields: { type: 'Numeric', label: 'Y Canvas (px)' } }
+                { id: 'y_canvas', fields: { type: 'Numeric', label: 'Y Canvas (px)' } },
+                { id: 'x_percent', fields: { type: 'Numeric', label: 'X (%)' } },
+                { id: 'y_percent', fields: { type: 'Numeric', label: 'Y (%)' } },
+                { id: 'width_percent', fields: { type: 'Numeric', label: 'Largeur (%)' } },
+                { id: 'height_percent', fields: { type: 'Numeric', label: 'Hauteur (%)' } }
             ]]);
         }
 

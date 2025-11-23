@@ -401,21 +401,35 @@ function renderComponent(component, positionOverride = null) {
     // Appliquer preset D'ABORD (sera écrasé par les propriétés spécifiques du composant)
     Object.assign(styles, preset);
 
-    // Positionnement absolu si x_canvas/y_canvas sont définis
-    if (component.x_canvas !== undefined && component.x_canvas !== null &&
+    // PRIORITÉ : Utiliser les pourcentages (relatifs) si disponibles
+    if (component.x_percent !== undefined && component.x_percent !== null &&
+        component.y_percent !== undefined && component.y_percent !== null) {
+        styles.position = 'absolute';
+        styles.left = `${component.x_percent}%`;
+        styles.top = `${component.y_percent}%`;
+        console.log(`📍 Component ${component.type} positioned at (${component.x_percent.toFixed(1)}%, ${component.y_percent.toFixed(1)}%)`);
+    }
+    // FALLBACK : Utiliser les pixels (absolus) si pas de pourcentages
+    else if (component.x_canvas !== undefined && component.x_canvas !== null &&
         component.y_canvas !== undefined && component.y_canvas !== null) {
         styles.position = 'absolute';
         styles.left = `${component.x_canvas}px`;
         styles.top = `${component.y_canvas}px`;
-        console.log(`📍 Component ${component.type} positioned at (${component.x_canvas}, ${component.y_canvas})`);
+        console.log(`📍 Component ${component.type} positioned at (${component.x_canvas}px, ${component.y_canvas}px) - using pixels fallback`);
     } else {
-        console.log(`⚠️ Component ${component.type} missing x_canvas/y_canvas, using grid position: ${position}`);
+        console.log(`⚠️ Component ${component.type} missing positioning, using grid position: ${position}`);
     }
 
-    if (component.width && component.width !== 'auto') {
+    // Dimensions en pourcentages (PRIORITÉ) ou pixels (FALLBACK)
+    if (component.width_percent !== undefined && component.width_percent !== null) {
+        styles.width = `${component.width_percent}%`;
+    } else if (component.width && component.width !== 'auto') {
         styles.width = typeof component.width === 'number' ? `${component.width}px` : component.width;
     }
-    if (component.height && component.height !== 'auto') {
+
+    if (component.height_percent !== undefined && component.height_percent !== null) {
+        styles.height = `${component.height_percent}%`;
+    } else if (component.height && component.height !== 'auto') {
         styles.height = typeof component.height === 'number' ? `${component.height}px` : component.height;
     }
 
@@ -724,8 +738,14 @@ async function loadPresentations() {
             shadow: components.shadow?.[i],
             animation: components.animation?.[i],
             custom_css: components.custom_css?.[i],
-            x_canvas: components.x_canvas?.[i],      // AJOUT CRITIQUE
-            y_canvas: components.y_canvas?.[i]       // AJOUT CRITIQUE
+            // Coordonnées pixels (fallback)
+            x_canvas: components.x_canvas?.[i],
+            y_canvas: components.y_canvas?.[i],
+            // Coordonnées pourcentages (PRIORITÉ)
+            x_percent: components.x_percent?.[i],
+            y_percent: components.y_percent?.[i],
+            width_percent: components.width_percent?.[i],
+            height_percent: components.height_percent?.[i]
         }));
 
         // Build presentation
