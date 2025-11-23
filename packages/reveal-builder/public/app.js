@@ -723,7 +723,9 @@ async function loadPresentations() {
             border_radius: components.border_radius?.[i],
             shadow: components.shadow?.[i],
             animation: components.animation?.[i],
-            custom_css: components.custom_css?.[i]
+            custom_css: components.custom_css?.[i],
+            x_canvas: components.x_canvas?.[i],      // AJOUT CRITIQUE
+            y_canvas: components.y_canvas?.[i]       // AJOUT CRITIQUE
         }));
 
         // Build presentation
