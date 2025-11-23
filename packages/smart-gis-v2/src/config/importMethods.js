@@ -5,6 +5,8 @@
  * validation rules, and processing logic.
  */
 
+import { geoJSONToWKT } from '../utils/geometryConverters';
+
 export const IMPORT_METHODS = {
   geojson: {
     id: 'geojson',
@@ -443,11 +445,17 @@ export const IMPORT_METHODS = {
         throw new Error('Aucune donnée trouvée. Essayez sans filtre ou avec un autre nom.');
       }
 
-      return geojson.features.map((feature, idx) => ({
-        geometry: JSON.stringify(feature.geometry),
-        properties: feature.properties || {},
-        feature_index: idx
-      }));
+      return geojson.features.map((feature, idx) => {
+        const wkt = geoJSONToWKT(feature.geometry);
+        if (!wkt) {
+          console.warn(`[IGN Import] Failed to convert geometry for feature ${idx}`);
+        }
+        return {
+          geometry: wkt,
+          properties: feature.properties || {},
+          feature_index: idx
+        };
+      });
     }
   },
 
@@ -597,8 +605,14 @@ out geom;`;
           return null;
         }
 
+        const wkt = geoJSONToWKT(geometry);
+        if (!wkt) {
+          console.warn(`[OSM Import] Failed to convert geometry for element ${element.id}`);
+          return null;
+        }
+
         return {
-          geometry: JSON.stringify(geometry),
+          geometry: wkt,
           properties: {
             osm_id: element.id,
             osm_type: element.type,
