@@ -79,11 +79,18 @@ export const IMPORT_METHODS = {
         ? geojson.features
         : [geojson];
 
-      return features.map((feature, idx) => ({
-        geometry: JSON.stringify(feature.geometry),
-        properties: feature.properties || {},
-        feature_index: idx
-      }));
+      return features.map((feature, idx) => {
+        // Convert GeoJSON geometry to WKT format
+        const wkt = geoJSONToWKT(feature.geometry);
+        if (!wkt) {
+          console.warn(`[GeoJSON Import] Failed to convert geometry for feature ${idx}`);
+        }
+        return {
+          geometry: wkt,  // WKT format for geometry_wgs84 column
+          properties: feature.properties || {},
+          feature_index: idx
+        };
+      });
     }
   },
 
