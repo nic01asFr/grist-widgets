@@ -13,7 +13,7 @@ import SearchPanel from '../panels/SearchPanel';
 
 const Sidebar = () => {
   const [activeTab, setActiveTab] = useState('layers');
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true); // Default: collapsed for full map view
 
   useEffect(() => {
     const unsubscribe = StateManager.subscribe('ui.activeTab', (tab) => {
