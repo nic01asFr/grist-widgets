@@ -76,20 +76,21 @@ const LayerRenderer = ({ layer }) => {
             )}
 
             {/* Polygon metrics */}
-            {layer.area_km2 && (
+            {layer.area_km2 != null && typeof layer.area_km2 === 'number' && (
               <div><strong>Surface:</strong> {layer.area_km2.toFixed(2)} km²</div>
             )}
-            {layer.perimeter_km && (
+            {layer.perimeter_km != null && typeof layer.perimeter_km === 'number' && (
               <div><strong>Périmètre:</strong> {layer.perimeter_km.toFixed(2)} km</div>
             )}
 
             {/* LineString metrics */}
-            {layer.length_km && (
+            {layer.length_km != null && typeof layer.length_km === 'number' && (
               <div><strong>Longueur:</strong> {layer.length_km.toFixed(2)} km</div>
             )}
 
             {/* Center coordinates (all geometry types) */}
-            {layer.center_lat && layer.center_lon && (
+            {layer.center_lat != null && typeof layer.center_lat === 'number' &&
+             layer.center_lon != null && typeof layer.center_lon === 'number' && (
               <div>
                 <strong>Centre:</strong> {layer.center_lat.toFixed(6)}, {layer.center_lon.toFixed(6)}
               </div>
