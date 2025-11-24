@@ -12,6 +12,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import StateManager from '../../core/StateManager';
 import BasemapProvider from '../../services/BasemapProvider';
 import LayerRenderer from './LayerRenderer';
+import LegendPanel from './LegendPanel';
 import { filterVisibleLayers, ProgressiveLoader } from '../../utils/viewportManager';
 import 'leaflet/dist/leaflet.css';
 
@@ -155,41 +156,46 @@ const MapView = () => {
   }, [basemap]);
 
   return (
-    <MapContainer
-      center={center}
-      zoom={zoom}
-      style={{ height: '100%', width: '100%' }}
-      whenCreated={map => mapRef.current = map}
-      onMoveEnd={handleMapMove}
-      onZoomEnd={handleMapMove}
-    >
-      {/* Dynamic base map tile layer */}
-      <TileLayer
-        key={basemap}
-        url={basemapProps.url}
-        attribution={basemapProps.attribution}
-        maxZoom={basemapProps.maxZoom}
-        subdomains={basemapProps.subdomains}
-      />
+    <>
+      <MapContainer
+        center={center}
+        zoom={zoom}
+        style={{ height: '100%', width: '100%' }}
+        whenCreated={map => mapRef.current = map}
+        onMoveEnd={handleMapMove}
+        onZoomEnd={handleMapMove}
+      >
+        {/* Dynamic base map tile layer */}
+        <TileLayer
+          key={basemap}
+          url={basemapProps.url}
+          attribution={basemapProps.attribution}
+          maxZoom={basemapProps.maxZoom}
+          subdomains={basemapProps.subdomains}
+        />
 
-      {/* Non-point layers (no clustering) */}
-      {otherLayers.map(layer => (
-        <LayerRenderer key={layer.id} layer={layer} />
-      ))}
+        {/* Non-point layers (no clustering) */}
+        {otherLayers.map(layer => (
+          <LayerRenderer key={layer.id} layer={layer} />
+        ))}
 
-      {/* Point layers with clustering */}
-      {pointLayers.length > 0 && (
-        <MarkerClusterGroup
-          chunkedLoading
-          maxClusterRadius={50}
-          showCoverageOnHover={false}
-        >
-          {pointLayers.map(layer => (
-            <LayerRenderer key={layer.id} layer={layer} />
-          ))}
-        </MarkerClusterGroup>
-      )}
-    </MapContainer>
+        {/* Point layers with clustering */}
+        {pointLayers.length > 0 && (
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={50}
+            showCoverageOnHover={false}
+          >
+            {pointLayers.map(layer => (
+              <LayerRenderer key={layer.id} layer={layer} />
+            ))}
+          </MarkerClusterGroup>
+        )}
+      </MapContainer>
+
+      {/* Legend panel (overlay) */}
+      <LegendPanel />
+    </>
   );
 };
 
