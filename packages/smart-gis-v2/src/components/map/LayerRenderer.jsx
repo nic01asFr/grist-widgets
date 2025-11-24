@@ -15,6 +15,8 @@ import { Marker, Polyline, Polygon, Popup } from 'react-leaflet';
 import geometryCache from '../../utils/geometry/geometryCache';
 import StateManager from '../../core/StateManager';
 import SelectionManager from '../../services/SelectionManager';
+import StyleManager from '../../services/StyleManager';
+import PopupTemplateEngine from '../../services/PopupTemplateEngine';
 
 const LayerRenderer = ({ layer }) => {
   const [isSelected, setIsSelected] = useState(false);
@@ -40,27 +42,20 @@ const LayerRenderer = ({ layer }) => {
     return unsubscribe;
   }, [layer.id]);
 
-  // Base style with selection highlight
+  // Get computed style from StyleManager (handles layer/feature styles + selection + hover)
   const style = useMemo(() => {
-    try {
-      const baseStyle = layer.style ? JSON.parse(layer.style) : getDefaultStyle(geometry.type);
+    return StyleManager.getFeatureStyle(layer, false, isSelected);
+  }, [layer, isSelected]);
 
-      // Add highlight style if selected
-      if (isSelected) {
-        return {
-          ...baseStyle,
-          color: '#ffff00',           // Yellow border for selected
-          weight: (baseStyle.weight || 2) + 2,  // Thicker border
-          fillColor: '#ffff00',       // Yellow fill
-          fillOpacity: (baseStyle.fillOpacity || 0.3) + 0.2  // More opaque
-        };
-      }
+  // Subscribe to style updates
+  useEffect(() => {
+    const unsubscribe = StateManager.subscribe('styles.updated', () => {
+      // Force re-render when styles change
+      // (useMemo will recompute style)
+    });
 
-      return baseStyle;
-    } catch {
-      return getDefaultStyle(geometry.type);
-    }
-  }, [layer.style, geometry.type, isSelected]);
+    return unsubscribe;
+  }, []);
 
   // Handle click with Grist sync
   const handleClick = (e) => {
@@ -82,58 +77,13 @@ const LayerRenderer = ({ layer }) => {
     }
   }, [layer.properties]);
 
+  // Render popup using PopupTemplateEngine
   const renderPopup = () => {
+    const popupHtml = PopupTemplateEngine.render(layer);
+
     return (
       <Popup>
-        <div className="feature-popup">
-          <h4>{layer.feature_name || layer.layer_name}</h4>
-          <p><em>{layer.layer_name}</em></p>
-
-          {/* Display properties */}
-          {Object.keys(properties).length > 0 && (
-            <dl>
-              {Object.entries(properties).slice(0, 5).map(([key, value]) => (
-                <React.Fragment key={key}>
-                  <dt>{key}</dt>
-                  <dd>{String(value)}</dd>
-                </React.Fragment>
-              ))}
-            </dl>
-          )}
-
-          {/* Display ST_* calculated metrics (read from Grist formulas) */}
-          <div className="metrics">
-            {layer.geometry_type && (
-              <div><strong>Type:</strong> {layer.geometry_type}</div>
-            )}
-
-            {/* Polygon metrics */}
-            {layer.area_km2 != null && typeof layer.area_km2 === 'number' && (
-              <div><strong>Surface:</strong> {layer.area_km2.toFixed(2)} km²</div>
-            )}
-            {layer.perimeter_km != null && typeof layer.perimeter_km === 'number' && (
-              <div><strong>Périmètre:</strong> {layer.perimeter_km.toFixed(2)} km</div>
-            )}
-
-            {/* LineString metrics */}
-            {layer.length_km != null && typeof layer.length_km === 'number' && (
-              <div><strong>Longueur:</strong> {layer.length_km.toFixed(2)} km</div>
-            )}
-
-            {/* Center coordinates (all geometry types) */}
-            {layer.center_lat != null && typeof layer.center_lat === 'number' &&
-             layer.center_lon != null && typeof layer.center_lon === 'number' && (
-              <div>
-                <strong>Centre:</strong> {layer.center_lat.toFixed(6)}, {layer.center_lon.toFixed(6)}
-              </div>
-            )}
-
-            {/* Validation */}
-            {layer.is_valid_geom !== undefined && !layer.is_valid_geom && (
-              <div style={{ color: 'red' }}>⚠️ Géométrie invalide</div>
-            )}
-          </div>
-        </div>
+        <div dangerouslySetInnerHTML={{ __html: popupHtml }} />
       </Popup>
     );
   };
@@ -227,31 +177,6 @@ const LayerRenderer = ({ layer }) => {
       return null;
   }
 };
-
-function getDefaultStyle(geometryType) {
-  const defaults = {
-    Point: {
-      color: '#3388ff',
-      fillColor: '#3388ff',
-      fillOpacity: 0.6,
-      radius: 8,
-      weight: 2
-    },
-    LineString: {
-      color: '#ff7800',
-      weight: 3,
-      opacity: 0.8
-    },
-    Polygon: {
-      color: '#ff7800',
-      fillColor: '#ff7800',
-      fillOpacity: 0.3,
-      weight: 2
-    }
-  };
-
-  return defaults[geometryType] || defaults.Polygon;
-}
 
 // OPTIMIZATION: React.memo prevents re-render when props haven't changed
 // Note: Selection state is managed internally via StateManager subscription,

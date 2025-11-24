@@ -14,6 +14,7 @@ import Sidebar from './components/layout/Sidebar';
 import MapView from './components/map/MapView';
 import ContextualPanel from './components/layout/ContextualPanel';
 import './styles/main.css';
+import './styles/popups.css';
 
 const SmartGISWidget = () => {
   const [isReady, setIsReady] = useState(false);
