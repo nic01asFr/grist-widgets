@@ -947,8 +947,8 @@ function initializeRevealJS() {
             margin: 0,      // Pas de marge pour correspondance exacte avec l'éditeur
             width: 960,     // Dimensions exactes
             height: 700,    // Dimensions exactes
-            minScale: 0.2,
-            maxScale: 2.0
+            minScale: 1.0,  // CRITIQUE: forcer scale 1:1 pour correspondance avec éditeur
+            maxScale: 1.0   // CRITIQUE: pas de zoom automatique
         });
 
         Reveal.on('ready', () => {
