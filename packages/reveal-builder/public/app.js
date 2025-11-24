@@ -940,15 +940,15 @@ function initializeRevealJS() {
             transition: 'slide',
             keyboard: true,
             overview: true,
-            center: false,  // Désactivé pour correspondance exacte avec l'éditeur
+            center: false,  // Désactivé pour alignement cohérent avec l'éditeur
             touch: true,
             controls: true,
             progress: true,
             margin: 0,      // Pas de marge pour correspondance exacte avec l'éditeur
-            width: 960,     // Dimensions exactes
-            height: 700,    // Dimensions exactes
-            minScale: 1.0,  // CRITIQUE: forcer scale 1:1 pour correspondance avec éditeur
-            maxScale: 1.0   // CRITIQUE: pas de zoom automatique
+            width: 960,     // Dimensions exactes (natives)
+            height: 700,    // Dimensions exactes (natives)
+            minScale: 0.2,  // Permettre scaling down jusqu'à 20%
+            maxScale: 3.0   // Permettre scaling up jusqu'à 300%
         });
 
         Reveal.on('ready', () => {

@@ -365,16 +365,13 @@ body {
 /* Cadre visuel pour montrer les limites exactes de la slide */
 .canvas-frame {
     position: relative;
-    width: 960px;
-    height: 700px;
+    /* width et height définis dynamiquement par JS selon le zoom */
     border: 3px solid rgba(103, 126, 234, 0.5);
     box-shadow:
         0 0 0 1px rgba(103, 126, 234, 0.3),
         0 0 40px rgba(0, 0, 0, 0.8),
         inset 0 0 0 1px rgba(255, 255, 255, 0.05);
     background: var(--color-bg-secondary);
-    transform-origin: center center;
-    /* Le scale sera ajusté dynamiquement par JS si nécessaire */
 }
 
 .canvas-frame-label {
