@@ -198,6 +198,7 @@ function initializeCanvas() {
 
 // Ajuster automatiquement le scale du canvas pour qu'il tienne dans l'espace disponible
 // UTILISE canvas.setZoom() au lieu de CSS transform pour maintenir les coordonnées correctes
+// IGNORE le zoom navigateur pour garder les proportions cohérentes
 function scaleCanvasToFit() {
     const canvasContainer = document.getElementById('canvas-container');
     const canvasFrame = document.querySelector('.canvas-frame');
@@ -208,9 +209,23 @@ function scaleCanvasToFit() {
     const CANVAS_HEIGHT = 700;
     const PADDING = 40; // padding du container
 
-    // Dimensions disponibles
-    const containerWidth = canvasContainer.clientWidth - PADDING * 2;
-    const containerHeight = canvasContainer.clientHeight - PADDING * 2;
+    // CRITIQUE: Utiliser visualViewport pour ignorer le zoom navigateur
+    // visualViewport donne les dimensions réelles du viewport, indépendantes du zoom
+    let containerWidth, containerHeight;
+
+    if (window.visualViewport) {
+        // Utiliser visualViewport qui n'est pas affecté par le zoom navigateur
+        const rect = canvasContainer.getBoundingClientRect();
+        const viewportScale = window.visualViewport.scale || 1;
+
+        // Calculer les dimensions réelles en compensant le zoom navigateur
+        containerWidth = (rect.width * viewportScale) - PADDING * 2;
+        containerHeight = (rect.height * viewportScale) - PADDING * 2;
+    } else {
+        // Fallback pour anciens navigateurs
+        containerWidth = canvasContainer.clientWidth - PADDING * 2;
+        containerHeight = canvasContainer.clientHeight - PADDING * 2;
+    }
 
     // Calculer le scale pour que le canvas tienne entièrement
     const scaleX = containerWidth / CANVAS_WIDTH;
@@ -229,7 +244,7 @@ function scaleCanvasToFit() {
     canvasFrame.style.width = `${CANVAS_WIDTH * scale}px`;
     canvasFrame.style.height = `${CANVAS_HEIGHT * scale}px`;
 
-    console.log(`📐 Canvas zoomed to ${(scale * 100).toFixed(1)}% (Fabric.js setZoom)`);
+    console.log(`📐 Canvas zoomed to ${(scale * 100).toFixed(1)}% (Fabric.js setZoom, viewport scale: ${window.visualViewport?.scale || 1})`);
 }
 
 function handleSelection(e) {
