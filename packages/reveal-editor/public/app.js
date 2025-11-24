@@ -187,64 +187,14 @@ function initializeCanvas() {
     // Object modification events
     appState.canvas.on('object:modified', handleObjectModified);
 
-    // Ajuster le scale du canvas pour qu'il tienne dans l'espace disponible
-    scaleCanvasToFit();
-
-    // Re-scale sur resize de la fenêtre
-    window.addEventListener('resize', scaleCanvasToFit);
-
-    console.log('🎨 Canvas initialized');
-}
-
-// Ajuster automatiquement le scale du canvas pour qu'il tienne dans l'espace disponible
-// UTILISE canvas.setZoom() au lieu de CSS transform pour maintenir les coordonnées correctes
-// IGNORE le zoom navigateur pour garder les proportions cohérentes
-function scaleCanvasToFit() {
-    const canvasContainer = document.getElementById('canvas-container');
+    // Ajuster les dimensions de la frame
     const canvasFrame = document.querySelector('.canvas-frame');
-
-    if (!canvasContainer || !canvasFrame || !appState.canvas) return;
-
-    const CANVAS_WIDTH = 960;
-    const CANVAS_HEIGHT = 700;
-    const PADDING = 40; // padding du container
-
-    // CRITIQUE: Utiliser visualViewport pour ignorer le zoom navigateur
-    // visualViewport donne les dimensions réelles du viewport, indépendantes du zoom
-    let containerWidth, containerHeight;
-
-    if (window.visualViewport) {
-        // Utiliser visualViewport qui n'est pas affecté par le zoom navigateur
-        const rect = canvasContainer.getBoundingClientRect();
-        const viewportScale = window.visualViewport.scale || 1;
-
-        // Calculer les dimensions réelles en compensant le zoom navigateur
-        containerWidth = (rect.width * viewportScale) - PADDING * 2;
-        containerHeight = (rect.height * viewportScale) - PADDING * 2;
-    } else {
-        // Fallback pour anciens navigateurs
-        containerWidth = canvasContainer.clientWidth - PADDING * 2;
-        containerHeight = canvasContainer.clientHeight - PADDING * 2;
+    if (canvasFrame) {
+        canvasFrame.style.width = `${CONFIG.CANVAS.WIDTH}px`;
+        canvasFrame.style.height = `${CONFIG.CANVAS.HEIGHT}px`;
     }
 
-    // Calculer le scale pour que le canvas tienne entièrement
-    const scaleX = containerWidth / CANVAS_WIDTH;
-    const scaleY = containerHeight / CANVAS_HEIGHT;
-    const scale = Math.min(scaleX, scaleY); // Permettre scaling up et down
-
-    // CRITIQUE: Utiliser canvas.setZoom() au lieu de CSS transform
-    // Cela maintient les coordonnées correctes pour Fabric.js
-    appState.canvas.setZoom(scale);
-
-    // Ajuster les dimensions du canvas HTML pour correspondre au zoom
-    appState.canvas.setWidth(CANVAS_WIDTH * scale);
-    appState.canvas.setHeight(CANVAS_HEIGHT * scale);
-
-    // Ajuster la frame pour contenir le canvas zoomé
-    canvasFrame.style.width = `${CANVAS_WIDTH * scale}px`;
-    canvasFrame.style.height = `${CANVAS_HEIGHT * scale}px`;
-
-    console.log(`📐 Canvas zoomed to ${(scale * 100).toFixed(1)}% (Fabric.js setZoom, viewport scale: ${window.visualViewport?.scale || 1})`);
+    console.log('🎨 Canvas initialized at 960x700 (fixed size, no scaling)');
 }
 
 function handleSelection(e) {
