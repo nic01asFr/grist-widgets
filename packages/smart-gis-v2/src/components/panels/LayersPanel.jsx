@@ -13,12 +13,16 @@ import React, { useState, useEffect } from 'react';
 import StateManager from '../../core/StateManager';
 import GristAPI from '../../core/GristAPI';
 import { calculateBounds } from '../../utils/geometry/wktParser';
+import DataDrivenStyleEditor from '../styling/DataDrivenStyleEditor';
+import AttributeQueryBuilder from '../query/AttributeQueryBuilder';
 import './LayersPanel.css';
 
 const LayersPanel = () => {
   const [layers, setLayers] = useState([]);
   const [selectedLayerId, setSelectedLayerId] = useState(null);
   const [groupedLayers, setGroupedLayers] = useState({});
+  const [activeEditor, setActiveEditor] = useState(null); // 'style' or 'query'
+  const [editorLayerId, setEditorLayerId] = useState(null);
 
   useEffect(() => {
     const unsubscribe = StateManager.subscribe('layers.workspace', (workspaceLayers) => {
@@ -155,6 +159,29 @@ const LayersPanel = () => {
     };
   };
 
+  const openStyleEditor = (layerName) => {
+    // Get first feature ID from this layer for editor
+    const layerGroup = groupedLayers[layerName];
+    if (layerGroup && layerGroup.features.length > 0) {
+      setEditorLayerId(layerGroup.features[0].id);
+      setActiveEditor('style');
+    }
+  };
+
+  const openQueryBuilder = (layerName) => {
+    // Get first feature ID from this layer for editor
+    const layerGroup = groupedLayers[layerName];
+    if (layerGroup && layerGroup.features.length > 0) {
+      setEditorLayerId(layerGroup.features[0].id);
+      setActiveEditor('query');
+    }
+  };
+
+  const closeEditor = () => {
+    setActiveEditor(null);
+    setEditorLayerId(null);
+  };
+
   const layersList = Object.values(groupedLayers).sort((a, b) => b.zIndex - a.zIndex);
 
   return (
@@ -212,6 +239,20 @@ const LayersPanel = () => {
 
                 <div className="layer-actions">
                   <button
+                    onClick={() => openStyleEditor(layerGroup.name)}
+                    title="Configurer le style"
+                    className="btn-action"
+                  >
+                    🎨
+                  </button>
+                  <button
+                    onClick={() => openQueryBuilder(layerGroup.name)}
+                    title="Requête attributaire"
+                    className="btn-action"
+                  >
+                    🔎
+                  </button>
+                  <button
                     onClick={() => zoomToLayer(layerGroup.name)}
                     title="Zoomer sur le layer"
                     className="btn-action"
@@ -236,6 +277,20 @@ const LayersPanel = () => {
         <div className="layers-footer">
           <div className="layers-stats">
             <strong>Total:</strong> {layers.length} features dans {layersList.length} layer{layersList.length > 1 ? 's' : ''}
+          </div>
+        </div>
+      )}
+
+      {/* Editor modals */}
+      {activeEditor && editorLayerId && (
+        <div className="editor-modal-overlay" onClick={closeEditor}>
+          <div className="editor-modal-content" onClick={(e) => e.stopPropagation()}>
+            {activeEditor === 'style' && (
+              <DataDrivenStyleEditor layerId={editorLayerId} onClose={closeEditor} />
+            )}
+            {activeEditor === 'query' && (
+              <AttributeQueryBuilder layerId={editorLayerId} onClose={closeEditor} />
+            )}
           </div>
         </div>
       )}

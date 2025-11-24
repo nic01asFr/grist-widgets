@@ -16,6 +16,7 @@ import geometryCache from '../../utils/geometry/geometryCache';
 import StateManager from '../../core/StateManager';
 import SelectionManager from '../../services/SelectionManager';
 import StyleManager from '../../services/StyleManager';
+import StyleRuleEngine from '../../services/StyleRuleEngine';
 import PopupTemplateEngine from '../../services/PopupTemplateEngine';
 
 const LayerRenderer = ({ layer }) => {
@@ -42,19 +43,49 @@ const LayerRenderer = ({ layer }) => {
     return unsubscribe;
   }, [layer.id]);
 
-  // Get computed style from StyleManager (handles layer/feature styles + selection + hover)
+  // Get computed style: Check for data-driven rules first, then fallback to StyleManager
   const style = useMemo(() => {
+    // Check if there's a style rule for this layer
+    const styleRules = StateManager.getState('layers.styleRules') || {};
+    const rule = styleRules[layer.layer_name];
+
+    if (rule) {
+      // Use data-driven styling
+      const dataDrivenStyle = StyleRuleEngine.applyStyleRule(layer, rule);
+
+      // Merge with selection highlighting if selected
+      if (isSelected) {
+        return {
+          ...dataDrivenStyle,
+          color: '#fbbf24',
+          fillColor: '#fbbf24',
+          weight: 3
+        };
+      }
+
+      return dataDrivenStyle;
+    }
+
+    // Fallback to StyleManager for basic styling
     return StyleManager.getFeatureStyle(layer, false, isSelected);
   }, [layer, isSelected]);
 
-  // Subscribe to style updates
+  // Subscribe to style updates (both basic styles and data-driven rules)
   useEffect(() => {
-    const unsubscribe = StateManager.subscribe('styles.updated', () => {
+    const unsubscribeStyles = StateManager.subscribe('styles.updated', () => {
       // Force re-render when styles change
       // (useMemo will recompute style)
     });
 
-    return unsubscribe;
+    const unsubscribeRules = StateManager.subscribe('layers.styleRules', () => {
+      // Force re-render when style rules change
+      // (useMemo will recompute style with new rules)
+    });
+
+    return () => {
+      unsubscribeStyles();
+      unsubscribeRules();
+    };
   }, []);
 
   // Handle click with Grist sync
