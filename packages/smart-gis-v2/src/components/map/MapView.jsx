@@ -10,6 +10,7 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import StateManager from '../../core/StateManager';
+import BasemapProvider from '../../services/BasemapProvider';
 import LayerRenderer from './LayerRenderer';
 import { filterVisibleLayers, ProgressiveLoader } from '../../utils/viewportManager';
 import 'leaflet/dist/leaflet.css';
@@ -23,6 +24,7 @@ const MapView = () => {
   const [allLayers, setAllLayers] = useState([]);
   const [displayedLayers, setDisplayedLayers] = useState([]);
   const [mapBounds, setMapBounds] = useState(null);
+  const [basemap, setBasemap] = useState('osm');
   const mapRef = useRef(null);
   const moveTimeoutRef = useRef(null);
   const isLoadingRef = useRef(false);
@@ -66,10 +68,20 @@ const MapView = () => {
     // Subscribe to map view changes
     const unsubscribeCenter = StateManager.subscribe('map.center', setCenter);
     const unsubscribeZoom = StateManager.subscribe('map.zoom', setZoom);
+    const unsubscribeBasemap = StateManager.subscribe('map.basemap', (newBasemap) => {
+      setBasemap(newBasemap || 'osm');
+    });
+
+    // Load initial basemap
+    const initialBasemap = StateManager.getState('map.basemap');
+    if (initialBasemap) {
+      setBasemap(initialBasemap);
+    }
 
     return () => {
       unsubscribeCenter();
       unsubscribeZoom();
+      unsubscribeBasemap();
     };
   }, []);
 
@@ -137,6 +149,11 @@ const MapView = () => {
     return { pointLayers: points, otherLayers: others };
   }, [displayedLayers, mapBounds]);
 
+  // Get basemap tile layer props
+  const basemapProps = useMemo(() => {
+    return BasemapProvider.getTileLayerProps(basemap);
+  }, [basemap]);
+
   return (
     <MapContainer
       center={center}
@@ -146,10 +163,13 @@ const MapView = () => {
       onMoveEnd={handleMapMove}
       onZoomEnd={handleMapMove}
     >
-      {/* Base map tile layer */}
+      {/* Dynamic base map tile layer */}
       <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        key={basemap}
+        url={basemapProps.url}
+        attribution={basemapProps.attribution}
+        maxZoom={basemapProps.maxZoom}
+        subdomains={basemapProps.subdomains}
       />
 
       {/* Non-point layers (no clustering) */}

@@ -10,10 +10,11 @@ import LayersPanel from '../panels/LayersPanel';
 import ToolsPanel from '../panels/ToolsPanel';
 import DataPanel from '../panels/DataPanel';
 import SearchPanel from '../panels/SearchPanel';
+import StylePanel from '../panels/StylePanel';
 
 const Sidebar = () => {
   const [activeTab, setActiveTab] = useState('layers');
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true); // Default: collapsed for full map view
 
   useEffect(() => {
     const unsubscribe = StateManager.subscribe('ui.activeTab', (tab) => {
@@ -37,6 +38,7 @@ const Sidebar = () => {
 
   const tabs = [
     { id: 'layers', icon: '📚', label: 'Layers' },
+    { id: 'styles', icon: '🎨', label: 'Styles' },
     { id: 'tools', icon: '🛠', label: 'Tools' },
     { id: 'data', icon: '📊', label: 'Import' },
     { id: 'search', icon: '🔍', label: 'Search' }
@@ -71,6 +73,7 @@ const Sidebar = () => {
       {!collapsed && (
         <div className="sidebar-content">
           {activeTab === 'layers' && <LayersPanel />}
+          {activeTab === 'styles' && <StylePanel />}
           {activeTab === 'tools' && <ToolsPanel />}
           {activeTab === 'data' && <DataPanel />}
           {activeTab === 'search' && <SearchPanel />}
