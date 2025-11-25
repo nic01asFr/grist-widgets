@@ -60,18 +60,30 @@ class DataAnalyzer {
    * Analyze numeric field
    */
   analyzeNumericField(values, fieldName) {
-    const sorted = values.sort((a, b) => a - b);
-    const sum = values.reduce((acc, v) => acc + v, 0);
-    const mean = sum / values.length;
+    // Convert all values to numbers (they might be strings that look like numbers)
+    const numericValues = values.map(v => Number(v)).filter(v => !isNaN(v));
+
+    if (numericValues.length === 0) {
+      return {
+        type: 'number',
+        fieldName,
+        count: 0,
+        error: 'No valid numeric values'
+      };
+    }
+
+    const sorted = numericValues.sort((a, b) => a - b);
+    const sum = numericValues.reduce((acc, v) => acc + v, 0);
+    const mean = sum / numericValues.length;
 
     // Calculate standard deviation
-    const variance = values.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / values.length;
+    const variance = numericValues.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / numericValues.length;
     const stdDev = Math.sqrt(variance);
 
     return {
       type: 'number',
       fieldName,
-      count: values.length,
+      count: numericValues.length,
       min: sorted[0],
       max: sorted[sorted.length - 1],
       mean,
@@ -79,7 +91,7 @@ class DataAnalyzer {
       stdDev,
 
       // Suggest number of classes based on data distribution
-      suggestedClasses: this.suggestClassCount(values.length),
+      suggestedClasses: this.suggestClassCount(numericValues.length),
 
       // Pre-calculate breaks for different methods
       breaks: {

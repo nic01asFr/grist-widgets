@@ -104,11 +104,15 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       const min = index === 0 ? analysis.min : breaks[index - 1];
       const max = breakValue;
 
+      // Ensure values are numbers before calling toFixed
+      const minNum = typeof min === 'number' ? min : Number(min);
+      const maxNum = typeof max === 'number' ? max : Number(max);
+
       return {
-        min,
-        max,
+        min: minNum,
+        max: maxNum,
         color: colors[index % colors.length],
-        label: `${min.toFixed(2)} - ${max.toFixed(2)}`
+        label: `${minNum.toFixed(2)} - ${maxNum.toFixed(2)}`
       };
     });
 
@@ -169,11 +173,15 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       const min = index === 0 ? fieldAnalysis.min : breaks[index - 1];
       const max = breakValue;
 
+      // Ensure values are numbers before calling toFixed
+      const minNum = typeof min === 'number' ? min : Number(min);
+      const maxNum = typeof max === 'number' ? max : Number(max);
+
       return {
-        min,
-        max,
+        min: minNum,
+        max: maxNum,
         color: colors[index] || '#cccccc',
-        label: `${min.toFixed(2)} - ${max.toFixed(2)}`
+        label: `${minNum.toFixed(2)} - ${maxNum.toFixed(2)}`
       };
     });
 
@@ -292,9 +300,9 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
               <span className="info-badge">Type: {fieldAnalysis.type}</span>
               {fieldAnalysis.type === 'number' && (
                 <>
-                  <span className="info-badge">Min: {fieldAnalysis.min?.toFixed(2)}</span>
-                  <span className="info-badge">Max: {fieldAnalysis.max?.toFixed(2)}</span>
-                  <span className="info-badge">Moyenne: {fieldAnalysis.mean?.toFixed(2)}</span>
+                  <span className="info-badge">Min: {typeof fieldAnalysis.min === 'number' ? fieldAnalysis.min.toFixed(2) : fieldAnalysis.min}</span>
+                  <span className="info-badge">Max: {typeof fieldAnalysis.max === 'number' ? fieldAnalysis.max.toFixed(2) : fieldAnalysis.max}</span>
+                  <span className="info-badge">Moyenne: {typeof fieldAnalysis.mean === 'number' ? fieldAnalysis.mean.toFixed(2) : fieldAnalysis.mean}</span>
                 </>
               )}
               {fieldAnalysis.type === 'string' && (
