@@ -206,15 +206,12 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       ...configuration
     };
 
-    // Save to StateManager
+    // Save to StateManager (setState automatically notifies subscribers)
     const currentRules = StateManager.getState('layers.styleRules') || {};
     StateManager.setState('layers.styleRules', {
       ...currentRules,
       [layer.layer_name]: rule
     }, 'Apply style rule');
-
-    // Trigger layer re-render
-    StateManager.notify('layers.workspace');
 
     if (onClose) onClose();
   };
@@ -224,7 +221,6 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
     const currentRules = StateManager.getState('layers.styleRules') || {};
     delete currentRules[layer?.layer_name];
     StateManager.setState('layers.styleRules', currentRules, 'Reset style rule');
-    StateManager.notify('layers.workspace');
 
     if (onClose) onClose();
   };
