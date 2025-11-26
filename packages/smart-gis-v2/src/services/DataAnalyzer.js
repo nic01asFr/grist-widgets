@@ -80,6 +80,9 @@ class DataAnalyzer {
     const variance = numericValues.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / numericValues.length;
     const stdDev = Math.sqrt(variance);
 
+    // Calculate unique values (useful for categorized styling of numeric fields like IDs, codes, etc.)
+    const uniqueValues = [...new Set(numericValues)].sort((a, b) => a - b);
+
     return {
       type: 'number',
       fieldName,
@@ -89,6 +92,10 @@ class DataAnalyzer {
       mean,
       median: sorted[Math.floor(sorted.length / 2)],
       stdDev,
+
+      // Unique values (for categorized styling)
+      uniqueValues,
+      uniqueCount: uniqueValues.length,
 
       // Suggest number of classes based on data distribution
       suggestedClasses: this.suggestClassCount(numericValues.length),
