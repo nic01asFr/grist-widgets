@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import StateManager from '../../core/StateManager';
+import GristAPI from '../../core/GristAPI';
 import DataAnalyzer from '../../services/DataAnalyzer';
 import StyleRuleEngine from '../../services/StyleRuleEngine';
 import './DataDrivenStyleEditor.css';
@@ -193,7 +194,7 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
   };
 
   // Apply rule
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!layer || !selectedField) {
       alert('Veuillez sélectionner un champ');
       return;
@@ -206,21 +207,62 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       ...configuration
     };
 
-    // Save to StateManager (setState automatically notifies subscribers)
+    // Save to StateManager for immediate visual update
     const currentRules = StateManager.getState('layers.styleRules') || {};
-    StateManager.setState('layers.styleRules', {
+    const newRules = {
       ...currentRules,
       [layer.layer_name]: rule
-    }, 'Apply style rule');
+    };
+    StateManager.setState('layers.styleRules', newRules, 'Apply style rule');
+
+    // Save to Grist for persistence
+    try {
+      const layers = StateManager.getState('layers.workspace');
+      const layerFeatures = layers.filter(f => f.layer_name === layer.layer_name);
+      const currentTable = StateManager.getState('data.currentTable') || 'GIS_WorkSpace';
+
+      // Serialize rule to JSON
+      const ruleJSON = JSON.stringify(rule);
+
+      // Update all features of this layer with the style rule
+      const updates = layerFeatures.map(f => ({
+        id: f.id,
+        style_rule: ruleJSON
+      }));
+
+      await GristAPI.updateRecords(currentTable, updates);
+      console.log(`✅ Style rule saved for layer "${layer.layer_name}"`);
+    } catch (error) {
+      console.error('Error saving style rule to Grist:', error);
+      alert('Style appliqué mais erreur lors de la sauvegarde. La règle sera perdue au rechargement.');
+    }
 
     if (onClose) onClose();
   };
 
   // Reset rule
-  const handleReset = () => {
+  const handleReset = async () => {
     const currentRules = StateManager.getState('layers.styleRules') || {};
     delete currentRules[layer?.layer_name];
     StateManager.setState('layers.styleRules', currentRules, 'Reset style rule');
+
+    // Remove from Grist
+    try {
+      const layers = StateManager.getState('layers.workspace');
+      const layerFeatures = layers.filter(f => f.layer_name === layer.layer_name);
+      const currentTable = StateManager.getState('data.currentTable') || 'GIS_WorkSpace';
+
+      // Clear style_rule for all features of this layer
+      const updates = layerFeatures.map(f => ({
+        id: f.id,
+        style_rule: null
+      }));
+
+      await GristAPI.updateRecords(currentTable, updates);
+      console.log(`✅ Style rule removed for layer "${layer.layer_name}"`);
+    } catch (error) {
+      console.error('Error removing style rule from Grist:', error);
+    }
 
     if (onClose) onClose();
   };
