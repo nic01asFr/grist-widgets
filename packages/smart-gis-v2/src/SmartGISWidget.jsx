@@ -63,6 +63,25 @@ const SmartGISWidget = () => {
         StateManager.setState('layers.workspace', workspaceData, 'Load workspace');
         StateManager.setState('data.currentTable', 'GIS_WorkSpace', 'Set current table');
         console.log(`✓ Loaded ${workspaceData.length} features from GIS_WorkSpace`);
+
+        // Load style rules from data
+        const styleRules = {};
+        workspaceData.forEach(feature => {
+          if (feature.style_rule && feature.layer_name) {
+            try {
+              // Deserialize rule from JSON (one rule per layer)
+              const rule = JSON.parse(feature.style_rule);
+              styleRules[feature.layer_name] = rule;
+            } catch (error) {
+              console.warn(`Failed to parse style rule for layer ${feature.layer_name}:`, error);
+            }
+          }
+        });
+
+        if (Object.keys(styleRules).length > 0) {
+          StateManager.setState('layers.styleRules', styleRules, 'Load style rules');
+          console.log(`✓ Loaded ${Object.keys(styleRules).length} style rule(s)`);
+        }
       } catch (err) {
         console.warn('⚠️ Could not load workspace data (table may be empty):', err.message);
         StateManager.setState('layers.workspace', [], 'Empty workspace');

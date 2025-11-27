@@ -21,6 +21,7 @@ import PopupTemplateEngine from '../../services/PopupTemplateEngine';
 
 const LayerRenderer = ({ layer }) => {
   const [isSelected, setIsSelected] = useState(false);
+  const [styleRules, setStyleRules] = useState({});
 
   // OPTIMIZATION: Use global geometry cache (prevents re-parsing on every render)
   const geometry = useMemo(() => {
@@ -43,10 +44,21 @@ const LayerRenderer = ({ layer }) => {
     return unsubscribe;
   }, [layer.id]);
 
+  // Subscribe to style rule changes
+  useEffect(() => {
+    const unsubscribeRules = StateManager.subscribe('layers.styleRules', (rules) => {
+      setStyleRules(rules || {});
+    });
+
+    // Load initial rules
+    const initialRules = StateManager.getState('layers.styleRules') || {};
+    setStyleRules(initialRules);
+
+    return unsubscribeRules;
+  }, []);
+
   // Get computed style: Check for data-driven rules first, then fallback to StyleManager
   const style = useMemo(() => {
-    // Check if there's a style rule for this layer
-    const styleRules = StateManager.getState('layers.styleRules') || {};
     const rule = styleRules[layer.layer_name];
 
     if (rule) {
@@ -68,24 +80,15 @@ const LayerRenderer = ({ layer }) => {
 
     // Fallback to StyleManager for basic styling
     return StyleManager.getFeatureStyle(layer, false, isSelected);
-  }, [layer, isSelected]);
+  }, [layer, isSelected, styleRules]);
 
-  // Subscribe to style updates (both basic styles and data-driven rules)
+  // Subscribe to basic style updates
   useEffect(() => {
     const unsubscribeStyles = StateManager.subscribe('styles.updated', () => {
-      // Force re-render when styles change
-      // (useMemo will recompute style)
+      // Force re-render when basic styles change
     });
 
-    const unsubscribeRules = StateManager.subscribe('layers.styleRules', () => {
-      // Force re-render when style rules change
-      // (useMemo will recompute style with new rules)
-    });
-
-    return () => {
-      unsubscribeStyles();
-      unsubscribeRules();
-    };
+    return unsubscribeStyles;
   }, []);
 
   // Handle click with Grist sync
