@@ -215,23 +215,38 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
     };
     StateManager.setState('layers.styleRules', newRules, 'Apply style rule');
 
-    // Save to Grist for persistence
+    // Save to Grist as metadata row (geometry = NULL)
     try {
-      const layers = StateManager.getState('layers.workspace');
-      const layerFeatures = layers.filter(f => f.layer_name === layer.layer_name);
       const currentTable = StateManager.getState('data.currentTable') || 'GIS_WorkSpace';
-
-      // Serialize rule to JSON
       const ruleJSON = JSON.stringify(rule);
 
-      // Update all features of this layer with the style rule
-      const updates = layerFeatures.map(f => ({
-        id: f.id,
-        style_rule: ruleJSON
-      }));
+      // Check if metadata row already exists for this layer
+      const allData = await GristAPI.fetchTable(currentTable);
+      const metadataRow = allData.find(r =>
+        r.layer_name === layer.layer_name &&
+        (r.geometry === null || r.geometry === '' || !r.geometry)
+      );
 
-      await GristAPI.updateRecords(currentTable, updates);
-      console.log(`✅ Style rule saved for layer "${layer.layer_name}"`);
+      if (metadataRow) {
+        // Update existing metadata row
+        await GristAPI.updateRecords(currentTable, [{
+          id: metadataRow.id,
+          style_rule: ruleJSON
+        }]);
+        console.log(`✅ Style rule updated for layer "${layer.layer_name}" (row ${metadataRow.id})`);
+      } else {
+        // Create new metadata row with negative ID convention
+        await GristAPI.addRecords(currentTable, [{
+          layer_name: layer.layer_name,
+          geometry: null,
+          geometry_wgs84: null,
+          geojson: null,
+          style_rule: ruleJSON,
+          is_visible: false,  // Metadata rows are not rendered
+          feature_name: `[METADATA] ${layer.layer_name}`
+        }]);
+        console.log(`✅ Style rule created for layer "${layer.layer_name}"`);
+      }
     } catch (error) {
       console.error('Error saving style rule to Grist:', error);
       alert('Style appliqué mais erreur lors de la sauvegarde. La règle sera perdue au rechargement.');
@@ -246,20 +261,21 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
     delete currentRules[layer?.layer_name];
     StateManager.setState('layers.styleRules', currentRules, 'Reset style rule');
 
-    // Remove from Grist
+    // Remove metadata row from Grist
     try {
-      const layers = StateManager.getState('layers.workspace');
-      const layerFeatures = layers.filter(f => f.layer_name === layer.layer_name);
       const currentTable = StateManager.getState('data.currentTable') || 'GIS_WorkSpace';
 
-      // Clear style_rule for all features of this layer
-      const updates = layerFeatures.map(f => ({
-        id: f.id,
-        style_rule: null
-      }));
+      // Find metadata row for this layer
+      const allData = await GristAPI.fetchTable(currentTable);
+      const metadataRow = allData.find(r =>
+        r.layer_name === layer.layer_name &&
+        (r.geometry === null || r.geometry === '' || !r.geometry)
+      );
 
-      await GristAPI.updateRecords(currentTable, updates);
-      console.log(`✅ Style rule removed for layer "${layer.layer_name}"`);
+      if (metadataRow) {
+        await GristAPI.deleteRecords(currentTable, [metadataRow.id]);
+        console.log(`✅ Style rule removed for layer "${layer.layer_name}" (deleted row ${metadataRow.id})`);
+      }
     } catch (error) {
       console.error('Error removing style rule from Grist:', error);
     }

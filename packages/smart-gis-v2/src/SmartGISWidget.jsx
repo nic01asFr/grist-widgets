@@ -60,23 +60,30 @@ const SmartGISWidget = () => {
           console.log('📊 geojson value type:', typeof workspaceData[0].geojson);
         }
 
-        StateManager.setState('layers.workspace', workspaceData, 'Load workspace');
-        StateManager.setState('data.currentTable', 'GIS_WorkSpace', 'Set current table');
-        console.log(`✓ Loaded ${workspaceData.length} features from GIS_WorkSpace`);
-
-        // Load style rules from data
+        // Separate features from metadata rows
+        const features = [];
         const styleRules = {};
-        workspaceData.forEach(feature => {
-          if (feature.style_rule && feature.layer_name) {
+
+        workspaceData.forEach(record => {
+          // Metadata rows: geometry is NULL and has style_rule
+          if ((!record.geometry || record.geometry === '') && record.style_rule) {
             try {
-              // Deserialize rule from JSON (one rule per layer)
-              const rule = JSON.parse(feature.style_rule);
-              styleRules[feature.layer_name] = rule;
+              const rule = JSON.parse(record.style_rule);
+              styleRules[record.layer_name] = rule;
+              console.log(`📐 Loaded style rule for layer "${record.layer_name}"`);
             } catch (error) {
-              console.warn(`Failed to parse style rule for layer ${feature.layer_name}:`, error);
+              console.warn(`Failed to parse style rule for layer ${record.layer_name}:`, error);
             }
           }
+          // Regular features: has geometry
+          else if (record.geometry) {
+            features.push(record);
+          }
         });
+
+        StateManager.setState('layers.workspace', features, 'Load workspace');
+        StateManager.setState('data.currentTable', 'GIS_WorkSpace', 'Set current table');
+        console.log(`✓ Loaded ${features.length} features from GIS_WorkSpace`);
 
         if (Object.keys(styleRules).length > 0) {
           StateManager.setState('layers.styleRules', styleRules, 'Load style rules');
