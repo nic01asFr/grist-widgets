@@ -78,7 +78,8 @@ export const GIS_WORKSPACE_SCHEMA = {
 
     // === Affichage et style ===
     { id: 'is_visible', type: 'Bool', label: 'Visible' },
-    { id: 'z_index', type: 'Int', label: 'Z-Index' }
+    { id: 'z_index', type: 'Int', label: 'Z-Index' },
+    { id: 'style_rule', type: 'Text', label: 'Style Rule (JSON)' }
   ]
 };
 
