@@ -66,8 +66,13 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       setFieldAnalysis(analysis);
 
       // Initialize configuration based on type
-      if (styleType === 'categorized' && analysis.type === 'string') {
-        initializeCategorized(analysis);
+      if (styleType === 'categorized') {
+        // Categorized works for both string and number (if uniqueValues exist)
+        if (analysis.uniqueValues && analysis.uniqueValues.length > 0) {
+          initializeCategorized(analysis);
+        } else {
+          setConfiguration({});
+        }
       } else if (styleType === 'graduated' && analysis.type === 'number') {
         initializeGraduated(analysis);
       } else if (styleType === 'proportional' && analysis.type === 'number') {
@@ -249,7 +254,17 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       }
     } catch (error) {
       console.error('Error saving style rule to Grist:', error);
-      alert('Style appliqué mais erreur lors de la sauvegarde. La règle sera perdue au rechargement.');
+
+      // Check if column doesn't exist
+      if (error.message && error.message.includes('style_rule')) {
+        alert('⚠️ La colonne "style_rule" n\'existe pas dans votre table GIS_WorkSpace.\n\n' +
+              'Pour sauvegarder les styles :\n' +
+              '1. Ouvrez la table GIS_WorkSpace dans Grist\n' +
+              '2. Ajoutez une colonne "style_rule" de type Text\n\n' +
+              'Le style est appliqué mais sera perdu au rechargement.');
+      } else {
+        alert('Style appliqué mais erreur lors de la sauvegarde. La règle sera perdue au rechargement.');
+      }
     }
 
     if (onClose) onClose();
