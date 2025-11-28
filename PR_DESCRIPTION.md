@@ -1,199 +1,161 @@
-# Smart GIS Widget v2.0 - Production Ready (90% Complete)
+## Summary
 
-## 🎯 Summary
+This PR implements a complete, professional data-driven styling and attribute query system for Smart-GIS v2, enabling users to:
 
-Finalizes the Smart GIS Widget to v2.0 with **semantic search (Phase 8)**, **UX polish (Phase 10)**, and **autonomous operation** (no column mapping required).
+- **Style layers based on data attributes** (categorized, graduated, proportional)
+- **Query and filter features** using multi-condition attribute queries
+- **Visualize data** with auto-generated legends
+- **Persist styles** efficiently using metadata rows pattern
 
-The widget is now **production-ready at 90% completion**.
-
----
-
-## 🚀 Major Features Added
-
-### Phase 8: Semantic Search (✅ Complete)
-- **GIS_SearchQueries table** with `VECTOR_SEARCH` formulas
-- **Semantic catalog search**: "🤖 Recherche Sémantique (IA)" button in Import Wizard
-- **Semantic element search**: Intelligent search in Explorer sidebar
-- **Automatic embeddings**: `CREATE_VECTOR()` formulas on catalogs and workspace
-- **Intelligent fallback**: Auto-switch to textual search if semantic fails
-- Functions: `searchCatalogsSemantic()`, `searchElementsSemantic()`, `searchCatalogsTextual()`
-
-### Phase 10: Polish & UX (✅ Complete)
-- **Smooth animations**: fadeIn, slideUp on modals and loading states
-- **Enhanced loading**: Animated spinner + progress bar
-- **Better error handling**: Styled error card with reload button
-- **Tooltips everywhere**: All header buttons with descriptive `title` attributes
-- **Hover effects**: Transform + boxShadow on all interactive elements
-- **Seamless transitions**: 0.2-0.3s ease animations
-
-### Autonomous Widget (✅ Complete)
-- **No column mapping required**: Widget works with its own tables
-- **Install on any table**: Even empty tables work
-- **Auto-creates infrastructure**: GIS_WorkSpace, GIS_Catalogs, GIS_Styles, GIS_Config, GIS_SearchQueries
-- **Fixed column schema**: Uses predefined column names from GIS_WorkSpace
-
-### Critical Performance Fixes (✅ Complete)
-
-**1. Removed Aggressive Polling**
-- **Was**: Fetching 94MB every 2 seconds → caused WebSocket crashes
-- **Now**: Manual refresh only after user actions (import, edit, delete)
-- **Impact**: Zero idle bandwidth (from ~47 MB/s → 0 MB/s)
-- **Stability**: No more WebSocket crashes or 404 reconnection errors
-
-**2. Fast-Path Initialization**
-- **Was**: 7+ network requests on every widget load (even when already initialized)
-- **Now**: 2 requests via fast-path check (70% faster)
-- **Implementation**: Single batch check for all tables + quick config validation
-- **Impact**: Widget loads 70% faster on subsequent visits
-
-### Critical IGN Import Fixes (✅ Complete)
-
-**1. BBOX Coordinate Order Fix**
-- **Fixed BBOX coordinate order**: IGN WFS 2.0.0 expects longitude-first (X,Y) format
-- **Was**: `minLat,minLon,maxLat,maxLon` (Y,X,Y,X) → 0 results returned
-- **Now**: `minLon,minLat,maxLon,maxLat` (X,Y,X,Y) → correct results
-- **Impact**: IGN WFS queries now return features
-
-**2. WKT Parser Rewrite**
-- **Fixed parsing bug**: Previous parser left parasitic `)` characters in coordinates
-- **Error**: `Invalid LatLng object: (NaN, 2.29925484)` → Leaflet crash
-- **Root cause**: Incorrect depth-tracking algorithm in POLYGON/MULTIPOLYGON parser
-- **Solution**: Complete rewrite with proper nested parsing
-- **Now handles**:
-  - Polygons with holes: `POLYGON((outer), (hole1), (hole2))`
-  - Complex multi-polygons: `MULTIPOLYGON(((ring)), ((ring)))`
-  - Coordinate validation (filters NaN values)
-- **Impact**: IGN geometries now display correctly on map
-
-### Phase 9: Performance Optimizations (📝 Documented)
-- **NEW FILE**: `performanceOptimizations.js` with hooks (WKT cache, viewport filtering, lazy loading)
-- **NEW FILE**: `PERFORMANCE_README.md` with integration guide
-- Ready for integration when needed (datasets >5000 features)
+This transforms Smart-GIS v2 into a SaaS-quality GIS widget with professional data visualization capabilities.
 
 ---
 
-## 📦 Files Changed
+## Core Features
 
-### Modified Files
-- **src/GeoSemanticMapWidget.js** (+219 lines, -91 lines)
-  - **CRITICAL**: Removed aggressive polling (was causing WebSocket crashes)
-  - **CRITICAL**: Rewrote WKT parser for POLYGON and MULTIPOLYGON (fixed NaN errors)
-  - Removed column mapping requirement (fully autonomous widget)
-  - Added Phase 8 semantic search in handleSearch()
-  - Added Phase 10 UX improvements (animations, loading states, tooltips)
-  - Added manual refresh after modifications (import, edit, delete, style)
-  - Fixed column names: `geometry`, `nom`, `description`
-  - Enhanced WKT parser now handles polygons with holes and nested multi-polygons
+### 1. Data-Driven Styling (4 Types)
 
-- **src/services/IGNService.js** (+1 line, -1 line)
-  - **CRITICAL**: Fixed BBOX coordinate order for WFS 2.0.0 compliance
-  - Changed from latitude-first (Y,X) to longitude-first (X,Y) format
-  - Fixes all IGN imports returning 0 features
+**Categorized Styling** - Unique values with distinct colors
+- Works for both string fields and numeric fields
+- Auto-detects unique values
+- Color scheme picker (10+ palettes)
 
-- **src/ImportWizard.js** (+51 lines)
-  - Added semantic search button and state management
-  - Added smooth modal animations (fadeIn, slideUp)
-  - Integrated `searchCatalogsSemantic()` function
+**Graduated Styling** - Numeric ranges with color gradients (choropleth)
+- Classification methods: Quantile, Equal Interval, Jenks/Natural Breaks
+- Color ramps: Sequential, diverging, custom
+- 5 automatic classes with smart breaks
 
-- **src/systemInfrastructure.js** (+163 lines, -17 lines)
-  - **CRITICAL**: Added fast-path initialization (70% faster subsequent loads)
-  - Added `GIS_SearchQueries` table schema
-  - Fixed `CREATE_VECTOR` formula syntax (added `grist.` prefix)
-  - Added `searchCatalogsSemantic()` function
-  - Added `searchElementsSemantic()` function
-  - Added `searchCatalogsTextual()` helper function
-  - Optimized table existence checks (1 batch request vs 4 individual requests)
-  - Removed unused `tableExists()` helper function
+**Proportional Styling** - Size based on numeric values
+- Min/max size configuration
+- Linear scaling
+- Works for all geometry types
 
-- **README.md** (+63 lines)
-  - Updated to v2.0 - 90% complete
-  - Added Phase 8 and Phase 10 features
-  - Added installation warning about no column mapping
-  - Added semantic search usage instructions
+### 2. Attribute Query Builder
 
-- **ROADMAP.md** (+85 lines)
-  - Marked Phase 8 as complete (2025-11-07)
-  - Marked Phase 10 as complete (2025-11-07)
-  - Updated project status to v2.0 - 90% complete
-  - Added implementation details for each completed phase
+- **Visual query interface** - No SQL knowledge required
+- **15+ operators**: =, !=, >, <, >=, <=, LIKE, NOT LIKE, IN, NOT IN, BETWEEN, IS NULL, IS NOT NULL, STARTS WITH, ENDS WITH
+- **Multi-condition support** - AND/OR logic
+- **Actions**: Select features, filter map, save as layer
+- **SQL preview** - See generated query
 
-### New Files
-- **src/performanceOptimizations.js** (NEW - 192 lines)
-  - `useWKTCache()` hook for caching parsed geometries
-  - `filterByViewport()` function for viewport filtering
-  - `useLazyLoading()` hook for progressive loading
+### 3. Dynamic Legends
 
-- **src/PERFORMANCE_README.md** (NEW - 144 lines)
-  - Complete documentation for Phase 9 optimizations
-  - Usage examples and integration guide
-  - Performance metrics and testing procedures
+- **Auto-generated** from active style rules
+- **Collapsible overlay** on map
+- **Color swatches** with value labels
+- **Updates automatically** when styles change
 
 ---
 
-## ✅ Build Status
+## Architecture
 
-- **Compilation**: ✅ Successful
-- **Bundle Size**: 198.76 kB gzipped (stable)
-- **Warnings**: 0
-- **Errors**: 0
-- **Performance**: Zero idle bandwidth (polling removed)
-- **Stability**: WebSocket connection stable (no more crashes)
+### Service Layer (3 new services)
 
----
+**DataAnalyzer.js** (325 lines)
+- Analyzes field data for styling decisions
+- Statistical analysis and classification
+- Supports both string and numeric fields
 
-## 🎯 Completion Status
+**StyleRuleEngine.js** (299 lines)
+- Applies data-driven rules to map features
+- Generates Leaflet-compatible styles
+- Legend generation
 
-**Version**: v2.0 - Smart GIS Widget
-**Completion**: 90% - **Production Ready**
+**SelectionQueryEngine.js** (338 lines)
+- Executes multi-condition attribute queries
+- 15+ operators with type-safe comparisons
+- AND/OR logic evaluation
 
-**Completed Phases**: 1, 2, 3, 4, 5, 6, 7, 8, 10 / 10
-**Optional Phase**: Phase 9 (Performance) - Documented but not integrated
+### UI Layer (3 new components)
 
----
+**DataDrivenStyleEditor.jsx** (450 lines + CSS)
+- 4-step workflow: Type → Field → Configuration → Preview
+- Live preview with color scheme selection
+- Field analysis display
 
-## 🚀 Key Features Available
+**AttributeQueryBuilder.jsx** (380 lines + CSS)
+- Visual condition builder
+- Results preview
+- Action buttons
 
-✅ Multi-source import (IGN Géoplateforme, OpenStreetMap)
-✅ Multi-layer management with LayerManager
-✅ 3-step import wizard with preview
-✅ **Semantic search AI (VECTOR_SEARCH)**
-✅ Advanced editing (attributes, styles, geometry)
-✅ Raster + vector support
-✅ Project save/load
-✅ **Professional UI with smooth animations**
-✅ **Fully autonomous (no column configuration)**
+**LegendPanel.jsx** (120 lines + CSS)
+- Dynamic map overlay
+- Auto-generated from style rules
+- Collapsible interface
 
----
+### Integration Updates
 
-## 📝 Testing Checklist
-
-- [x] Widget initializes without column mapping prompt
-- [x] Infrastructure tables auto-created (GIS_Catalogs, GIS_Styles, GIS_Config, GIS_SearchQueries)
-- [x] GIS_WorkSpace auto-created
-- [x] Semantic search button appears in Import Wizard
-- [x] Search bar works in Explorer sidebar
-- [x] Smooth animations on modals
-- [x] Loading states display correctly
-- [x] Error handling with reload button works
-- [x] Tooltips appear on hover
-- [x] Build compiles successfully
+**LayersPanel.jsx** - Added style/query editors + modal system
+**LayerRenderer.jsx** - StyleRuleEngine integration with immediate updates
+**MapView.jsx** - LegendPanel integration
+**SmartGISWidget.jsx** - Metadata row separation and loading
+**TableSchemas.js** - Added style_rule column for auto-creation
 
 ---
 
-## 🔗 Related Documentation
+## Storage Pattern: Metadata Rows (Option 3)
 
-- `/packages/smart-gis/README.md` - User guide and features
-- `/packages/smart-gis/ROADMAP.md` - Complete development roadmap
-- `/packages/smart-gis/src/PERFORMANCE_README.md` - Performance optimization guide
+Style rules are persisted using **metadata rows** in the existing GIS_WorkSpace table:
+
+- **Metadata rows**: geometry = NULL, contains style_rule JSON
+- **Feature rows**: geometry != NULL, no style_rule
+- **One metadata row per layer** (no duplication)
+
+**Benefits**:
+- No new table required
+- Clean separation (geometry vs metadata)
+- One style per layer (automatic deduplication)
+- Easy to query: WHERE geometry IS NULL
 
 ---
 
-## 🎉 Ready for Deployment
+## Bug Fixes
 
-This PR brings the Smart GIS Widget to **production-ready** status. The widget now:
-- Requires **no configuration** from users
-- Provides **AI-powered semantic search**
-- Offers a **professional, polished UX**
-- Works **autonomously** with its own tables
+1. **TypeError: toFixed is not a function** - Fixed Number() conversion (8608dbc)
+2. **Empty configuration for numeric categorization** - Fixed uniqueValues check (87022ad)
+3. **StateManager.notify is not a function** - Removed invalid calls (2b7231a)
+4. **Scroll not working in modal** - Changed to max-height: 90vh (496c2d3)
+5. **KeyError 'style_rule'** - Added to TableSchemas.js (65d16b8)
+6. **Visual update not immediate** - Fixed with state subscription (87d0008)
 
-Once merged, GitHub Actions will automatically build and deploy to GitHub Pages.
+---
+
+## Files Changed
+
+### New Files (6)
+- DataAnalyzer.js (325 lines)
+- StyleRuleEngine.js (299 lines)
+- SelectionQueryEngine.js (338 lines)
+- DataDrivenStyleEditor.jsx + CSS (450 + 395 lines)
+- AttributeQueryBuilder.jsx + CSS (380 + 340 lines)
+- LegendPanel.jsx (120 lines)
+
+### Modified Files (5)
+- LayersPanel.jsx
+- LayerRenderer.jsx
+- MapView.jsx
+- SmartGISWidget.jsx
+- TableSchemas.js
+
+---
+
+## Impact
+
+This PR elevates Smart-GIS v2 to professional GIS software quality, matching capabilities found in QGIS, ArcGIS Online, and Mapbox Studio.
+
+**Business value:**
+- Enables advanced spatial analysis without leaving Grist
+- Professional visualizations for presentations
+- No-code attribute queries for non-technical users
+- SaaS-quality user experience
+
+---
+
+## Migration Notes
+
+The widget will automatically:
+1. Create the style_rule column in GIS_WorkSpace on first load
+2. Continue displaying existing data normally
+3. Enable new styling features without data migration
+
+No manual intervention required.
