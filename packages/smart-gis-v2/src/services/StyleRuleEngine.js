@@ -26,6 +26,16 @@ class StyleRuleEngine {
 
       const geometryType = feature.geometry_type;
 
+      // Debug logging for first feature only (to avoid spam)
+      if (!this._hasLogged) {
+        console.log(`[StyleRuleEngine] Applying ${rule.type} rule, field: ${rule.field}`);
+        console.log(`[StyleRuleEngine] Sample value from properties[${rule.field}]:`, properties[rule.field]);
+        if (rule.type === 'categorized') {
+          console.log(`[StyleRuleEngine] Categories:`, rule.categories?.map(c => ({ value: c.value, type: typeof c.value })));
+        }
+        this._hasLogged = true;
+      }
+
       switch (rule.type) {
         case 'categorized':
           return this.applyCategorized(properties, geometryType, rule);
@@ -53,7 +63,11 @@ class StyleRuleEngine {
    */
   applyCategorized(properties, geometryType, rule) {
     const value = properties[rule.field];
-    const category = rule.categories?.find(c => c.value === value);
+
+    // Convert both to strings for comparison (handles "1" vs 1)
+    const valueStr = String(value);
+    const category = rule.categories?.find(c => String(c.value) === valueStr);
+
     const color = category ? category.color : (rule.defaultColor || '#cccccc');
 
     return this.createStyleForGeometry(geometryType, {

@@ -70,14 +70,18 @@ const SmartGISWidget = () => {
             try {
               const rule = JSON.parse(record.style_rule);
               styleRules[record.layer_name] = rule;
-              console.log(`📐 Loaded style rule for layer "${record.layer_name}"`);
+              console.log(`📐 Loaded style rule for layer "${record.layer_name}":`, rule);
             } catch (error) {
-              console.warn(`Failed to parse style rule for layer ${record.layer_name}:`, error);
+              console.warn(`⚠️ Failed to parse style rule for layer ${record.layer_name}:`, error);
             }
           }
           // Regular features: has geometry_wgs84
           else if (record.geometry_wgs84) {
             features.push(record);
+          }
+          // Debug: Log rows that don't match either condition
+          else {
+            console.log(`⚠️ Row ${record.id} excluded: geometry_wgs84=${record.geometry_wgs84}, style_rule=${!!record.style_rule}, layer_name=${record.layer_name}`);
           }
         });
 
