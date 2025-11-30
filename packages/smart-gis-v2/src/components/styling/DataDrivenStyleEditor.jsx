@@ -229,7 +229,7 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       const allData = await GristAPI.fetchTable(currentTable);
       const metadataRow = allData.find(r =>
         r.layer_name === layer.layer_name &&
-        (r.geometry === null || r.geometry === '' || !r.geometry)
+        (r.geometry_wgs84 === null || r.geometry_wgs84 === '' || !r.geometry_wgs84)
       );
 
       if (metadataRow) {
@@ -240,15 +240,15 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
         }]);
         console.log(`✅ Style rule updated for layer "${layer.layer_name}" (row ${metadataRow.id})`);
       } else {
-        // Create new metadata row with negative ID convention
+        // Create new metadata row (geometry_wgs84 = null to mark as metadata)
         await GristAPI.addRecords(currentTable, [{
           layer_name: layer.layer_name,
-          geometry: null,
-          geometry_wgs84: null,
-          geojson: null,
+          geometry_wgs84: null,  // NULL geometry marks this as metadata row
+          properties: '{}',
           style_rule: ruleJSON,
           is_visible: false,  // Metadata rows are not rendered
-          feature_name: `[METADATA] ${layer.layer_name}`
+          feature_name: `[METADATA] ${layer.layer_name}`,
+          import_session: Date.now()
         }]);
         console.log(`✅ Style rule created for layer "${layer.layer_name}"`);
       }
@@ -284,7 +284,7 @@ const DataDrivenStyleEditor = ({ layerId, onClose }) => {
       const allData = await GristAPI.fetchTable(currentTable);
       const metadataRow = allData.find(r =>
         r.layer_name === layer.layer_name &&
-        (r.geometry === null || r.geometry === '' || !r.geometry)
+        (r.geometry_wgs84 === null || r.geometry_wgs84 === '' || !r.geometry_wgs84)
       );
 
       if (metadataRow) {

@@ -65,8 +65,8 @@ const SmartGISWidget = () => {
         const styleRules = {};
 
         workspaceData.forEach(record => {
-          // Metadata rows: geometry is NULL and has style_rule
-          if ((!record.geometry || record.geometry === '') && record.style_rule) {
+          // Metadata rows: geometry_wgs84 is NULL and has style_rule
+          if ((!record.geometry_wgs84 || record.geometry_wgs84 === '') && record.style_rule) {
             try {
               const rule = JSON.parse(record.style_rule);
               styleRules[record.layer_name] = rule;
@@ -75,8 +75,8 @@ const SmartGISWidget = () => {
               console.warn(`Failed to parse style rule for layer ${record.layer_name}:`, error);
             }
           }
-          // Regular features: has geometry
-          else if (record.geometry) {
+          // Regular features: has geometry_wgs84
+          else if (record.geometry_wgs84) {
             features.push(record);
           }
         });
