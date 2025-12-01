@@ -64,6 +64,13 @@ class StyleRuleEngine {
   applyCategorized(properties, geometryType, rule) {
     const value = properties[rule.field];
 
+    // Handle null/undefined values
+    if (value === null || value === undefined) {
+      console.warn(`[StyleRuleEngine] Null/undefined value for field "${rule.field}" - using default color`);
+      const color = rule.defaultColor || '#cccccc';
+      return this.createStyleForGeometry(geometryType, { color, fillColor: color });
+    }
+
     // Convert both to strings for comparison (handles "1" vs 1)
     const valueStr = String(value);
     const category = rule.categories?.find(c => String(c.value) === valueStr);
@@ -83,9 +90,11 @@ class StyleRuleEngine {
    * Apply graduated styling (numeric ranges)
    */
   applyGraduated(properties, geometryType, rule) {
-    const value = Number(properties[rule.field]);
+    const rawValue = properties[rule.field];
+    const value = Number(rawValue);
 
     if (isNaN(value)) {
+      console.warn(`[StyleRuleEngine] Cannot convert "${rawValue}" to number for field "${rule.field}" - using default color`);
       const color = rule.defaultColor || '#cccccc';
       return this.createStyleForGeometry(geometryType, { color, fillColor: color });
     }
@@ -123,9 +132,11 @@ class StyleRuleEngine {
    * Apply proportional sizing
    */
   applyProportional(properties, geometryType, rule) {
-    const value = Number(properties[rule.field]);
+    const rawValue = properties[rule.field];
+    const value = Number(rawValue);
 
     if (isNaN(value)) {
+      console.warn(`[StyleRuleEngine] Cannot convert "${rawValue}" to number for field "${rule.field}" - using default style`);
       return this.createStyleForGeometry(geometryType, {
         color: rule.color || '#3b82f6',
         fillColor: rule.color || '#3b82f6'
@@ -138,7 +149,11 @@ class StyleRuleEngine {
     const minSize = rule.minSize || 5;
     const maxSize = rule.maxSize || 30;
 
-    const ratio = Math.max(0, Math.min(1, (value - minVal) / (maxVal - minVal)));
+    // Handle division by zero (when all values are the same)
+    const ratio = maxVal === minVal
+      ? 0.5  // Use middle size when all values are identical
+      : Math.max(0, Math.min(1, (value - minVal) / (maxVal - minVal)));
+
     const size = minSize + ratio * (maxSize - minSize);
 
     const type = geometryType?.toUpperCase();
