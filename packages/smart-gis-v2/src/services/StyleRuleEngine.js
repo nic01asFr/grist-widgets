@@ -11,6 +11,12 @@
 import StyleManager from './StyleManager';
 
 class StyleRuleEngine {
+  constructor() {
+    // Debug mode: set to true to log style application for ALL features
+    this.DEBUG_STYLES = false;
+    this._hasLogged = false;
+  }
+
   /**
    * Apply a style rule to a feature
    */
@@ -26,10 +32,10 @@ class StyleRuleEngine {
 
       const geometryType = feature.geometry_type;
 
-      // Debug logging for first feature only (to avoid spam)
-      if (!this._hasLogged) {
+      // Debug logging (first feature only, unless DEBUG_STYLES is true)
+      if (this.DEBUG_STYLES || !this._hasLogged) {
         console.log(`[StyleRuleEngine] Applying ${rule.type} rule, field: ${rule.field}`);
-        console.log(`[StyleRuleEngine] Sample value from properties[${rule.field}]:`, properties[rule.field]);
+        console.log(`[StyleRuleEngine] Feature ${feature.id}: value from properties[${rule.field}]:`, properties[rule.field]);
         if (rule.type === 'categorized') {
           console.log(`[StyleRuleEngine] Categories:`, rule.categories?.map(c => ({ value: c.value, type: typeof c.value })));
         }
@@ -38,13 +44,13 @@ class StyleRuleEngine {
 
       switch (rule.type) {
         case 'categorized':
-          return this.applyCategorized(properties, geometryType, rule);
+          return this.applyCategorized(properties, geometryType, rule, feature.id);
 
         case 'graduated':
-          return this.applyGraduated(properties, geometryType, rule);
+          return this.applyGraduated(properties, geometryType, rule, feature.id);
 
         case 'proportional':
-          return this.applyProportional(properties, geometryType, rule);
+          return this.applyProportional(properties, geometryType, rule, feature.id);
 
         case 'expression':
           return this.applyExpression(properties, geometryType, rule);
@@ -61,12 +67,12 @@ class StyleRuleEngine {
   /**
    * Apply categorized styling (unique values)
    */
-  applyCategorized(properties, geometryType, rule) {
+  applyCategorized(properties, geometryType, rule, featureId) {
     const value = properties[rule.field];
 
     // Handle null/undefined values
     if (value === null || value === undefined) {
-      console.warn(`[StyleRuleEngine] Null/undefined value for field "${rule.field}" - using default color`);
+      console.warn(`[StyleRuleEngine] Feature ${featureId}: Null/undefined value for field "${rule.field}" - using default color`);
       const color = rule.defaultColor || '#cccccc';
       return this.createStyleForGeometry(geometryType, { color, fillColor: color });
     }
@@ -76,6 +82,11 @@ class StyleRuleEngine {
     const category = rule.categories?.find(c => String(c.value) === valueStr);
 
     const color = category ? category.color : (rule.defaultColor || '#cccccc');
+
+    // Debug: Log the result for each feature
+    if (this.DEBUG_STYLES) {
+      console.log(`[StyleRuleEngine] Feature ${featureId}: value="${valueStr}" → color="${color}" ${category ? '✅' : '⚠️ (default)'}`);
+    }
 
     return this.createStyleForGeometry(geometryType, {
       color,
@@ -89,12 +100,12 @@ class StyleRuleEngine {
   /**
    * Apply graduated styling (numeric ranges)
    */
-  applyGraduated(properties, geometryType, rule) {
+  applyGraduated(properties, geometryType, rule, featureId) {
     const rawValue = properties[rule.field];
     const value = Number(rawValue);
 
     if (isNaN(value)) {
-      console.warn(`[StyleRuleEngine] Cannot convert "${rawValue}" to number for field "${rule.field}" - using default color`);
+      console.warn(`[StyleRuleEngine] Feature ${featureId}: Cannot convert "${rawValue}" to number for field "${rule.field}" - using default color`);
       const color = rule.defaultColor || '#cccccc';
       return this.createStyleForGeometry(geometryType, { color, fillColor: color });
     }
@@ -119,6 +130,12 @@ class StyleRuleEngine {
 
     const color = range ? range.color : (rule.defaultColor || '#cccccc');
 
+    // Debug: Log the result for each feature
+    if (this.DEBUG_STYLES) {
+      const rangeLabel = range ? `[${range.min}-${range.max}]` : 'out of range';
+      console.log(`[StyleRuleEngine] Feature ${featureId}: value=${value} → range=${rangeLabel} → color="${color}" ${range ? '✅' : '⚠️ (default)'}`);
+    }
+
     return this.createStyleForGeometry(geometryType, {
       color,
       fillColor: color,
@@ -131,12 +148,12 @@ class StyleRuleEngine {
   /**
    * Apply proportional sizing
    */
-  applyProportional(properties, geometryType, rule) {
+  applyProportional(properties, geometryType, rule, featureId) {
     const rawValue = properties[rule.field];
     const value = Number(rawValue);
 
     if (isNaN(value)) {
-      console.warn(`[StyleRuleEngine] Cannot convert "${rawValue}" to number for field "${rule.field}" - using default style`);
+      console.warn(`[StyleRuleEngine] Feature ${featureId}: Cannot convert "${rawValue}" to number for field "${rule.field}" - using default style`);
       return this.createStyleForGeometry(geometryType, {
         color: rule.color || '#3b82f6',
         fillColor: rule.color || '#3b82f6'
@@ -155,6 +172,11 @@ class StyleRuleEngine {
       : Math.max(0, Math.min(1, (value - minVal) / (maxVal - minVal)));
 
     const size = minSize + ratio * (maxSize - minSize);
+
+    // Debug: Log the result for each feature
+    if (this.DEBUG_STYLES) {
+      console.log(`[StyleRuleEngine] Feature ${featureId}: value=${value} → ratio=${ratio.toFixed(2)} → size=${size.toFixed(1)} ✅`);
+    }
 
     const type = geometryType?.toUpperCase();
 
