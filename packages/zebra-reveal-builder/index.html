@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZEBRA Reveal Builder</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Layout 3 Panneaux -->
+    <div class="builder-container" id="builderContainer">
+        
+        <!-- Panneau Gauche - Navigation Slides -->
+        <div class="slides-panel" id="slidesPanel">
+            <div class="slides-panel-header">
+                <h2><i class="fas fa-layer-group"></i> Slides</h2>
+                <button class="btn-primary" id="btnAddSlide">
+                    <i class="fas fa-plus"></i> Nouvelle slide
+                </button>
+            </div>
+            
+            <div class="slides-list" id="slidesList">
+                <!-- Populated by JavaScript -->
+            </div>
+            
+            <div class="slides-panel-footer">
+                <button class="btn-secondary" id="btnGenerateAI">
+                    <i class="fas fa-magic"></i> Générer avec IA
+                </button>
+            </div>
+        </div>
+
+        <!-- Panneau Central - Éditeur -->
+        <div class="editor-panel" id="editorPanel">
+            <div class="editor-header">
+                <div class="editor-breadcrumb" id="editorBreadcrumb">
+                    Sélectionnez une slide
+                </div>
+                <div class="editor-toolbar">
+                    <button class="tool-btn" title="Gras" data-action="bold">
+                        <i class="fas fa-bold"></i>
+                    </button>
+                    <button class="tool-btn" title="Italique" data-action="italic">
+                        <i class="fas fa-italic"></i>
+                    </button>
+                    <button class="tool-btn" title="Liste" data-action="list">
+                        <i class="fas fa-list-ul"></i>
+                    </button>
+                    <button class="tool-btn" title="Lien" data-action="link">
+                        <i class="fas fa-link"></i>
+                    </button>
+                    <button class="tool-btn" title="Image" data-action="image">
+                        <i class="fas fa-image"></i>
+                    </button>
+                    <span class="toolbar-divider"></span>
+                    <button class="tool-btn" title="Preview" data-action="preview">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="tool-btn" title="Plein écran" data-action="fullscreen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="editor-content">
+                <textarea 
+                    id="slideEditor" 
+                    class="markdown-editor"
+                    placeholder="# Titre de la slide
+
+Contenu en Markdown...
+
+Utilisez {{variable}} pour lier aux données Grist."
+                ></textarea>
+            </div>
+            
+            <div class="editor-footer">
+                <div class="editor-status" id="editorStatus">
+                    <span id="charCount">0 caractères</span>
+                    <span class="separator">•</span>
+                    <span id="lastSaved">Non sauvegardé</span>
+                </div>
+                <button class="btn-success" id="btnSaveSlide">
+                    <i class="fas fa-save"></i> Sauvegarder
+                </button>
+            </div>
+        </div>
+
+        <!-- Panneau Droit - Propriétés -->
+        <div class="properties-panel" id="propertiesPanel">
+            <div class="properties-header">
+                <h3>Propriétés</h3>
+            </div>
+            
+            <div class="properties-tabs">
+                <button class="tab-btn active" data-tab="settings">Réglages</button>
+                <button class="tab-btn" data-tab="template">Template</button>
+                <button class="tab-btn" data-tab="data">Données</button>
+            </div>
+            
+            <div class="properties-content">
+                <!-- Onglet Settings -->
+                <div class="tab-content active" data-tab="settings">
+                    <div class="form-group">
+                        <label>Section</label>
+                        <select id="slideSection" class="form-control">
+                            <option value="intro">1. Introduction</option>
+                            <option value="probleme">2. Problème</option>
+                            <option value="solution">3. Solution</option>
+                            <option value="donnees">4. Données</option>
+                            <option value="ia">5. Intelligence Artificielle</option>
+                            <option value="processus">6. Processus</option>
+                            <option value="resultats">7. Résultats</option>
+                            <option value="impact">8. Impact</option>
+                            <option value="techno">9. Technologies</option>
+                            <option value="deploiement">10. Déploiement</option>
+                            <option value="partenaires">11. Partenaires</option>
+                            <option value="qr">12. Questions/Réponses</option>
+                            <option value="ressources">13. Ressources</option>
+                            <option value="conclusion">14. Conclusion</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Type de slide</label>
+                        <select id="slideType" class="form-control">
+                            <option value="horizontal">Horizontale (→)</option>
+                            <option value="vertical">Verticale (↓)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Transition</label>
+                        <select id="slideTransition" class="form-control">
+                            <option value="none">Aucune</option>
+                            <option value="fade">Fade</option>
+                            <option value="slide" selected>Slide</option>
+                            <option value="convex">Convex</option>
+                            <option value="concave">Concave</option>
+                            <option value="zoom">Zoom</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Arrière-plan</label>
+                        <input type="color" id="slideBackground" class="form-control" value="#ffffff">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Image de fond (URL)</label>
+                        <input type="text" id="slideBackgroundImage" class="form-control" placeholder="https://...">
+                    </div>
+                </div>
+                
+                <!-- Onglet Template -->
+                <div class="tab-content" data-tab="template">
+                    <div class="template-grid" id="templateGrid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Onglet Data -->
+                <div class="tab-content" data-tab="data">
+                    <div class="form-group">
+                        <label>Source de données</label>
+                        <select id="dataSourceTable" class="form-control">
+                            <option value="">Aucune</option>
+                            <!-- Populated from Grist tables -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Requête (JSON)</label>
+                        <textarea id="dataQuery" class="form-control" rows="5" placeholder='{
+  "filter": { "commune": "Grenoble" },
+  "aggregate": { "total": "COUNT(*)" }
+}'></textarea>
+                    </div>
+                    
+                    <button class="btn-secondary btn-block" id="btnTestQuery">
+                        <i class="fas fa-play"></i> Tester la requête
+                    </button>
+                    
+                    <div id="queryResult" class="query-result"></div>
+                </div>
+            </div>
+            
+            <!-- Notes Présentateur -->
+            <div class="notes-section">
+                <label>Notes présentateur</label>
+                <textarea id="slideNotes" class="form-control" rows="3" placeholder="Notes visibles uniquement en mode présentateur..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Preview -->
+    <div class="modal" id="previewModal" style="display: none;">
+        <div class="modal-overlay" id="previewOverlay"></div>
+        <div class="modal-content modal-fullscreen">
+            <div class="modal-header">
+                <h3>Prévisualisation</h3>
+                <button class="btn-close" id="btnClosePreview">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <iframe id="previewFrame" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loader"></div>
+        <p>Chargement...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="templates.js"></script>
+    <script src="mcp-integration.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
