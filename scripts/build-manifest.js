@@ -111,6 +111,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Territoire 3D',
+    description: 'Jumeau numérique LiDAR HD IGN avec Giro3D. Visualisation de nuages de points COPC, 4 modes d\'affichage (classification IGN, orthophoto, élévation, intensité), filtrage par classe, Eye Dome Lighting. Architecture 1 dalle = 1 document Grist. Support import BD TOPO, OSM et GeoJSON.',
+    path: 'territoire-3d',
+    widgetId: '@nic01asFr/territoire-3d',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 
