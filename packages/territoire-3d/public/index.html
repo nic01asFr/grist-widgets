@@ -1022,10 +1022,13 @@
                         <div class="form-group">
                             <label class="form-label">Source des données</label>
                             <select class="form-input" id="setupSource">
+                                <option value="ign">IGN Géoplateforme (France entière)</option>
                                 <option value="oslandia">Oslandia (Paris uniquement)</option>
-                                <option value="ign" disabled>IGN Direct (bientôt)</option>
                                 <option value="custom">URL personnalisée</option>
                             </select>
+                            <div class="form-hint">
+                                IGN: Requête WFS automatique pour trouver l'URL COPC
+                            </div>
                         </div>
                     </div>
 
@@ -1875,10 +1878,82 @@
         }
 
         // ============================================================
-        // TILE URL BUILDER
+        // TILE URL BUILDER & IGN WFS INTEGRATION
         // ============================================================
-        function buildCopcUrl(tileRef, source) {
-            // Format: XXXX_YYYY
+
+        // IGN Géoplateforme WFS configuration
+        const IGN_WFS = {
+            url: 'https://data.geopf.fr/wfs/ows',
+            layer: 'IGNF_NUAGES-DE-POINTS-LIDAR-HD:dalle',
+            // Fallback storage URLs
+            ovhStorage: 'https://storage.sbg.cloud.ovh.net/v1/AUTH_63234f509d6048bca3c9fd7928720ca1/ppk-lidar'
+        };
+
+        // Query IGN WFS to find COPC URL for a specific tile
+        async function queryIGNWfsForTile(tileRef) {
+            const match = tileRef.match(/^(\d{4})_(\d{4})$/);
+            if (!match) return null;
+
+            const [, xKm, yKm] = match;
+            const x = parseInt(xKm) * 1000;
+            const y = parseInt(yKm) * 1000;
+
+            // Build WFS GetFeature request with BBOX filter
+            const bbox = `${x},${y},${x + 1000},${y + 1000},EPSG:2154`;
+
+            const wfsUrl = `${IGN_WFS.url}?` + new URLSearchParams({
+                SERVICE: 'WFS',
+                VERSION: '2.0.0',
+                REQUEST: 'GetFeature',
+                TYPENAMES: IGN_WFS.layer,
+                OUTPUTFORMAT: 'application/json',
+                SRSNAME: 'EPSG:2154',
+                BBOX: bbox
+            });
+
+            console.log('🔍 Querying IGN WFS for tile:', tileRef);
+
+            try {
+                const response = await fetch(wfsUrl);
+                if (!response.ok) {
+                    throw new Error(`WFS error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.features && data.features.length > 0) {
+                    // Find the exact tile matching our reference
+                    const feature = data.features.find(f => {
+                        const name = f.properties?.nom || f.properties?.name || '';
+                        return name.includes(`${xKm}_${yKm}`);
+                    }) || data.features[0];
+
+                    // Extract COPC URL from feature properties
+                    const copcUrl = feature.properties?.url ||
+                                   feature.properties?.url_telechargement ||
+                                   feature.properties?.lien_telechargement;
+
+                    if (copcUrl) {
+                        console.log('✅ Found COPC URL via WFS:', copcUrl);
+                        return {
+                            url: copcUrl,
+                            properties: feature.properties,
+                            geometry: feature.geometry
+                        };
+                    }
+                }
+
+                console.log('⚠️ No COPC URL found in WFS response');
+                return null;
+
+            } catch (error) {
+                console.warn('⚠️ WFS query failed:', error.message);
+                return null;
+            }
+        }
+
+        // Build COPC URL with multiple fallback strategies
+        async function buildCopcUrl(tileRef, source) {
             const match = tileRef.match(/^(\d{4})_(\d{4})$/);
             if (!match) return null;
 
@@ -1886,14 +1961,79 @@
 
             switch (source) {
                 case 'oslandia':
-                    // Only Paris tiles available
+                    // Oslandia Paris tiles
                     return `https://3d.oslandia.com/giro3d/pointclouds/lidarhd/paris/LHD_FXX_${x}_${y}_PTS_O_LAMB93_IGN69.copc.laz`;
+
                 case 'ign':
-                    // IGN direct URL (would need authentication)
-                    return null;
+                    // Try WFS query first
+                    const wfsResult = await queryIGNWfsForTile(tileRef);
+                    if (wfsResult?.url) {
+                        return wfsResult.url;
+                    }
+
+                    // Fallback: try direct OVH storage URL pattern
+                    // The block code (2 letters) is derived from tile position
+                    // This is a heuristic - real block codes vary by region
+                    const blockCodes = getBlockCodeForTile(x, y);
+                    for (const blockCode of blockCodes) {
+                        const url = `${IGN_WFS.ovhStorage}/${blockCode}/LHD_FXX_${x}_${y}_PTS_O_LAMB93_IGN69.copc.laz`;
+                        if (await checkUrlExists(url)) {
+                            return url;
+                        }
+                    }
+
+                    // Final fallback: new Géoplateforme URL pattern
+                    return `https://data.geopf.fr/telechargement/download/LiDARHD-NUALID/NUALHD_1-0__LAZ_LAMB93_D077/LHD_FXX_${x}_${y}_PTS_LAMB93_IGN69.copc.laz`;
+
+                case 'custom':
+                    return null; // User will provide URL
+
                 default:
                     return null;
             }
+        }
+
+        // Check if URL exists (HEAD request)
+        async function checkUrlExists(url) {
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                return response.ok;
+            } catch {
+                return false;
+            }
+        }
+
+        // Heuristic to guess block codes for a tile
+        function getBlockCodeForTile(xKm, yKm) {
+            // Known block codes and their approximate regions
+            // This is a simplified mapping - real data would come from WFS
+            const x = parseInt(xKm);
+            const y = parseInt(yKm);
+
+            const blockMap = [
+                // Paris region
+                { minX: 600, maxX: 700, minY: 6800, maxY: 6900, codes: ['FP', 'FQ'] },
+                // Millau region
+                { minX: 650, maxX: 750, minY: 6300, maxY: 6400, codes: ['LP'] },
+                // La Rochelle region
+                { minX: 350, maxX: 420, minY: 6500, maxY: 6600, codes: ['FK'] },
+                // Bordeaux region
+                { minX: 380, maxX: 450, minY: 6400, maxY: 6500, codes: ['GK', 'GL'] },
+                // Lyon region
+                { minX: 800, maxX: 880, minY: 6500, maxY: 6600, codes: ['NO', 'NP'] },
+                // Rennes region
+                { minX: 300, maxX: 380, minY: 6780, maxY: 6850, codes: ['DP', 'DQ'] }
+            ];
+
+            for (const region of blockMap) {
+                if (x >= region.minX && x <= region.maxX &&
+                    y >= region.minY && y <= region.maxY) {
+                    return region.codes;
+                }
+            }
+
+            // Default: try common codes
+            return ['D077', 'FP', 'FK', 'LP'];
         }
 
         function getTileBbox(tileRef) {
@@ -1910,6 +2050,37 @@
                 maxX: x + 1000,
                 maxY: y + 1000
             };
+        }
+
+        // Get list of available tiles from IGN WFS
+        async function getAvailableTilesInBbox(bbox) {
+            const wfsUrl = `${IGN_WFS.url}?` + new URLSearchParams({
+                SERVICE: 'WFS',
+                VERSION: '2.0.0',
+                REQUEST: 'GetFeature',
+                TYPENAMES: IGN_WFS.layer,
+                OUTPUTFORMAT: 'application/json',
+                SRSNAME: 'EPSG:2154',
+                BBOX: `${bbox.minX},${bbox.minY},${bbox.maxX},${bbox.maxY},EPSG:2154`,
+                COUNT: '100'
+            });
+
+            try {
+                const response = await fetch(wfsUrl);
+                if (!response.ok) return [];
+
+                const data = await response.json();
+                return (data.features || []).map(f => ({
+                    name: f.properties?.nom || 'Dalle',
+                    url: f.properties?.url || f.properties?.url_telechargement,
+                    bbox: f.bbox,
+                    properties: f.properties
+                }));
+
+            } catch (error) {
+                console.warn('⚠️ Failed to get available tiles:', error);
+                return [];
+            }
         }
 
         async function loadObjectsFromGrist() {
@@ -2210,7 +2381,20 @@
                 tileRef = document.getElementById('setupTileRef').value.trim();
                 source = document.getElementById('setupSource').value;
                 tileName = document.getElementById('setupTileName').value.trim() || `Dalle ${tileRef}`;
-                copcUrl = buildCopcUrl(tileRef, source);
+
+                // Validate tile reference format
+                if (!tileRef.match(/^\d{4}_\d{4}$/)) {
+                    showToast('Format invalide. Utilisez XXXX_YYYY (ex: 0643_6862)', 'warning');
+                    return;
+                }
+
+                // Show searching message for IGN source
+                if (source === 'ign') {
+                    showToast('Recherche de la dalle sur IGN Géoplateforme...', 'info');
+                }
+
+                // Build URL (async for IGN WFS query)
+                copcUrl = await buildCopcUrl(tileRef, source);
             }
 
             const autoTables = document.getElementById('setupAutoTables').checked;
@@ -2221,7 +2405,7 @@
                 if (activeTab === 'url') {
                     showToast('URL COPC requise', 'warning');
                 } else {
-                    showToast('Référence de dalle invalide ou source non disponible', 'warning');
+                    showToast('Dalle non trouvée. Vérifiez la référence ou essayez une autre source.', 'warning');
                 }
                 return;
             }
