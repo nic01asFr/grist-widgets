@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Territoire 3D - Jumeau Numérique LiDAR HD</title>
+
+    <!-- Grist Plugin API -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <!-- Giro3D via ESM -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@giro3d/giro3d/": "https://unpkg.com/@giro3d/giro3d@0.43.7/",
+            "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+            "three/": "https://unpkg.com/three@0.165.0/",
+            "ol/": "https://cdn.jsdelivr.net/npm/ol@9.0.0/",
+            "proj4": "https://unpkg.com/proj4@2.11.0/dist/proj4-src.js"
+        }
+    }
+    </script>
+
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --bg-hover: #252530;
+            --text-primary: #ffffff;
+            --text-secondary: #8888aa;
+            --text-muted: #666680;
+            --accent: #4a7dff;
+            --accent-hover: #6090ff;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --border: #2a2a3a;
+            --radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .app {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            flex-shrink: 0;
+            gap: 8px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tile-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+        }
+
+        .tile-badge strong {
+            color: var(--text-primary);
+        }
+
+        .status-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .status-badge.loading { background: rgba(245,158,11,0.2); color: var(--warning); }
+        .status-badge.ready { background: rgba(34,197,94,0.2); color: var(--success); }
+        .status-badge.error { background: rgba(239,68,68,0.2); color: var(--error); }
+
+        /* Mode buttons */
+        .header-center {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--bg-primary);
+            padding: 3px;
+            border-radius: var(--radius);
+        }
+
+        .mode-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mode-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Header actions */
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+        .btn.active { background: var(--accent); border-color: var(--accent); }
+        .btn-icon { padding: 6px; min-width: 30px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 3D View */
+        #view {
+            flex: 1;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        #view canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .loading-overlay.hidden { display: none; }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text {
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .loading-progress {
+            margin-top: 8px;
+            width: 200px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+
+        /* Info bar */
+        .info-bar {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(18, 18, 26, 0.9);
+            padding: 8px 12px;
+            border-radius: var(--radius);
+            font-size: 10px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 14px;
+            z-index: 50;
+            border: 1px solid var(--border);
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .info-item strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Side panels */
+        .panel {
+            position: absolute;
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            z-index: 100;
+            max-height: calc(100% - 20px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        .panel.hidden { display: none; }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--bg-card);
+        }
+
+        .panel-close {
+            cursor: pointer;
+            opacity: 0.5;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .panel-close:hover { opacity: 1; }
+
+        .panel-body {
+            padding: 12px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .panel-section {
+            margin-bottom: 14px;
+        }
+
+        .panel-section:last-child { margin-bottom: 0; }
+
+        .panel-section-title {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        /* Display mode panel */
+        .display-panel {
+            left: 10px;
+            top: 10px;
+            width: 240px;
+        }
+
+        .display-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 6px;
+            transition: all 0.15s;
+        }
+
+        .display-option:hover { border-color: var(--accent); }
+        .display-option.active { border-color: var(--accent); background: rgba(74, 125, 255, 0.1); }
+
+        .display-option-icon {
+            font-size: 18px;
+            width: 28px;
+            text-align: center;
+        }
+
+        .display-option-info { flex: 1; }
+
+        .display-option-name {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .display-option-desc {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        /* Classification toggles */
+        .class-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .class-toggle:hover { background: var(--bg-hover); }
+
+        .class-toggle input {
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent);
+        }
+
+        .class-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .class-name {
+            flex: 1;
+            font-size: 11px;
+        }
+
+        .class-code {
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        /* Objects panel */
+        .objects-panel {
+            right: 10px;
+            top: 10px;
+            width: 280px;
+            max-height: 60%;
+        }
+
+        .object-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            transition: all 0.15s;
+        }
+
+        .object-item:hover { border-color: var(--accent); }
+        .object-item.selected { border-color: var(--accent); background: rgba(74, 125, 255, 0.1); }
+
+        .object-icon {
+            font-size: 16px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .object-info { flex: 1; min-width: 0; }
+
+        .object-name {
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .object-meta {
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        .object-status {
+            font-size: 8px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .object-status.imported { background: rgba(59,130,246,0.2); color: #3b82f6; }
+        .object-status.verified { background: rgba(34,197,94,0.2); color: var(--success); }
+        .object-status.corrected { background: rgba(245,158,11,0.2); color: var(--warning); }
+
+        /* Stats cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Slider controls */
+        .control-row {
+            margin-bottom: 10px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .control-value {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border);
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 10px 14px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border-left: 3px solid var(--accent);
+            font-size: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success { border-color: var(--success); }
+        .toast.warning { border-color: var(--warning); }
+        .toast.error { border-color: var(--error); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Setup screen */
+        .setup-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        .setup-overlay.hidden { display: none; }
+
+        .setup-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 450px;
+            overflow: hidden;
+        }
+
+        .setup-header {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            padding: 24px;
+            text-align: center;
+        }
+
+        .setup-header h2 {
+            font-size: 20px;
+            margin-bottom: 6px;
+        }
+
+        .setup-header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .setup-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-hint {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .setup-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .setup-actions .btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 13px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Import modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 400;
+            padding: 20px;
+        }
+
+        .modal-overlay.hidden { display: none; }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-card);
+        }
+
+        .modal-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 14px 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* Import options */
+        .import-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: all 0.15s;
+        }
+
+        .import-option:hover { border-color: var(--accent); }
+
+        .import-option-icon {
+            font-size: 24px;
+            width: 40px;
+            text-align: center;
+        }
+
+        .import-option-info { flex: 1; }
+
+        .import-option-name {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .import-option-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-center { display: none; }
+            .panel { width: calc(100% - 20px) !important; }
+            .display-panel { left: 10px; right: 10px; width: auto !important; }
+            .objects-panel { right: 10px; left: 10px; width: auto !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <span>🗺️</span>
+                    <span>Territoire 3D</span>
+                </div>
+                <div class="tile-badge" id="tileBadge">
+                    <strong id="tileName">Aucune dalle</strong>
+                </div>
+                <span class="status-badge loading" id="statusBadge">Initialisation</span>
+            </div>
+
+            <div class="header-center">
+                <button class="mode-btn active" data-mode="navigate" title="Navigation">
+                    <span>🔍</span> Explorer
+                </button>
+                <button class="mode-btn" data-mode="select" title="Sélection">
+                    <span>👆</span> Sélection
+                </button>
+                <button class="mode-btn" data-mode="edit" title="Édition">
+                    <span>✏️</span> Édition
+                </button>
+            </div>
+
+            <div class="header-right">
+                <button class="btn btn-icon" id="btnDisplay" title="Modes d'affichage">🎨</button>
+                <button class="btn btn-icon" id="btnObjects" title="Objets">📦</button>
+                <button class="btn btn-icon" id="btnImport" title="Importer">📥</button>
+                <button class="btn btn-icon" id="btnFit" title="Ajuster la vue">🎯</button>
+                <button class="btn btn-icon" id="btnSettings" title="Paramètres">⚙️</button>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main">
+            <!-- 3D View (Giro3D) -->
+            <div id="view">
+                <!-- Loading overlay -->
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                    <div class="loading-text" id="loadingText">Chargement du nuage de points...</div>
+                    <div class="loading-progress">
+                        <div class="loading-progress-bar" id="loadingProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Info bar -->
+                <div class="info-bar" id="infoBar">
+                    <div class="info-item">
+                        <span>☁️</span>
+                        <strong id="infoPoints">0</strong> pts
+                    </div>
+                    <div class="info-item">
+                        <span>📦</span>
+                        <strong id="infoObjects">0</strong> objets
+                    </div>
+                    <div class="info-item">
+                        <span>📍</span>
+                        <strong id="infoCoords">-</strong>
+                    </div>
+                </div>
+
+                <!-- Display mode panel -->
+                <div class="panel display-panel hidden" id="displayPanel">
+                    <div class="panel-header">
+                        <span>🎨 Mode d'affichage</span>
+                        <span class="panel-close" data-close="displayPanel">×</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-section">
+                            <div class="panel-section-title">Colorisation</div>
+
+                            <div class="display-option active" data-display="classification">
+                                <div class="display-option-icon">🏷️</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Classification IGN</div>
+                                    <div class="display-option-desc">Sol, végétation, bâtiments...</div>
+                                </div>
+                            </div>
+
+                            <div class="display-option" data-display="ortho">
+                                <div class="display-option-icon">🛰️</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Orthophoto IGN</div>
+                                    <div class="display-option-desc">Couleurs réelles depuis WMS</div>
+                                </div>
+                            </div>
+
+                            <div class="display-option" data-display="elevation">
+                                <div class="display-option-icon">📊</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Élévation</div>
+                                    <div class="display-option-desc">Gradient altimétrique</div>
+                                </div>
+                            </div>
+
+                            <div class="display-option" data-display="intensity">
+                                <div class="display-option-icon">💡</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Intensité</div>
+                                    <div class="display-option-desc">Retour du signal LiDAR</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel-section">
+                            <div class="panel-section-title">Classes visibles</div>
+                            <div id="classToggles">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="panel-section">
+                            <div class="panel-section-title">Rendu</div>
+
+                            <div class="control-row">
+                                <div class="control-header">
+                                    <span>Taille des points</span>
+                                    <span class="control-value" id="pointSizeValue">2</span>
+                                </div>
+                                <input type="range" class="slider" id="pointSizeSlider" min="1" max="10" value="2">
+                            </div>
+
+                            <div class="control-row">
+                                <div class="control-header">
+                                    <span>Budget de points (M)</span>
+                                    <span class="control-value" id="pointBudgetValue">5</span>
+                                </div>
+                                <input type="range" class="slider" id="pointBudgetSlider" min="1" max="15" value="5">
+                            </div>
+
+                            <label class="class-toggle">
+                                <input type="checkbox" id="edlToggle" checked>
+                                <span class="class-name">Eye Dome Lighting</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Objects panel -->
+                <div class="panel objects-panel hidden" id="objectsPanel">
+                    <div class="panel-header">
+                        <span>📦 Objets (<span id="objectCount">0</span>)</span>
+                        <span class="panel-close" data-close="objectsPanel">×</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-section">
+                            <div class="stats-row">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="statTotal">0</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="statVerified">0</div>
+                                    <div class="stat-label">Vérifiés</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel-section">
+                            <div class="panel-section-title">Liste des objets</div>
+                            <div id="objectList">
+                                <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:11px;">
+                                    Aucun objet
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toast container -->
+                <div class="toast-container" id="toastContainer"></div>
+            </div>
+        </main>
+
+        <!-- Setup overlay -->
+        <div class="setup-overlay" id="setupOverlay">
+            <div class="setup-card">
+                <div class="setup-header">
+                    <h2>🗺️ Territoire 3D</h2>
+                    <p>Jumeau numérique LiDAR HD IGN</p>
+                </div>
+                <div class="setup-body">
+                    <div class="form-group">
+                        <label class="form-label">URL du fichier COPC</label>
+                        <input type="text" class="form-input" id="setupCopcUrl"
+                            placeholder="https://3d.oslandia.com/.../file.copc.laz">
+                        <div class="form-hint">
+                            Fichier Cloud Optimized Point Cloud (.copc.laz) depuis IGN ou autre source
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nom de la dalle (optionnel)</label>
+                        <input type="text" class="form-input" id="setupTileName"
+                            placeholder="Ex: Montpellier Centre">
+                    </div>
+                    <div class="setup-actions">
+                        <button class="btn" id="btnDemo">Démo Paris</button>
+                        <button class="btn btn-primary" id="btnSetup">🚀 Charger</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import modal -->
+        <div class="modal-overlay hidden" id="importModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <div class="modal-title">📥 Importer des objets</div>
+                    <span class="panel-close" data-close="importModal">×</span>
+                </div>
+                <div class="modal-body">
+                    <div class="import-option" id="importBdTopo">
+                        <div class="import-option-icon">🗺️</div>
+                        <div class="import-option-info">
+                            <div class="import-option-name">BD TOPO IGN</div>
+                            <div class="import-option-desc">Bâtiments, routes, mobilier urbain depuis l'IGN</div>
+                        </div>
+                    </div>
+                    <div class="import-option" id="importOsm">
+                        <div class="import-option-icon">🌍</div>
+                        <div class="import-option-info">
+                            <div class="import-option-name">OpenStreetMap</div>
+                            <div class="import-option-desc">Arbres, lampadaires, bancs depuis OSM</div>
+                        </div>
+                    </div>
+                    <div class="import-option" id="importGeojson">
+                        <div class="import-option-icon">📄</div>
+                        <div class="import-option-info">
+                            <div class="import-option-name">Fichier GeoJSON</div>
+                            <div class="import-option-desc">Importer un fichier local</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" data-close="importModal">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ============================================================
+        // IMPORTS
+        // ============================================================
+        import Instance from '@giro3d/giro3d/core/Instance.js';
+        import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
+        import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
+        import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
+        import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+        import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
+        import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
+        import { Vector3, Box3 } from 'three';
+
+        // LAZ-PERF WebAssembly path
+        import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
+        setLazPerfPath('https://unpkg.com/laz-perf@0.0.6/');
+
+        // ============================================================
+        // CONFIGURATION
+        // ============================================================
+        const CONFIG = {
+            // CRS Lambert 93
+            crs: 'EPSG:2154',
+            proj4def: '+proj=lcc +lat_0=46.5 +lon_0=3 +lat_1=49 +lat_2=44 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
+
+            // Demo COPC (Oslandia Paris dataset)
+            demoUrl: 'https://3d.oslandia.com/giro3d/pointclouds/lidarhd/paris/LHD_FXX_0643_6862_PTS_O_LAMB93_IGN69.copc.laz',
+            demoName: 'Paris - 0643_6862',
+
+            // WMS IGN Orthophoto
+            orthoWms: 'https://data.geopf.fr/wms-r',
+            orthoLayer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+
+            // IGN LiDAR HD Classifications
+            classifications: {
+                1: { name: 'Non classifié', color: '#808080' },
+                2: { name: 'Sol', color: '#8B4513' },
+                3: { name: 'Végétation basse', color: '#90EE90' },
+                4: { name: 'Végétation moyenne', color: '#32CD32' },
+                5: { name: 'Végétation haute', color: '#228B22' },
+                6: { name: 'Bâtiment', color: '#CD853F' },
+                9: { name: 'Eau', color: '#4169E1' },
+                17: { name: 'Pont', color: '#808080' },
+                64: { name: 'Sursol pérenne', color: '#94a770' },
+                65: { name: 'Artefacts', color: '#d3ff00' },
+                67: { name: 'Points virtuels', color: '#00ff8d' }
+            },
+
+            // Grist tables
+            tables: {
+                config: 'Config',
+                objects: 'Objects',
+                models: 'Models_Lib',
+                styles: 'Display_Styles'
+            }
+        };
+
+        // ============================================================
+        // STATE
+        // ============================================================
+        const state = {
+            instance: null,
+            pointCloud: null,
+            colorLayer: null,
+            controls: null,
+
+            // Data
+            copcUrl: null,
+            tileName: null,
+            objects: [],
+
+            // UI
+            currentMode: 'navigate',
+            currentDisplay: 'classification',
+            selectedObject: null,
+
+            // Grist
+            gristReady: false,
+            gristConfig: null
+        };
+
+        // ============================================================
+        // UTILITIES
+        // ============================================================
+        function showLoading(text = 'Chargement...', progress = 0) {
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingProgress').style.width = `${progress}%`;
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+
+        function updateProgress(progress) {
+            document.getElementById('loadingProgress').style.width = `${Math.round(progress * 100)}%`;
+        }
+
+        function setStatus(type, text) {
+            const badge = document.getElementById('statusBadge');
+            badge.className = `status-badge ${type}`;
+            badge.textContent = text;
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        function togglePanel(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+
+        function closePanel(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function formatNumber(num) {
+            if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        // ============================================================
+        // GIRO3D INITIALIZATION
+        // ============================================================
+        async function initGiro3D() {
+            console.log('🗺️ Initializing Giro3D...');
+
+            // Register Lambert 93
+            Instance.registerCRS(CONFIG.crs, CONFIG.proj4def);
+
+            // Create instance
+            state.instance = new Instance({
+                target: 'view',
+                crs: CONFIG.crs,
+                renderer: {
+                    logarithmicDepthBuffer: true
+                }
+            });
+
+            // Enable post-processing
+            state.instance.renderingOptions.enableEDL = true;
+            state.instance.renderingOptions.EDLRadius = 0.6;
+            state.instance.renderingOptions.EDLStrength = 5;
+            state.instance.renderingOptions.enableInpainting = true;
+            state.instance.renderingOptions.enablePointCloudOcclusion = true;
+
+            console.log('✅ Giro3D instance created');
+        }
+
+        // ============================================================
+        // POINT CLOUD LOADING
+        // ============================================================
+        async function loadPointCloud(url, name = 'Dalle') {
+            if (!state.instance) {
+                await initGiro3D();
+            }
+
+            showLoading('Connexion au fichier COPC...', 0);
+            setStatus('loading', 'Chargement...');
+
+            try {
+                console.log('📥 Loading COPC:', url);
+
+                // Create COPC source
+                const source = new COPCSource({ url });
+
+                // Track progress
+                source.addEventListener('progress', () => {
+                    updateProgress(source.progress);
+                });
+
+                showLoading('Initialisation du nuage de points...', 10);
+
+                // Initialize source to get metadata
+                await source.initialize();
+
+                console.log('📊 COPC metadata:', {
+                    pointCount: source.metadata.pointCount,
+                    crs: source.crs,
+                    bounds: source.bounds
+                });
+
+                showLoading('Création du nuage de points...', 30);
+
+                // Create point cloud entity
+                state.pointCloud = new PointCloud({
+                    source,
+                    subdivisionThreshold: 1.5
+                });
+
+                showLoading('Ajout à la scène...', 50);
+
+                // Add to scene
+                await state.instance.add(state.pointCloud);
+
+                showLoading('Configuration de la caméra...', 80);
+
+                // Setup camera and controls
+                await setupCamera();
+
+                // Update UI
+                state.copcUrl = url;
+                state.tileName = name;
+                document.getElementById('tileName').textContent = name;
+                document.getElementById('infoPoints').textContent = formatNumber(source.metadata.pointCount);
+
+                // Populate classification toggles
+                populateClassificationToggles();
+
+                // Apply default display mode
+                setDisplayMode('classification');
+
+                hideLoading();
+                setStatus('ready', `${formatNumber(source.metadata.pointCount)} pts`);
+                showToast(`Nuage chargé: ${formatNumber(source.metadata.pointCount)} points`, 'success');
+
+                console.log('✅ Point cloud loaded successfully');
+
+            } catch (error) {
+                console.error('❌ Error loading point cloud:', error);
+                hideLoading();
+                setStatus('error', 'Erreur');
+                showToast(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function setupCamera() {
+            if (!state.pointCloud) return;
+
+            const bbox = state.pointCloud.getBoundingBox();
+            if (!bbox || bbox.isEmpty()) {
+                console.warn('⚠️ Empty bounding box');
+                return;
+            }
+
+            const center = new Vector3();
+            bbox.getCenter(center);
+
+            const size = new Vector3();
+            bbox.getSize(size);
+
+            // Position camera
+            const camera = state.instance.view.camera;
+            camera.position.set(
+                center.x - size.x * 0.5,
+                center.y - size.y * 0.5,
+                center.z + size.z * 2
+            );
+
+            // Setup MapControls
+            state.controls = new MapControls(camera, state.instance.domElement);
+            state.controls.target.copy(center);
+            state.controls.enableDamping = true;
+            state.controls.dampingFactor = 0.15;
+            state.controls.maxPolarAngle = Math.PI / 2.1;
+
+            state.instance.view.setControls(state.controls);
+
+            // Update controls
+            state.controls.update();
+
+            console.log('📷 Camera setup complete', { center, size });
+        }
+
+        // ============================================================
+        // DISPLAY MODES
+        // ============================================================
+        function setDisplayMode(mode) {
+            state.currentDisplay = mode;
+
+            // Update UI
+            document.querySelectorAll('.display-option').forEach(el => {
+                el.classList.toggle('active', el.dataset.display === mode);
+            });
+
+            if (!state.pointCloud) return;
+
+            switch (mode) {
+                case 'classification':
+                    state.pointCloud.setColoringMode('attribute');
+                    state.pointCloud.setColorAttribute('Classification');
+                    if (state.colorLayer) {
+                        state.pointCloud.setColorLayer(null);
+                    }
+                    break;
+
+                case 'ortho':
+                    loadOrthoColorization();
+                    break;
+
+                case 'elevation':
+                    state.pointCloud.setColoringMode('attribute');
+                    state.pointCloud.setColorAttribute('Z');
+                    state.pointCloud.setColorMap('viridis');
+                    if (state.colorLayer) {
+                        state.pointCloud.setColorLayer(null);
+                    }
+                    break;
+
+                case 'intensity':
+                    state.pointCloud.setColoringMode('attribute');
+                    state.pointCloud.setColorAttribute('Intensity');
+                    state.pointCloud.setColorMap('greys');
+                    if (state.colorLayer) {
+                        state.pointCloud.setColorLayer(null);
+                    }
+                    break;
+            }
+
+            state.instance.notifyChange();
+        }
+
+        async function loadOrthoColorization() {
+            if (!state.pointCloud) return;
+
+            showToast('Chargement de l\'orthophoto...', 'info');
+
+            try {
+                // Dynamic import for OpenLayers
+                const { default: TileWMS } = await import('ol/source/TileWMS.js');
+
+                const orthoSource = new TiledImageSource({
+                    source: new TileWMS({
+                        url: CONFIG.orthoWms,
+                        projection: CONFIG.crs,
+                        params: {
+                            LAYERS: CONFIG.orthoLayer,
+                            FORMAT: 'image/jpeg'
+                        }
+                    })
+                });
+
+                // Get extent from point cloud
+                const bbox = state.pointCloud.getBoundingBox();
+                const extent = new Extent(
+                    CONFIG.crs,
+                    bbox.min.x, bbox.max.x,
+                    bbox.min.y, bbox.max.y
+                );
+
+                state.colorLayer = new ColorLayer({
+                    name: 'ortho_ign',
+                    source: orthoSource,
+                    extent
+                });
+
+                state.pointCloud.setColorLayer(state.colorLayer);
+                state.pointCloud.setColoringMode('layer');
+                state.instance.notifyChange();
+
+                showToast('Orthophoto appliquée', 'success');
+
+            } catch (error) {
+                console.error('❌ Error loading orthophoto:', error);
+                showToast('Erreur orthophoto: ' + error.message, 'error');
+            }
+        }
+
+        function populateClassificationToggles() {
+            const container = document.getElementById('classToggles');
+            container.innerHTML = '';
+
+            for (const [code, info] of Object.entries(CONFIG.classifications)) {
+                const toggle = document.createElement('label');
+                toggle.className = 'class-toggle';
+                toggle.innerHTML = `
+                    <input type="checkbox" checked data-class="${code}">
+                    <div class="class-color" style="background:${info.color}"></div>
+                    <span class="class-name">${info.name}</span>
+                    <span class="class-code">${code}</span>
+                `;
+
+                toggle.querySelector('input').addEventListener('change', (e) => {
+                    updateClassificationVisibility();
+                });
+
+                container.appendChild(toggle);
+            }
+        }
+
+        function updateClassificationVisibility() {
+            if (!state.pointCloud) return;
+
+            const visibility = {};
+
+            // Initialize all to false
+            for (let i = 0; i < 256; i++) {
+                visibility[i] = false;
+            }
+
+            // Enable checked classes
+            document.querySelectorAll('#classToggles input:checked').forEach(input => {
+                visibility[parseInt(input.dataset.class)] = true;
+            });
+
+            state.pointCloud.setClassificationVisibility(visibility);
+            state.instance.notifyChange();
+        }
+
+        // ============================================================
+        // GRIST INTEGRATION
+        // ============================================================
+        async function initGrist() {
+            if (typeof grist === 'undefined') {
+                console.log('ℹ️ Grist not available, standalone mode');
+                return false;
+            }
+
+            try {
+                await grist.ready({
+                    requiredAccess: 'full',
+                    allowSelectBy: true,
+                    columns: [
+                        { name: 'CopcUrl', type: 'Text', optional: true },
+                        { name: 'TileName', type: 'Text', optional: true }
+                    ]
+                });
+
+                state.gristReady = true;
+                console.log('✅ Grist connected');
+
+                // Listen for record selection
+                grist.onRecord(handleGristRecord);
+                grist.onRecords(handleGristRecords);
+
+                // Try to load config
+                await loadConfigFromGrist();
+
+                return true;
+
+            } catch (error) {
+                console.warn('⚠️ Grist init error:', error);
+                return false;
+            }
+        }
+
+        async function loadConfigFromGrist() {
+            if (!state.gristReady) return;
+
+            try {
+                const tables = await grist.docApi.listTables();
+
+                if (tables.includes(CONFIG.tables.config)) {
+                    const data = await grist.docApi.fetchTable(CONFIG.tables.config);
+
+                    if (data.id && data.id.length > 0) {
+                        const config = {
+                            copcUrl: data.CopcUrl?.[0],
+                            tileName: data.TileName?.[0] || data.Name?.[0]
+                        };
+
+                        if (config.copcUrl) {
+                            console.log('📋 Config loaded from Grist:', config);
+                            state.gristConfig = config;
+
+                            // Auto-load point cloud
+                            document.getElementById('setupOverlay').classList.add('hidden');
+                            await loadPointCloud(config.copcUrl, config.tileName || 'Dalle');
+                        }
+                    }
+                }
+
+                // Load objects
+                if (tables.includes(CONFIG.tables.objects)) {
+                    await loadObjectsFromGrist();
+                }
+
+            } catch (error) {
+                console.warn('⚠️ Error loading Grist config:', error);
+            }
+        }
+
+        async function loadObjectsFromGrist() {
+            if (!state.gristReady) return;
+
+            try {
+                const data = await grist.docApi.fetchTable(CONFIG.tables.objects);
+
+                if (!data.id || data.id.length === 0) {
+                    state.objects = [];
+                    updateObjectsList();
+                    return;
+                }
+
+                state.objects = [];
+                for (let i = 0; i < data.id.length; i++) {
+                    if (data.X?.[i] != null && data.Y?.[i] != null) {
+                        state.objects.push({
+                            id: data.id[i],
+                            name: data.Name?.[i] || `Objet ${data.id[i]}`,
+                            type: data.Type?.[i] || 'inconnu',
+                            category: data.Category?.[i] || 'Autre',
+                            x: data.X[i],
+                            y: data.Y[i],
+                            z: data.Z?.[i] || 0,
+                            status: data.Status?.[i] || 'Importé',
+                            sourceBD: data.SourceBD?.[i] || 'Manuel'
+                        });
+                    }
+                }
+
+                console.log(`📦 ${state.objects.length} objects loaded from Grist`);
+                updateObjectsList();
+                document.getElementById('infoObjects').textContent = state.objects.length;
+
+            } catch (error) {
+                console.warn('⚠️ Error loading objects:', error);
+            }
+        }
+
+        function handleGristRecord(record) {
+            if (!record) return;
+
+            // If record has CopcUrl, it's a config record
+            if (record.CopcUrl) {
+                loadPointCloud(record.CopcUrl, record.TileName || record.Name || 'Dalle');
+            }
+
+            // If record is an object, select it
+            if (record.X != null && record.Y != null) {
+                selectObject(record.id);
+            }
+        }
+
+        function handleGristRecords(records) {
+            // Reload objects when data changes
+            loadObjectsFromGrist();
+        }
+
+        // ============================================================
+        // OBJECTS MANAGEMENT
+        // ============================================================
+        function updateObjectsList() {
+            const container = document.getElementById('objectList');
+            const countEl = document.getElementById('objectCount');
+
+            countEl.textContent = state.objects.length;
+            document.getElementById('statTotal').textContent = state.objects.length;
+            document.getElementById('statVerified').textContent =
+                state.objects.filter(o => o.status === 'Vérifié').length;
+
+            if (state.objects.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:11px;">
+                        Aucun objet<br>
+                        <small>Utilisez "Importer" pour ajouter des objets</small>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = state.objects.map(obj => `
+                <div class="object-item ${state.selectedObject?.id === obj.id ? 'selected' : ''}"
+                     data-id="${obj.id}">
+                    <div class="object-icon">${getObjectIcon(obj.type)}</div>
+                    <div class="object-info">
+                        <div class="object-name">${obj.name}</div>
+                        <div class="object-meta">${obj.type} • ${obj.sourceBD}</div>
+                    </div>
+                    <span class="object-status ${obj.status.toLowerCase()}">${obj.status}</span>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            container.querySelectorAll('.object-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    selectObject(parseInt(el.dataset.id));
+                });
+            });
+        }
+
+        function getObjectIcon(type) {
+            const icons = {
+                'lampadaire': '💡',
+                'arbre': '🌳',
+                'banc': '🪑',
+                'poubelle': '🗑️',
+                'feu_tricolore': '🚦',
+                'abribus': '🚏',
+                'panneau': '🪧',
+                'borne': '🔌',
+                'batiment': '🏢'
+            };
+            return icons[type?.toLowerCase()] || '📦';
+        }
+
+        function selectObject(objectId) {
+            state.selectedObject = state.objects.find(o => o.id === objectId);
+            updateObjectsList();
+
+            if (state.selectedObject && state.instance) {
+                // Pan to object location
+                const { x, y, z } = state.selectedObject;
+                state.controls.target.set(x, y, z);
+                state.instance.view.camera.position.set(x - 50, y - 50, z + 100);
+                state.controls.update();
+                state.instance.notifyChange();
+            }
+
+            // Sync with Grist
+            if (state.gristReady && objectId) {
+                grist.setCursorPos({ rowId: objectId }).catch(() => {});
+            }
+        }
+
+        // ============================================================
+        // EVENT HANDLERS
+        // ============================================================
+        function setupEventListeners() {
+            // Mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.currentMode = btn.dataset.mode;
+                });
+            });
+
+            // Panel toggles
+            document.getElementById('btnDisplay').addEventListener('click', () => togglePanel('displayPanel'));
+            document.getElementById('btnObjects').addEventListener('click', () => togglePanel('objectsPanel'));
+            document.getElementById('btnImport').addEventListener('click', () => {
+                document.getElementById('importModal').classList.remove('hidden');
+            });
+
+            // Fit to view
+            document.getElementById('btnFit').addEventListener('click', () => {
+                if (state.pointCloud) {
+                    setupCamera();
+                    showToast('Vue ajustée', 'success');
+                }
+            });
+
+            // Close buttons
+            document.querySelectorAll('[data-close]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.dataset.close;
+                    if (target.includes('Modal')) {
+                        document.getElementById(target).classList.add('hidden');
+                    } else {
+                        closePanel(target);
+                    }
+                });
+            });
+
+            // Display mode options
+            document.querySelectorAll('.display-option').forEach(el => {
+                el.addEventListener('click', () => {
+                    setDisplayMode(el.dataset.display);
+                });
+            });
+
+            // Point size slider
+            document.getElementById('pointSizeSlider').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('pointSizeValue').textContent = value;
+                if (state.pointCloud) {
+                    state.pointCloud.setPointSize(value);
+                    state.instance.notifyChange();
+                }
+            });
+
+            // Point budget slider
+            document.getElementById('pointBudgetSlider').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                document.getElementById('pointBudgetValue').textContent = value;
+                // Point budget is set on source level, would need to reload
+            });
+
+            // EDL toggle
+            document.getElementById('edlToggle').addEventListener('change', (e) => {
+                if (state.instance) {
+                    state.instance.renderingOptions.enableEDL = e.target.checked;
+                    state.instance.notifyChange();
+                }
+            });
+
+            // Setup form
+            document.getElementById('btnSetup').addEventListener('click', () => {
+                const url = document.getElementById('setupCopcUrl').value.trim();
+                const name = document.getElementById('setupTileName').value.trim() || 'Dalle';
+
+                if (!url) {
+                    showToast('URL COPC requise', 'warning');
+                    return;
+                }
+
+                document.getElementById('setupOverlay').classList.add('hidden');
+                loadPointCloud(url, name);
+            });
+
+            // Demo button
+            document.getElementById('btnDemo').addEventListener('click', () => {
+                document.getElementById('setupOverlay').classList.add('hidden');
+                loadPointCloud(CONFIG.demoUrl, CONFIG.demoName);
+            });
+
+            // Import options
+            document.getElementById('importBdTopo').addEventListener('click', () => {
+                showToast('Import BD TOPO à venir...', 'info');
+            });
+
+            document.getElementById('importOsm').addEventListener('click', () => {
+                showToast('Import OSM à venir...', 'info');
+            });
+
+            document.getElementById('importGeojson').addEventListener('click', () => {
+                showToast('Import GeoJSON à venir...', 'info');
+            });
+
+            // Mouse move for coordinates
+            document.getElementById('view').addEventListener('mousemove', (e) => {
+                // Coordinate display would require raycasting - placeholder for now
+            });
+        }
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+        async function init() {
+            console.log('🗺️ Territoire 3D - Jumeau Numérique LiDAR HD');
+
+            setupEventListeners();
+
+            // Try Grist first
+            const gristOk = await initGrist();
+
+            if (gristOk && state.gristConfig?.copcUrl) {
+                // Config loaded from Grist, point cloud loading handled
+                console.log('✅ Configuration loaded from Grist');
+            } else {
+                // Show setup screen
+                document.getElementById('setupOverlay').classList.remove('hidden');
+            }
+        }
+
+        // Start
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
