@@ -8,9 +8,6 @@
     <!-- Grist Plugin API -->
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 
-    <!-- Proj4 (must be loaded before OpenLayers for CRS support) -->
-    <script src="https://unpkg.com/proj4@2.11.0/dist/proj4.js"></script>
-
     <!-- Giro3D via ESM -->
     <script type="importmap">
     {
@@ -19,7 +16,8 @@
             "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
             "three/": "https://unpkg.com/three@0.165.0/",
             "ol": "https://esm.sh/ol@9.2.4",
-            "ol/": "https://esm.sh/ol@9.2.4/"
+            "ol/": "https://esm.sh/ol@9.2.4/",
+            "proj4": "https://esm.sh/proj4@2.11.0"
         }
     }
     </script>
