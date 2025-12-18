@@ -18,7 +18,8 @@
             "@giro3d/giro3d/": "https://unpkg.com/@giro3d/giro3d@0.43.7/",
             "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
             "three/": "https://unpkg.com/three@0.165.0/",
-            "ol/": "https://cdn.jsdelivr.net/npm/ol@9.0.0/"
+            "ol": "https://cdn.jsdelivr.net/npm/ol@9.2.4/+esm",
+            "ol/": "https://cdn.jsdelivr.net/npm/ol@9.2.4/"
         }
     }
     </script>
@@ -2567,21 +2568,32 @@
         async function init() {
             console.log('🗺️ Territoire 3D - Jumeau Numérique LiDAR HD');
 
-            setupEventListeners();
+            try {
+                setupEventListeners();
+                console.log('✅ Event listeners setup');
 
-            // Try Grist first
-            const gristOk = await initGrist();
+                // Try Grist first
+                const gristOk = await initGrist();
+                console.log('ℹ️ Grist status:', gristOk ? 'connected' : 'standalone');
 
-            if (gristOk && state.gristConfig?.copcUrl) {
-                // Config loaded from Grist, point cloud loading handled
-                console.log('✅ Configuration loaded from Grist');
-            } else {
-                // Show setup screen
+                if (gristOk && state.gristConfig?.copcUrl) {
+                    // Config loaded from Grist, point cloud loading handled
+                    console.log('✅ Configuration loaded from Grist');
+                } else {
+                    // Show setup screen
+                    document.getElementById('setupOverlay').classList.remove('hidden');
+                    console.log('📋 Setup screen displayed');
+                }
+            } catch (error) {
+                console.error('❌ Initialization error:', error);
+                // Show setup screen anyway
                 document.getElementById('setupOverlay').classList.remove('hidden');
+                showToast('Erreur d\'initialisation: ' + error.message, 'error');
             }
         }
 
         // Start
+        console.log('🚀 Starting Territoire 3D...');
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', init);
         } else {
