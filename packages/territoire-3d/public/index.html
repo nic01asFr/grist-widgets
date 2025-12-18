@@ -733,6 +733,80 @@
             color: var(--text-muted);
         }
 
+        /* Setup tabs */
+        .setup-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            background: var(--bg-primary);
+            padding: 4px;
+            border-radius: var(--radius);
+        }
+
+        .setup-tab {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .setup-tab:hover { color: var(--text-primary); }
+        .setup-tab.active { background: var(--accent); color: white; }
+
+        .setup-tab-content { display: none; }
+        .setup-tab-content.active { display: block; }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: border-color 0.15s;
+        }
+
+        .checkbox-row:hover { border-color: var(--accent); }
+
+        .checkbox-row input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+
+        .setup-status {
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .setup-status.hidden { display: none; }
+
+        .setup-status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .setup-status-item .status-icon { font-size: 16px; }
+        .setup-status-item.done { color: var(--success); }
+        .setup-status-item.error { color: var(--error); }
+        .setup-status-item.active { color: var(--text-primary); }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header-center { display: none; }
@@ -922,28 +996,88 @@
 
         <!-- Setup overlay -->
         <div class="setup-overlay" id="setupOverlay">
-            <div class="setup-card">
+            <div class="setup-card" style="max-width: 520px;">
                 <div class="setup-header">
                     <h2>🗺️ Territoire 3D</h2>
                     <p>Jumeau numérique LiDAR HD IGN</p>
                 </div>
                 <div class="setup-body">
-                    <div class="form-group">
-                        <label class="form-label">URL du fichier COPC</label>
-                        <input type="text" class="form-input" id="setupCopcUrl"
-                            placeholder="https://3d.oslandia.com/.../file.copc.laz">
-                        <div class="form-hint">
-                            Fichier Cloud Optimized Point Cloud (.copc.laz) depuis IGN ou autre source
+                    <!-- Mode tabs -->
+                    <div class="setup-tabs">
+                        <button class="setup-tab active" data-tab="reference">Par référence IGN</button>
+                        <button class="setup-tab" data-tab="url">Par URL directe</button>
+                    </div>
+
+                    <!-- Tab: Reference IGN -->
+                    <div class="setup-tab-content active" id="tabReference">
+                        <div class="form-group">
+                            <label class="form-label">Référence de dalle IGN</label>
+                            <input type="text" class="form-input" id="setupTileRef"
+                                placeholder="Ex: 0643_6862 (Paris) ou 0770_6840 (Lyon)">
+                            <div class="form-hint">
+                                Format: XXXX_YYYY en coordonnées Lambert 93 (km).
+                                <a href="https://geoservices.ign.fr/lidarhd" target="_blank" style="color:var(--accent)">Carte des dalles</a>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Source des données</label>
+                            <select class="form-input" id="setupSource">
+                                <option value="oslandia">Oslandia (Paris uniquement)</option>
+                                <option value="ign" disabled>IGN Direct (bientôt)</option>
+                                <option value="custom">URL personnalisée</option>
+                            </select>
                         </div>
                     </div>
+
+                    <!-- Tab: URL directe -->
+                    <div class="setup-tab-content" id="tabUrl">
+                        <div class="form-group">
+                            <label class="form-label">URL du fichier COPC</label>
+                            <input type="text" class="form-input" id="setupCopcUrl"
+                                placeholder="https://3d.oslandia.com/.../file.copc.laz">
+                            <div class="form-hint">
+                                Fichier Cloud Optimized Point Cloud (.copc.laz)
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group">
-                        <label class="form-label">Nom de la dalle (optionnel)</label>
+                        <label class="form-label">Nom du projet (optionnel)</label>
                         <input type="text" class="form-input" id="setupTileName"
                             placeholder="Ex: Montpellier Centre">
                     </div>
+
+                    <!-- Auto-config options -->
+                    <div class="form-group">
+                        <label class="form-label">Configuration automatique</label>
+                        <label class="checkbox-row">
+                            <input type="checkbox" id="setupAutoTables" checked>
+                            <span>Créer les tables Grist (Config, Objects)</span>
+                        </label>
+                        <label class="checkbox-row">
+                            <input type="checkbox" id="setupAutoImport" checked>
+                            <span>Importer les objets de référence (OSM)</span>
+                        </label>
+                    </div>
+
                     <div class="setup-actions">
                         <button class="btn" id="btnDemo">Démo Paris</button>
-                        <button class="btn btn-primary" id="btnSetup">🚀 Charger</button>
+                        <button class="btn btn-primary" id="btnSetup">🚀 Configurer & Charger</button>
+                    </div>
+
+                    <div class="setup-status hidden" id="setupStatus">
+                        <div class="setup-status-item" id="statusTables">
+                            <span class="status-icon">⏳</span>
+                            <span>Création des tables Grist...</span>
+                        </div>
+                        <div class="setup-status-item" id="statusCopc">
+                            <span class="status-icon">⏳</span>
+                            <span>Chargement du nuage de points...</span>
+                        </div>
+                        <div class="setup-status-item" id="statusImport">
+                            <span class="status-icon">⏳</span>
+                            <span>Import des objets OSM...</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1441,7 +1575,11 @@
                     if (data.id && data.id.length > 0) {
                         const config = {
                             copcUrl: data.CopcUrl?.[0],
-                            tileName: data.TileName?.[0] || data.Name?.[0]
+                            tileName: data.TileName?.[0] || data.Name?.[0],
+                            bboxMinX: data.Bbox_MinX?.[0],
+                            bboxMinY: data.Bbox_MinY?.[0],
+                            bboxMaxX: data.Bbox_MaxX?.[0],
+                            bboxMaxY: data.Bbox_MaxY?.[0]
                         };
 
                         if (config.copcUrl) {
@@ -1465,10 +1603,322 @@
             }
         }
 
+        // ============================================================
+        // AUTO-CONFIGURATION
+        // ============================================================
+        async function createGristTables() {
+            if (!state.gristReady) return false;
+
+            try {
+                const tables = await grist.docApi.listTables();
+
+                // Create Config table if not exists
+                if (!tables.includes(CONFIG.tables.config)) {
+                    console.log('📋 Creating Config table...');
+                    await grist.docApi.applyUserActions([
+                        ['AddTable', CONFIG.tables.config, [
+                            { id: 'TileName', type: 'Text' },
+                            { id: 'TileRef', type: 'Text' },
+                            { id: 'CopcUrl', type: 'Text' },
+                            { id: 'Bbox_MinX', type: 'Numeric' },
+                            { id: 'Bbox_MinY', type: 'Numeric' },
+                            { id: 'Bbox_MaxX', type: 'Numeric' },
+                            { id: 'Bbox_MaxY', type: 'Numeric' },
+                            { id: 'PointCount', type: 'Int' },
+                            { id: 'Source', type: 'Text' },
+                            { id: 'CreatedAt', type: 'DateTime' }
+                        ]]
+                    ]);
+                }
+
+                // Create Objects table if not exists
+                if (!tables.includes(CONFIG.tables.objects)) {
+                    console.log('📦 Creating Objects table...');
+                    await grist.docApi.applyUserActions([
+                        ['AddTable', CONFIG.tables.objects, [
+                            { id: 'Name', type: 'Text' },
+                            { id: 'Type', type: 'Text' },
+                            { id: 'Category', type: 'Choice' },
+                            { id: 'X', type: 'Numeric' },
+                            { id: 'Y', type: 'Numeric' },
+                            { id: 'Z', type: 'Numeric' },
+                            { id: 'Status', type: 'Choice' },
+                            { id: 'SourceBD', type: 'Text' },
+                            { id: 'OsmId', type: 'Text' },
+                            { id: 'Lon', type: 'Numeric' },
+                            { id: 'Lat', type: 'Numeric' }
+                        ]]
+                    ]);
+                }
+
+                console.log('✅ Grist tables ready');
+                return true;
+
+            } catch (error) {
+                console.error('❌ Error creating tables:', error);
+                return false;
+            }
+        }
+
+        async function saveConfigToGrist(config) {
+            if (!state.gristReady) return;
+
+            try {
+                const tables = await grist.docApi.listTables();
+                if (!tables.includes(CONFIG.tables.config)) return;
+
+                // Check if config exists
+                const existing = await grist.docApi.fetchTable(CONFIG.tables.config);
+
+                if (existing.id && existing.id.length > 0) {
+                    // Update existing
+                    await grist.docApi.applyUserActions([
+                        ['UpdateRecord', CONFIG.tables.config, existing.id[0], {
+                            TileName: config.tileName,
+                            TileRef: config.tileRef,
+                            CopcUrl: config.copcUrl,
+                            Bbox_MinX: config.bboxMinX,
+                            Bbox_MinY: config.bboxMinY,
+                            Bbox_MaxX: config.bboxMaxX,
+                            Bbox_MaxY: config.bboxMaxY,
+                            PointCount: config.pointCount,
+                            Source: config.source
+                        }]
+                    ]);
+                } else {
+                    // Create new
+                    await grist.docApi.applyUserActions([
+                        ['AddRecord', CONFIG.tables.config, null, {
+                            TileName: config.tileName,
+                            TileRef: config.tileRef,
+                            CopcUrl: config.copcUrl,
+                            Bbox_MinX: config.bboxMinX,
+                            Bbox_MinY: config.bboxMinY,
+                            Bbox_MaxX: config.bboxMaxX,
+                            Bbox_MaxY: config.bboxMaxY,
+                            PointCount: config.pointCount,
+                            Source: config.source,
+                            CreatedAt: new Date().toISOString()
+                        }]
+                    ]);
+                }
+
+                console.log('✅ Config saved to Grist');
+
+            } catch (error) {
+                console.error('❌ Error saving config:', error);
+            }
+        }
+
+        // ============================================================
+        // OSM IMPORT
+        // ============================================================
+        async function importFromOSM(bbox) {
+            // bbox: { minX, minY, maxX, maxY } in Lambert 93
+            // Need to convert to WGS84 for Overpass
+
+            showToast('Import OSM en cours...', 'info');
+
+            try {
+                // Convert Lambert 93 bbox to WGS84 (approximate)
+                const wgs84Bbox = lambert93ToWGS84Bbox(bbox);
+
+                // Overpass query for urban furniture
+                const query = `
+                    [out:json][timeout:30];
+                    (
+                        node["amenity"="bench"](${wgs84Bbox.south},${wgs84Bbox.west},${wgs84Bbox.north},${wgs84Bbox.east});
+                        node["amenity"="waste_basket"](${wgs84Bbox.south},${wgs84Bbox.west},${wgs84Bbox.north},${wgs84Bbox.east});
+                        node["highway"="street_lamp"](${wgs84Bbox.south},${wgs84Bbox.west},${wgs84Bbox.north},${wgs84Bbox.east});
+                        node["highway"="traffic_signals"](${wgs84Bbox.south},${wgs84Bbox.west},${wgs84Bbox.north},${wgs84Bbox.east});
+                        node["natural"="tree"](${wgs84Bbox.south},${wgs84Bbox.west},${wgs84Bbox.north},${wgs84Bbox.east});
+                        node["amenity"="shelter"](${wgs84Bbox.south},${wgs84Bbox.west},${wgs84Bbox.north},${wgs84Bbox.east});
+                        node["tourism"="information"](${wgs84Bbox.south},${wgs84Bbox.west},${wgs84Bbox.north},${wgs84Bbox.east});
+                    );
+                    out body;
+                `;
+
+                const response = await fetch('https://overpass-api.de/api/interpreter', {
+                    method: 'POST',
+                    body: `data=${encodeURIComponent(query)}`
+                });
+
+                if (!response.ok) throw new Error('Overpass API error');
+
+                const data = await response.json();
+                const elements = data.elements || [];
+
+                console.log(`📥 OSM: ${elements.length} éléments trouvés`);
+
+                if (elements.length === 0) {
+                    showToast('Aucun objet OSM trouvé dans cette zone', 'warning');
+                    return [];
+                }
+
+                // Convert to objects and save to Grist
+                const objects = elements.map(el => {
+                    const lambert = wgs84ToLambert93(el.lon, el.lat);
+                    return {
+                        name: el.tags?.name || getOSMTypeName(el.tags),
+                        type: getOSMType(el.tags),
+                        category: getOSMCategory(el.tags),
+                        x: lambert.x,
+                        y: lambert.y,
+                        z: 0,
+                        status: 'Importé',
+                        sourceBD: 'OSM',
+                        osmId: `node/${el.id}`,
+                        lon: el.lon,
+                        lat: el.lat
+                    };
+                });
+
+                // Save to Grist
+                if (state.gristReady && objects.length > 0) {
+                    await saveObjectsToGrist(objects);
+                }
+
+                showToast(`${objects.length} objets importés depuis OSM`, 'success');
+                return objects;
+
+            } catch (error) {
+                console.error('❌ OSM import error:', error);
+                showToast('Erreur import OSM: ' + error.message, 'error');
+                return [];
+            }
+        }
+
+        async function saveObjectsToGrist(objects) {
+            if (!state.gristReady || objects.length === 0) return;
+
+            try {
+                const actions = objects.map(obj => [
+                    'AddRecord', CONFIG.tables.objects, null, {
+                        Name: obj.name,
+                        Type: obj.type,
+                        Category: obj.category,
+                        X: obj.x,
+                        Y: obj.y,
+                        Z: obj.z,
+                        Status: obj.status,
+                        SourceBD: obj.sourceBD,
+                        OsmId: obj.osmId || '',
+                        Lon: obj.lon || 0,
+                        Lat: obj.lat || 0
+                    }
+                ]);
+
+                await grist.docApi.applyUserActions(actions);
+                console.log(`✅ ${objects.length} objects saved to Grist`);
+
+            } catch (error) {
+                console.error('❌ Error saving objects:', error);
+            }
+        }
+
+        // Coordinate conversion helpers (approximate)
+        function lambert93ToWGS84Bbox(bbox) {
+            // Simplified conversion for France
+            // More accurate would use proj4
+            const toWGS84 = (x, y) => ({
+                lon: (x - 700000) / 111320 / Math.cos(46.5 * Math.PI / 180) + 3,
+                lat: (y - 6600000) / 111320 + 46.5
+            });
+
+            const sw = toWGS84(bbox.minX, bbox.minY);
+            const ne = toWGS84(bbox.maxX, bbox.maxY);
+
+            return {
+                west: sw.lon,
+                south: sw.lat,
+                east: ne.lon,
+                north: ne.lat
+            };
+        }
+
+        function wgs84ToLambert93(lon, lat) {
+            // Simplified inverse conversion
+            return {
+                x: (lon - 3) * 111320 * Math.cos(46.5 * Math.PI / 180) + 700000,
+                y: (lat - 46.5) * 111320 + 6600000
+            };
+        }
+
+        function getOSMType(tags) {
+            if (tags?.amenity === 'bench') return 'banc';
+            if (tags?.amenity === 'waste_basket') return 'poubelle';
+            if (tags?.highway === 'street_lamp') return 'lampadaire';
+            if (tags?.highway === 'traffic_signals') return 'feu_tricolore';
+            if (tags?.natural === 'tree') return 'arbre';
+            if (tags?.amenity === 'shelter') return 'abribus';
+            if (tags?.tourism === 'information') return 'panneau';
+            return 'autre';
+        }
+
+        function getOSMTypeName(tags) {
+            const typeNames = {
+                'banc': 'Banc',
+                'poubelle': 'Corbeille',
+                'lampadaire': 'Lampadaire',
+                'feu_tricolore': 'Feu tricolore',
+                'arbre': 'Arbre',
+                'abribus': 'Abribus',
+                'panneau': 'Panneau info'
+            };
+            return typeNames[getOSMType(tags)] || 'Objet';
+        }
+
+        function getOSMCategory(tags) {
+            if (tags?.natural === 'tree') return 'Végétation';
+            if (tags?.highway) return 'Voirie';
+            return 'Mobilier urbain';
+        }
+
+        // ============================================================
+        // TILE URL BUILDER
+        // ============================================================
+        function buildCopcUrl(tileRef, source) {
+            // Format: XXXX_YYYY
+            const match = tileRef.match(/^(\d{4})_(\d{4})$/);
+            if (!match) return null;
+
+            const [, x, y] = match;
+
+            switch (source) {
+                case 'oslandia':
+                    // Only Paris tiles available
+                    return `https://3d.oslandia.com/giro3d/pointclouds/lidarhd/paris/LHD_FXX_${x}_${y}_PTS_O_LAMB93_IGN69.copc.laz`;
+                case 'ign':
+                    // IGN direct URL (would need authentication)
+                    return null;
+                default:
+                    return null;
+            }
+        }
+
+        function getTileBbox(tileRef) {
+            // Tile ref is in km, each tile is 1km x 1km
+            const match = tileRef.match(/^(\d{4})_(\d{4})$/);
+            if (!match) return null;
+
+            const x = parseInt(match[1]) * 1000; // Convert km to m
+            const y = parseInt(match[2]) * 1000;
+
+            return {
+                minX: x,
+                minY: y,
+                maxX: x + 1000,
+                maxY: y + 1000
+            };
+        }
+
         async function loadObjectsFromGrist() {
             if (!state.gristReady) return;
 
             try {
+                const tables = await grist.docApi.listTables();
+                if (!tables.includes(CONFIG.tables.objects)) return;
+
                 const data = await grist.docApi.fetchTable(CONFIG.tables.objects);
 
                 if (!data.id || data.id.length === 0) {
@@ -1659,7 +2109,6 @@
             document.getElementById('pointBudgetSlider').addEventListener('input', (e) => {
                 const value = parseInt(e.target.value);
                 document.getElementById('pointBudgetValue').textContent = value;
-                // Point budget is set on source level, would need to reload
             });
 
             // EDL toggle
@@ -1670,43 +2119,253 @@
                 }
             });
 
-            // Setup form
-            document.getElementById('btnSetup').addEventListener('click', () => {
-                const url = document.getElementById('setupCopcUrl').value.trim();
-                const name = document.getElementById('setupTileName').value.trim() || 'Dalle';
-
-                if (!url) {
-                    showToast('URL COPC requise', 'warning');
-                    return;
-                }
-
-                document.getElementById('setupOverlay').classList.add('hidden');
-                loadPointCloud(url, name);
+            // Setup tabs
+            document.querySelectorAll('.setup-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.setup-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.setup-tab-content').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    const tabId = tab.dataset.tab === 'reference' ? 'tabReference' : 'tabUrl';
+                    document.getElementById(tabId).classList.add('active');
+                });
             });
+
+            // Main setup button - FULL AUTO-CONFIGURATION
+            document.getElementById('btnSetup').addEventListener('click', runFullSetup);
 
             // Demo button
             document.getElementById('btnDemo').addEventListener('click', () => {
-                document.getElementById('setupOverlay').classList.add('hidden');
-                loadPointCloud(CONFIG.demoUrl, CONFIG.demoName);
+                document.getElementById('setupTileRef').value = '0643_6862';
+                document.getElementById('setupTileName').value = 'Paris Centre';
+                document.getElementById('setupSource').value = 'oslandia';
+                runFullSetup();
             });
 
             // Import options
-            document.getElementById('importBdTopo').addEventListener('click', () => {
-                showToast('Import BD TOPO à venir...', 'info');
+            document.getElementById('importBdTopo').addEventListener('click', async () => {
+                if (!state.gristConfig?.bboxMinX) {
+                    showToast('Chargez d\'abord une dalle', 'warning');
+                    return;
+                }
+                showToast('Import BD TOPO en développement...', 'info');
+                // TODO: Implement BD TOPO WFS import
             });
 
-            document.getElementById('importOsm').addEventListener('click', () => {
-                showToast('Import OSM à venir...', 'info');
+            document.getElementById('importOsm').addEventListener('click', async () => {
+                if (!state.gristConfig) {
+                    showToast('Chargez d\'abord une dalle', 'warning');
+                    return;
+                }
+                document.getElementById('importModal').classList.add('hidden');
+                const bbox = {
+                    minX: state.gristConfig.bboxMinX,
+                    minY: state.gristConfig.bboxMinY,
+                    maxX: state.gristConfig.bboxMaxX,
+                    maxY: state.gristConfig.bboxMaxY
+                };
+                await importFromOSM(bbox);
+                await loadObjectsFromGrist();
             });
 
             document.getElementById('importGeojson').addEventListener('click', () => {
-                showToast('Import GeoJSON à venir...', 'info');
+                // Create hidden file input
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.geojson,.json';
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    try {
+                        const text = await file.text();
+                        const geojson = JSON.parse(text);
+                        await importFromGeoJSON(geojson);
+                    } catch (err) {
+                        showToast('Erreur lecture GeoJSON: ' + err.message, 'error');
+                    }
+                };
+                input.click();
+                document.getElementById('importModal').classList.add('hidden');
             });
+        }
 
-            // Mouse move for coordinates
-            document.getElementById('view').addEventListener('mousemove', (e) => {
-                // Coordinate display would require raycasting - placeholder for now
-            });
+        // ============================================================
+        // FULL AUTO-SETUP WORKFLOW
+        // ============================================================
+        async function runFullSetup() {
+            const statusEl = document.getElementById('setupStatus');
+            const statusTables = document.getElementById('statusTables');
+            const statusCopc = document.getElementById('statusCopc');
+            const statusImport = document.getElementById('statusImport');
+
+            // Get form values
+            const activeTab = document.querySelector('.setup-tab.active')?.dataset.tab;
+            let copcUrl, tileRef, tileName, source;
+
+            if (activeTab === 'url') {
+                copcUrl = document.getElementById('setupCopcUrl').value.trim();
+                tileName = document.getElementById('setupTileName').value.trim() || 'Dalle';
+                tileRef = '';
+                source = 'custom';
+            } else {
+                tileRef = document.getElementById('setupTileRef').value.trim();
+                source = document.getElementById('setupSource').value;
+                tileName = document.getElementById('setupTileName').value.trim() || `Dalle ${tileRef}`;
+                copcUrl = buildCopcUrl(tileRef, source);
+            }
+
+            const autoTables = document.getElementById('setupAutoTables').checked;
+            const autoImport = document.getElementById('setupAutoImport').checked;
+
+            // Validate
+            if (!copcUrl) {
+                if (activeTab === 'url') {
+                    showToast('URL COPC requise', 'warning');
+                } else {
+                    showToast('Référence de dalle invalide ou source non disponible', 'warning');
+                }
+                return;
+            }
+
+            // Show status panel
+            statusEl.classList.remove('hidden');
+
+            // Get bbox from tile ref
+            const bbox = tileRef ? getTileBbox(tileRef) : null;
+
+            // Step 1: Create Grist tables if requested
+            if (autoTables && state.gristReady) {
+                statusTables.classList.add('active');
+                statusTables.querySelector('.status-icon').textContent = '⏳';
+                try {
+                    await createGristTables();
+                    statusTables.classList.remove('active');
+                    statusTables.classList.add('done');
+                    statusTables.querySelector('.status-icon').textContent = '✅';
+                } catch (err) {
+                    statusTables.classList.add('error');
+                    statusTables.querySelector('.status-icon').textContent = '❌';
+                }
+            } else {
+                statusTables.querySelector('.status-icon').textContent = '⏭️';
+                statusTables.querySelector('span:last-child').textContent = 'Tables (ignoré)';
+            }
+
+            // Step 2: Load point cloud
+            statusCopc.classList.add('active');
+            statusCopc.querySelector('.status-icon').textContent = '⏳';
+
+            try {
+                document.getElementById('setupOverlay').classList.add('hidden');
+                await loadPointCloud(copcUrl, tileName);
+
+                // Get actual bbox from loaded point cloud
+                let actualBbox = bbox;
+                if (state.pointCloud) {
+                    const pcBbox = state.pointCloud.getBoundingBox();
+                    if (pcBbox && !pcBbox.isEmpty()) {
+                        actualBbox = {
+                            minX: pcBbox.min.x,
+                            minY: pcBbox.min.y,
+                            maxX: pcBbox.max.x,
+                            maxY: pcBbox.max.y
+                        };
+                    }
+                }
+
+                // Save config to Grist
+                const config = {
+                    tileName,
+                    tileRef,
+                    copcUrl,
+                    bboxMinX: actualBbox?.minX,
+                    bboxMinY: actualBbox?.minY,
+                    bboxMaxX: actualBbox?.maxX,
+                    bboxMaxY: actualBbox?.maxY,
+                    pointCount: state.pointCloud?.source?.metadata?.pointCount || 0,
+                    source
+                };
+
+                state.gristConfig = config;
+
+                if (state.gristReady) {
+                    await saveConfigToGrist(config);
+                }
+
+                statusCopc.classList.remove('active');
+                statusCopc.classList.add('done');
+                statusCopc.querySelector('.status-icon').textContent = '✅';
+
+                // Step 3: Import from OSM if requested
+                if (autoImport && actualBbox) {
+                    statusImport.classList.add('active');
+                    statusImport.querySelector('.status-icon').textContent = '⏳';
+
+                    try {
+                        await importFromOSM(actualBbox);
+                        await loadObjectsFromGrist();
+                        statusImport.classList.remove('active');
+                        statusImport.classList.add('done');
+                        statusImport.querySelector('.status-icon').textContent = '✅';
+                    } catch (err) {
+                        statusImport.classList.add('error');
+                        statusImport.querySelector('.status-icon').textContent = '❌';
+                    }
+                } else {
+                    statusImport.querySelector('.status-icon').textContent = '⏭️';
+                    statusImport.querySelector('span:last-child').textContent = 'Import OSM (ignoré)';
+                }
+
+                showToast('Configuration complète !', 'success');
+
+            } catch (err) {
+                statusCopc.classList.add('error');
+                statusCopc.querySelector('.status-icon').textContent = '❌';
+                document.getElementById('setupOverlay').classList.remove('hidden');
+                showToast('Erreur chargement: ' + err.message, 'error');
+            }
+        }
+
+        // ============================================================
+        // GEOJSON IMPORT
+        // ============================================================
+        async function importFromGeoJSON(geojson) {
+            if (!geojson.features || geojson.features.length === 0) {
+                showToast('GeoJSON vide ou invalide', 'warning');
+                return;
+            }
+
+            showToast(`Import de ${geojson.features.length} objets...`, 'info');
+
+            const objects = geojson.features
+                .filter(f => f.geometry?.type === 'Point')
+                .map(f => {
+                    const [lon, lat] = f.geometry.coordinates;
+                    const lambert = wgs84ToLambert93(lon, lat);
+                    return {
+                        name: f.properties?.name || f.properties?.nom || 'Objet',
+                        type: f.properties?.type || 'autre',
+                        category: f.properties?.category || f.properties?.categorie || 'Autre',
+                        x: lambert.x,
+                        y: lambert.y,
+                        z: f.properties?.z || f.properties?.altitude || 0,
+                        status: 'Importé',
+                        sourceBD: 'GeoJSON',
+                        lon,
+                        lat
+                    };
+                });
+
+            if (objects.length === 0) {
+                showToast('Aucun point trouvé dans le GeoJSON', 'warning');
+                return;
+            }
+
+            if (state.gristReady) {
+                await saveObjectsToGrist(objects);
+                await loadObjectsFromGrist();
+            }
+
+            showToast(`${objects.length} objets importés depuis GeoJSON`, 'success');
         }
 
         // ============================================================
