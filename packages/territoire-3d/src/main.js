@@ -21,27 +21,22 @@ import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
 setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 
 // ============================================================
-// FETCH THROTTLER & CACHE (avoid 429 rate limiting)
+// FETCH THROTTLER (avoid 429 rate limiting)
+// CRITICAL: Capture original fetch FIRST, before any override
 // ============================================================
+const originalFetch = window.fetch.bind(window);
+
+// Simple throttler without cache (cache corrupts COPC binary data)
 const FetchThrottler = {
-    maxConcurrent: 4,        // Max simultaneous requests
-    delayBetween: 100,       // ms between requests
+    maxConcurrent: 2,        // Conservative to avoid 429
+    delayBetween: 200,       // ms between requests
     queue: [],
     active: 0,
-    cache: new Map(),
-    cacheMaxSize: 100,       // Max cached responses
+    retryDelay: 2000,        // Wait on 429 before retry
 
     async fetch(url, options = {}) {
-        // Check cache first for GET requests
-        const cacheKey = `${url}_${options.headers?.Range || 'full'}`;
-        if (this.cache.has(cacheKey)) {
-            console.log('📦 Cache hit:', url.slice(-50));
-            return this.cache.get(cacheKey).clone();
-        }
-
-        // Queue the request
         return new Promise((resolve, reject) => {
-            this.queue.push({ url, options, resolve, reject, cacheKey });
+            this.queue.push({ url, options, resolve, reject, retries: 0 });
             this.processQueue();
         });
     },
@@ -50,27 +45,26 @@ const FetchThrottler = {
         if (this.active >= this.maxConcurrent || this.queue.length === 0) return;
 
         this.active++;
-        const { url, options, resolve, reject, cacheKey } = this.queue.shift();
+        const request = this.queue.shift();
+        const { url, options, resolve, reject, retries } = request;
 
         try {
-            // Add delay to avoid burst
-            if (this.active > 1) {
-                await new Promise(r => setTimeout(r, this.delayBetween));
-            }
+            // Add delay between requests to avoid burst
+            await new Promise(r => setTimeout(r, this.delayBetween));
 
-            const response = await fetch(url, options);
+            // CRITICAL: Use originalFetch, NOT the overridden fetch!
+            const response = await originalFetch(url, options);
 
-            // Cache successful responses
-            if (response.ok && response.status !== 429) {
-                // Clone for cache (response can only be read once)
-                const cloned = response.clone();
-                this.cache.set(cacheKey, cloned);
-
-                // Limit cache size
-                if (this.cache.size > this.cacheMaxSize) {
-                    const firstKey = this.cache.keys().next().value;
-                    this.cache.delete(firstKey);
-                }
+            // Handle 429 with exponential backoff
+            if (response.status === 429 && retries < 3) {
+                console.warn(`⏳ 429 rate limited, retry ${retries + 1}/3 in ${this.retryDelay}ms`);
+                request.retries = retries + 1;
+                // Re-queue with delay
+                setTimeout(() => {
+                    this.queue.unshift(request);
+                    this.processQueue();
+                }, this.retryDelay * (retries + 1));
+                return;
             }
 
             resolve(response);
@@ -84,15 +78,27 @@ const FetchThrottler = {
     }
 };
 
-// Override global fetch for IGN domains
-const originalFetch = window.fetch;
+// Override global fetch for IGN COPC domains only
 window.fetch = function(url, options) {
-    const urlStr = typeof url === 'string' ? url : url.toString();
-    // Throttle only IGN LiDAR requests
+    // Properly extract URL string (handle Request objects)
+    let urlStr;
+    if (typeof url === 'string') {
+        urlStr = url;
+    } else if (url instanceof Request) {
+        urlStr = url.url;
+    } else if (url && typeof url.toString === 'function') {
+        urlStr = url.toString();
+    } else {
+        urlStr = String(url);
+    }
+
+    // Throttle only IGN LiDAR COPC requests (not WMS, not other services)
     if (urlStr.includes('data.geopf.fr') && urlStr.includes('.copc.laz')) {
         return FetchThrottler.fetch(urlStr, options);
     }
-    return originalFetch.call(this, url, options);
+
+    // All other requests go through normally
+    return originalFetch(url, options);
 };
 
 // ============================================================
@@ -393,6 +399,28 @@ function setDisplayMode(mode) {
                 console.log('🎨 Display mode: classification');
                 break;
 
+            case 'rgb':
+                // Native RGB colors from LiDAR HD (PDRF 8 = RGB + NIR)
+                pc.setColoringMode('attribute');
+                // Try different attribute names for RGB
+                const rgbAttrs = ['Color', 'Rgb', 'RGB', 'color'];
+                let rgbFound = false;
+                for (const attr of rgbAttrs) {
+                    try {
+                        pc.setActiveAttribute(attr);
+                        rgbFound = true;
+                        console.log(`🎨 Display mode: rgb (using ${attr})`);
+                        break;
+                    } catch (e) {
+                        // Try next
+                    }
+                }
+                if (!rgbFound) {
+                    console.warn('⚠️ RGB attribute not found, falling back to classification');
+                    pc.setActiveAttribute('Classification');
+                }
+                break;
+
             case 'ortho':
                 loadOrthoColorization();
                 return; // loadOrthoColorization handles notifyChange
@@ -400,14 +428,13 @@ function setDisplayMode(mode) {
             case 'elevation':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Z');
-                pc.colorMap = 'viridis';
+                // Use a bright elevation colormap with proper bounds
                 console.log('🎨 Display mode: elevation');
                 break;
 
             case 'intensity':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Intensity');
-                pc.colorMap = 'greys';
                 console.log('🎨 Display mode: intensity');
                 break;
         }
