@@ -305,39 +305,30 @@ function setDisplayMode(mode) {
     if (!state.pointCloud) return;
 
     try {
-        // Giro3D 1.0.0: Use style.colorMap for coloring
         const pc = state.pointCloud;
 
         switch (mode) {
             case 'classification':
-                // In Giro3D 1.0.0, use activeAttribute and colorization style
-                if (typeof pc.setActiveAttribute === 'function') {
-                    pc.setActiveAttribute('Classification');
-                } else if (pc.source && typeof pc.source.setActiveAttribute === 'function') {
-                    pc.source.setActiveAttribute('Classification');
-                }
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Classification');
                 console.log('🎨 Display mode: classification');
                 break;
 
             case 'ortho':
                 loadOrthoColorization();
-                break;
+                return; // loadOrthoColorization handles notifyChange
 
             case 'elevation':
-                if (typeof pc.setActiveAttribute === 'function') {
-                    pc.setActiveAttribute('Z');
-                } else if (pc.source && typeof pc.source.setActiveAttribute === 'function') {
-                    pc.source.setActiveAttribute('Z');
-                }
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Z');
+                pc.colorMap = 'viridis';
                 console.log('🎨 Display mode: elevation');
                 break;
 
             case 'intensity':
-                if (typeof pc.setActiveAttribute === 'function') {
-                    pc.setActiveAttribute('Intensity');
-                } else if (pc.source && typeof pc.source.setActiveAttribute === 'function') {
-                    pc.source.setActiveAttribute('Intensity');
-                }
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Intensity');
+                pc.colorMap = 'greys';
                 console.log('🎨 Display mode: intensity');
                 break;
         }
