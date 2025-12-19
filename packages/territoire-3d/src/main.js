@@ -1413,27 +1413,19 @@ async function runFullSetup() {
     // Get bbox from tile ref
     const bbox = tileRef ? getTileBbox(tileRef) : null;
 
-    // Step 1: Create Grist tables if requested
-    console.log('📊 Step 1: Tables creation - autoTables:', autoTables, 'gristReady:', state.gristReady);
-    if (autoTables && state.gristReady) {
-        statusTables.classList.add('active');
+    // Tables are created at init, just mark as done
+    if (state.tablesReady) {
+        statusTables.classList.add('done');
+        statusTables.querySelector('.status-icon').textContent = '✅';
+    } else if (state.gristReady) {
+        // Fallback: tables should be ready, but ensure they exist
         statusTables.querySelector('.status-icon').textContent = '⏳';
-        console.log('📊 Creating Grist tables...');
-        try {
-            await createGristTables();
-            console.log('✅ Tables created successfully');
-            statusTables.classList.remove('active');
-            statusTables.classList.add('done');
-            statusTables.querySelector('.status-icon').textContent = '✅';
-        } catch (err) {
-            console.error('❌ Tables creation error:', err);
-            statusTables.classList.add('error');
-            statusTables.querySelector('.status-icon').textContent = '❌';
-        }
+        await createGristTables();
+        statusTables.classList.add('done');
+        statusTables.querySelector('.status-icon').textContent = '✅';
     } else {
-        console.log('⏭️ Skipping tables creation (autoTables:', autoTables, ', gristReady:', state.gristReady, ')');
         statusTables.querySelector('.status-icon').textContent = '⏭️';
-        statusTables.querySelector('span:last-child').textContent = autoTables ? 'Tables (Grist non connecté)' : 'Tables (ignoré)';
+        statusTables.querySelector('span:last-child').textContent = 'Tables (standalone)';
     }
 
     // Step 2: Load point cloud
