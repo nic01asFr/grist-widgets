@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Territoire 3D - Jumeau Numérique LiDAR HD</title>
+
+    <!-- Grist Plugin API -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <span>🗺️</span>
+                    <span>Territoire 3D</span>
+                </div>
+                <div class="tile-badge" id="tileBadge">
+                    <strong id="tileName">Aucune dalle</strong>
+                </div>
+                <span class="status-badge loading" id="statusBadge">Initialisation</span>
+            </div>
+
+            <div class="header-center">
+                <button class="mode-btn active" data-mode="navigate" title="Navigation">
+                    <span>🔍</span> Explorer
+                </button>
+                <button class="mode-btn" data-mode="select" title="Sélection">
+                    <span>👆</span> Sélection
+                </button>
+                <button class="mode-btn" data-mode="edit" title="Édition">
+                    <span>✏️</span> Édition
+                </button>
+            </div>
+
+            <div class="header-right">
+                <button class="btn btn-icon" id="btnDisplay" title="Modes d'affichage">🎨</button>
+                <button class="btn btn-icon" id="btnObjects" title="Objets">📦</button>
+                <button class="btn btn-icon" id="btnImport" title="Importer">📥</button>
+                <button class="btn btn-icon" id="btnFit" title="Ajuster la vue">🎯</button>
+                <button class="btn btn-icon" id="btnSettings" title="Paramètres">⚙️</button>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main">
+            <!-- 3D View (Giro3D) -->
+            <div id="view">
+                <!-- Loading overlay -->
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                    <div class="loading-text" id="loadingText">Chargement du nuage de points...</div>
+                    <div class="loading-progress">
+                        <div class="loading-progress-bar" id="loadingProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Info bar -->
+                <div class="info-bar" id="infoBar">
+                    <div class="info-item">
+                        <span>☁️</span>
+                        <strong id="infoPoints">0</strong> pts
+                    </div>
+                    <div class="info-item">
+                        <span>📦</span>
+                        <strong id="infoObjects">0</strong> objets
+                    </div>
+                    <div class="info-item">
+                        <span>📍</span>
+                        <strong id="infoCoords">-</strong>
+                    </div>
+                </div>
+
+                <!-- Display mode panel -->
+                <div class="panel display-panel hidden" id="displayPanel">
+                    <div class="panel-header">
+                        <span>🎨 Mode d'affichage</span>
+                        <span class="panel-close" data-close="displayPanel">×</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-section">
+                            <div class="panel-section-title">Colorisation</div>
+
+                            <div class="display-option active" data-display="classification">
+                                <div class="display-option-icon">🏷️</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Classification IGN</div>
+                                    <div class="display-option-desc">Sol, végétation, bâtiments...</div>
+                                </div>
+                            </div>
+
+                            <div class="display-option" data-display="ortho">
+                                <div class="display-option-icon">🛰️</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Orthophoto IGN</div>
+                                    <div class="display-option-desc">Couleurs réelles depuis WMS</div>
+                                </div>
+                            </div>
+
+                            <div class="display-option" data-display="elevation">
+                                <div class="display-option-icon">📊</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Élévation</div>
+                                    <div class="display-option-desc">Gradient altimétrique</div>
+                                </div>
+                            </div>
+
+                            <div class="display-option" data-display="intensity">
+                                <div class="display-option-icon">💡</div>
+                                <div class="display-option-info">
+                                    <div class="display-option-name">Intensité</div>
+                                    <div class="display-option-desc">Retour du signal LiDAR</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel-section">
+                            <div class="panel-section-title">Classes visibles</div>
+                            <div id="classToggles">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="panel-section">
+                            <div class="panel-section-title">Rendu</div>
+
+                            <div class="control-row">
+                                <div class="control-header">
+                                    <span>Taille des points</span>
+                                    <span class="control-value" id="pointSizeValue">2</span>
+                                </div>
+                                <input type="range" class="slider" id="pointSizeSlider" min="1" max="10" value="2">
+                            </div>
+
+                            <div class="control-row">
+                                <div class="control-header">
+                                    <span>Budget de points (M)</span>
+                                    <span class="control-value" id="pointBudgetValue">5</span>
+                                </div>
+                                <input type="range" class="slider" id="pointBudgetSlider" min="1" max="15" value="5">
+                            </div>
+
+                            <label class="class-toggle">
+                                <input type="checkbox" id="edlToggle" checked>
+                                <span class="class-name">Eye Dome Lighting</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Objects panel -->
+                <div class="panel objects-panel hidden" id="objectsPanel">
+                    <div class="panel-header">
+                        <span>📦 Objets (<span id="objectCount">0</span>)</span>
+                        <span class="panel-close" data-close="objectsPanel">×</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-section">
+                            <div class="stats-row">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="statTotal">0</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="statVerified">0</div>
+                                    <div class="stat-label">Vérifiés</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel-section">
+                            <div class="panel-section-title">Liste des objets</div>
+                            <div id="objectList">
+                                <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:11px;">
+                                    Aucun objet
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toast container -->
+                <div class="toast-container" id="toastContainer"></div>
+            </div>
+        </main>
+
+        <!-- Setup overlay -->
+        <div class="setup-overlay" id="setupOverlay">
+            <div class="setup-card" style="max-width: 520px;">
+                <div class="setup-header">
+                    <h2>🗺️ Territoire 3D</h2>
+                    <p>Jumeau numérique LiDAR HD IGN</p>
+                </div>
+                <div class="setup-body">
+                    <!-- Mode tabs -->
+                    <div class="setup-tabs">
+                        <button class="setup-tab active" data-tab="reference">Par référence IGN</button>
+                        <button class="setup-tab" data-tab="url">Par URL directe</button>
+                    </div>
+
+                    <!-- Tab: Reference IGN -->
+                    <div class="setup-tab-content active" id="tabReference">
+                        <div class="form-group">
+                            <label class="form-label">Référence de dalle IGN</label>
+                            <input type="text" class="form-input" id="setupTileRef"
+                                placeholder="Ex: 0643_6862 (Paris) ou 0770_6840 (Lyon)">
+                            <div class="form-hint">
+                                Format: XXXX_YYYY en coordonnées Lambert 93 (km).
+                                <a href="https://geoservices.ign.fr/lidarhd" target="_blank" style="color:var(--accent)">Carte des dalles</a>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Source des données</label>
+                            <select class="form-input" id="setupSource">
+                                <option value="ign">IGN Géoplateforme (France entière)</option>
+                                <option value="oslandia">Oslandia (Paris uniquement)</option>
+                                <option value="custom">URL personnalisée</option>
+                            </select>
+                            <div class="form-hint">
+                                IGN: Requête WFS automatique pour trouver l'URL COPC
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: URL directe -->
+                    <div class="setup-tab-content" id="tabUrl">
+                        <div class="form-group">
+                            <label class="form-label">URL du fichier COPC</label>
+                            <input type="text" class="form-input" id="setupCopcUrl"
+                                placeholder="https://3d.oslandia.com/.../file.copc.laz">
+                            <div class="form-hint">
+                                Fichier Cloud Optimized Point Cloud (.copc.laz)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Nom du projet (optionnel)</label>
+                        <input type="text" class="form-input" id="setupTileName"
+                            placeholder="Ex: Montpellier Centre">
+                    </div>
+
+                    <!-- Auto-config options -->
+                    <div class="form-group">
+                        <label class="form-label">Configuration automatique</label>
+                        <label class="checkbox-row">
+                            <input type="checkbox" id="setupAutoTables" checked>
+                            <span>Créer les tables Grist (Config, Objects)</span>
+                        </label>
+                        <label class="checkbox-row">
+                            <input type="checkbox" id="setupAutoImport" checked>
+                            <span>Importer les objets de référence (OSM)</span>
+                        </label>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="btn" id="btnDemo">Démo Paris</button>
+                        <button class="btn btn-primary" id="btnSetup">🚀 Configurer & Charger</button>
+                    </div>
+
+                    <div class="setup-status hidden" id="setupStatus">
+                        <div class="setup-status-item" id="statusTables">
+                            <span class="status-icon">⏳</span>
+                            <span>Création des tables Grist...</span>
+                        </div>
+                        <div class="setup-status-item" id="statusCopc">
+                            <span class="status-icon">⏳</span>
+                            <span>Chargement du nuage de points...</span>
+                        </div>
+                        <div class="setup-status-item" id="statusImport">
+                            <span class="status-icon">⏳</span>
+                            <span>Import des objets OSM...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import modal -->
+        <div class="modal-overlay hidden" id="importModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <div class="modal-title">📥 Importer des objets</div>
+                    <span class="panel-close" data-close="importModal">×</span>
+                </div>
+                <div class="modal-body">
+                    <div class="import-option" id="importBdTopo">
+                        <div class="import-option-icon">🗺️</div>
+                        <div class="import-option-info">
+                            <div class="import-option-name">BD TOPO IGN</div>
+                            <div class="import-option-desc">Bâtiments, routes, mobilier urbain depuis l'IGN</div>
+                        </div>
+                    </div>
+                    <div class="import-option" id="importOsm">
+                        <div class="import-option-icon">🌍</div>
+                        <div class="import-option-info">
+                            <div class="import-option-name">OpenStreetMap</div>
+                            <div class="import-option-desc">Arbres, lampadaires, bancs depuis OSM</div>
+                        </div>
+                    </div>
+                    <div class="import-option" id="importGeojson">
+                        <div class="import-option-icon">📄</div>
+                        <div class="import-option-info">
+                            <div class="import-option-name">Fichier GeoJSON</div>
+                            <div class="import-option-desc">Importer un fichier local</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" data-close="importModal">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

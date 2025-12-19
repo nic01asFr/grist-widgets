@@ -7,12 +7,14 @@
     "build:scrollytelling": "cd packages/scrollytelling && npm install && npm run build",
     "build:smart-gis": "cd packages/smart-gis && npm install && npm run build",
     "build:smart-gis-v2": "cd packages/smart-gis-v2 && npm install && npm run build",
-    "build:all": "npm run build:geo-map && npm run build:scrollytelling && npm run build:smart-gis && npm run build:smart-gis-v2 && npm run prepare-dist",
+    "build:territoire-3d": "cd packages/territoire-3d && npm install && npm run build",
+    "build:all": "npm run build:geo-map && npm run build:scrollytelling && npm run build:smart-gis && npm run build:smart-gis-v2 && npm run build:territoire-3d && npm run prepare-dist",
     "prepare-dist": "node scripts/prepare-dist.js",
     "dev:geo-map": "cd packages/geo-map && npm start",
     "dev:scrollytelling": "cd packages/scrollytelling && npm start",
     "dev:smart-gis": "cd packages/smart-gis && npm start",
     "dev:smart-gis-v2": "cd packages/smart-gis-v2 && npm run dev",
+    "dev:territoire-3d": "cd packages/territoire-3d && npm run dev",
     "verify": "node scripts/verify-config.js"
   },
   "repository": {

@@ -54,6 +54,12 @@ jobs:
           npm install
           npm run build
 
+      - name: Build Territoire 3D Widget
+        working-directory: packages/territoire-3d
+        run: |
+          npm install
+          npm run build
+
       - name: Prepare dist folder
         env:
           BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
