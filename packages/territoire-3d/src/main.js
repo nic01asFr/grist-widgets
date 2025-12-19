@@ -522,7 +522,7 @@ async function createGristTables() {
 
     try {
         // Create Config table if not exists
-        await ensureTableExists(CONFIG.tables.config, [
+        const configResult = await ensureTableExists(CONFIG.tables.config, [
             { id: 'TileName', type: 'Text' },
             { id: 'TileRef', type: 'Text' },
             { id: 'CopcUrl', type: 'Text' },
@@ -534,9 +534,13 @@ async function createGristTables() {
             { id: 'Source', type: 'Text' },
             { id: 'CreatedAt', type: 'DateTime' }
         ]);
+        console.log('📋 Config table result:', configResult);
+
+        // Small delay to let Grist process the table creation
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         // Create Objects table if not exists
-        await ensureTableExists(CONFIG.tables.objects, [
+        const objectsResult = await ensureTableExists(CONFIG.tables.objects, [
             { id: 'Name', type: 'Text' },
             { id: 'Type', type: 'Text' },
             { id: 'Category', type: 'Choice' },
@@ -549,6 +553,7 @@ async function createGristTables() {
             { id: 'Lon', type: 'Numeric' },
             { id: 'Lat', type: 'Numeric' }
         ]);
+        console.log('📋 Objects table result:', objectsResult);
 
         console.log('✅ All Grist tables ready');
         return true;
