@@ -4,6 +4,7 @@
 import './styles.css';
 
 import Instance from '@giro3d/giro3d/core/Instance.js';
+import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js';
 import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
@@ -133,8 +134,9 @@ function formatNumber(num) {
 async function initGiro3D() {
     console.log('🗺️ Initializing Giro3D...');
 
-    // Register Lambert 93
-    Instance.registerCRS(CONFIG.crs, CONFIG.proj4def);
+    // Register Lambert 93 (Giro3D 1.0.0 API)
+    CoordinateSystem.register(CONFIG.crs, CONFIG.proj4def);
+    console.log('✅ CRS registered:', CONFIG.crs);
 
     // Create instance
     state.instance = new Instance({
