@@ -495,19 +495,26 @@ function populateClassificationToggles() {
 function updateClassificationVisibility() {
     if (!state.pointCloud) return;
 
-    const visibility = {};
-
-    // Initialize all to false
-    for (let i = 0; i < 256; i++) {
-        visibility[i] = false;
+    // Giro3D 1.0.0: Use pointCloudClassifications array
+    const classifications = state.pointCloud.pointCloudClassifications;
+    if (!classifications) {
+        console.warn('⚠️ pointCloudClassifications not available');
+        return;
     }
 
-    // Enable checked classes
+    // Get checked classes
+    const checkedClasses = new Set();
     document.querySelectorAll('#classToggles input:checked').forEach(input => {
-        visibility[parseInt(input.dataset.class)] = true;
+        checkedClasses.add(parseInt(input.dataset.class));
     });
 
-    state.pointCloud.setClassificationVisibility(visibility);
+    // Update visibility for each classification
+    for (let i = 0; i < classifications.length; i++) {
+        if (classifications[i]) {
+            classifications[i].visible = checkedClasses.has(i);
+        }
+    }
+
     state.instance.notifyChange();
 }
 
