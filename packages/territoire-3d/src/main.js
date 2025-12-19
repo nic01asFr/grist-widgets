@@ -10,6 +10,7 @@ import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
+import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
 
@@ -23,76 +24,86 @@ setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 // ============================================================
 // FETCH THROTTLER & CACHE (avoid 429 rate limiting)
 // ============================================================
+// Save original fetch BEFORE any override
+const originalFetch = window.fetch.bind(window);
+
 const FetchThrottler = {
-    maxConcurrent: 4,        // Max simultaneous requests
-    delayBetween: 100,       // ms between requests
+    maxConcurrent: 2,        // Very conservative - IGN is strict
+    delayBetween: 300,       // ms between requests
+    retryDelay: 3000,        // ms to wait after 429
+    maxRetries: 3,
     queue: [],
     active: 0,
     cache: new Map(),
-    cacheMaxSize: 100,       // Max cached responses
+    cacheMaxSize: 100,
+    paused: false,
 
     async fetch(url, options = {}) {
-        // Check cache first for GET requests
         const cacheKey = `${url}_${options.headers?.Range || 'full'}`;
         if (this.cache.has(cacheKey)) {
-            console.log('📦 Cache hit:', url.slice(-50));
             return this.cache.get(cacheKey).clone();
         }
 
-        // Queue the request
         return new Promise((resolve, reject) => {
-            this.queue.push({ url, options, resolve, reject, cacheKey });
+            this.queue.push({ url, options, resolve, reject, cacheKey, retries: 0 });
             this.processQueue();
         });
     },
 
     async processQueue() {
-        if (this.active >= this.maxConcurrent || this.queue.length === 0) return;
+        if (this.paused || this.active >= this.maxConcurrent || this.queue.length === 0) return;
 
         this.active++;
-        const { url, options, resolve, reject, cacheKey } = this.queue.shift();
+        const item = this.queue.shift();
+        const { url, options, resolve, reject, cacheKey, retries } = item;
 
         try {
-            // Add delay to avoid burst
-            if (this.active > 1) {
-                await new Promise(r => setTimeout(r, this.delayBetween));
-            }
+            // Always delay between requests
+            await new Promise(r => setTimeout(r, this.delayBetween));
 
-            const response = await fetch(url, options);
+            // Use ORIGINAL fetch, not the overridden one!
+            const response = await originalFetch(url, options);
 
-            // Cache successful responses
-            if (response.ok && response.status !== 429) {
-                // Clone for cache (response can only be read once)
+            if (response.status === 429) {
+                if (retries < this.maxRetries) {
+                    console.log(`⏳ 429 - pausing ${this.retryDelay}ms, retry ${retries + 1}/${this.maxRetries}`);
+                    this.paused = true;
+                    this.active--;
+
+                    // Wait then retry
+                    await new Promise(r => setTimeout(r, this.retryDelay));
+                    this.paused = false;
+                    this.queue.unshift({ ...item, retries: retries + 1 });
+                    this.processQueue();
+                    return;
+                }
+                console.warn('❌ Max retries for:', url.slice(-50));
+            } else if (response.ok) {
                 const cloned = response.clone();
                 this.cache.set(cacheKey, cloned);
-
-                // Limit cache size
                 if (this.cache.size > this.cacheMaxSize) {
-                    const firstKey = this.cache.keys().next().value;
-                    this.cache.delete(firstKey);
+                    this.cache.delete(this.cache.keys().next().value);
                 }
             }
-
             resolve(response);
         } catch (error) {
             reject(error);
         } finally {
-            this.active--;
-            // Process next in queue
-            setTimeout(() => this.processQueue(), this.delayBetween);
+            if (!this.paused) {
+                this.active--;
+                setTimeout(() => this.processQueue(), this.delayBetween);
+            }
         }
     }
 };
 
-// Override global fetch for IGN domains
-const originalFetch = window.fetch;
+// Override global fetch for IGN LiDAR only
 window.fetch = function(url, options) {
     const urlStr = typeof url === 'string' ? url : url.toString();
-    // Throttle only IGN LiDAR requests
     if (urlStr.includes('data.geopf.fr') && urlStr.includes('.copc.laz')) {
         return FetchThrottler.fetch(urlStr, options);
     }
-    return originalFetch.call(this, url, options);
+    return originalFetch(url, options);
 };
 
 // ============================================================
@@ -400,14 +411,34 @@ function setDisplayMode(mode) {
             case 'elevation':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Z');
-                pc.colorMap = 'viridis';
-                console.log('🎨 Display mode: elevation');
+                // Create ColorMap with proper min/max bounds from bounding box
+                const elevBbox = pc.getBoundingBox();
+                if (elevBbox && !elevBbox.isEmpty()) {
+                    const elevColorMap = new ColorMap({
+                        colors: ColorMap.VIRIDIS,
+                        min: elevBbox.min.z,
+                        max: elevBbox.max.z
+                    });
+                    pc.setAttributeColorMap('Z', elevColorMap);
+                    console.log('🎨 Display mode: elevation', {
+                        zMin: elevBbox.min.z.toFixed(1),
+                        zMax: elevBbox.max.z.toFixed(1)
+                    });
+                } else {
+                    console.warn('⚠️ Cannot get elevation bounds');
+                }
                 break;
 
             case 'intensity':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Intensity');
-                pc.colorMap = 'greys';
+                // Create ColorMap for intensity (typically 0-65535 for 16-bit)
+                const intensityColorMap = new ColorMap({
+                    colors: ColorMap.GREYS,
+                    min: 0,
+                    max: 65535
+                });
+                pc.setAttributeColorMap('Intensity', intensityColorMap);
                 console.log('🎨 Display mode: intensity');
                 break;
         }
