@@ -28,19 +28,20 @@ setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 const originalFetch = window.fetch.bind(window);
 
 const FetchThrottler = {
-    maxConcurrent: 2,        // Very conservative - IGN is strict
-    delayBetween: 300,       // ms between requests
-    retryDelay: 3000,        // ms to wait after 429
-    maxRetries: 3,
+    maxConcurrent: 1,        // Only 1 request at a time - IGN is very strict
+    delayBetween: 500,       // 500ms between requests
+    retryDelay: 5000,        // 5s to wait after 429
+    maxRetries: 5,
     queue: [],
     active: 0,
     cache: new Map(),
-    cacheMaxSize: 100,
+    cacheMaxSize: 200,
     paused: false,
 
     async fetch(url, options = {}) {
         const cacheKey = `${url}_${options.headers?.Range || 'full'}`;
         if (this.cache.has(cacheKey)) {
+            console.log('📦 Cache hit:', url.slice(-40));
             return this.cache.get(cacheKey).clone();
         }
 
@@ -61,17 +62,20 @@ const FetchThrottler = {
             // Always delay between requests
             await new Promise(r => setTimeout(r, this.delayBetween));
 
+            console.log(`🌐 Fetching (${this.queue.length} queued):`, url.slice(-50));
+
             // Use ORIGINAL fetch, not the overridden one!
             const response = await originalFetch(url, options);
 
             if (response.status === 429) {
                 if (retries < this.maxRetries) {
-                    console.log(`⏳ 429 - pausing ${this.retryDelay}ms, retry ${retries + 1}/${this.maxRetries}`);
+                    const waitTime = this.retryDelay * (retries + 1); // Exponential backoff
+                    console.log(`⏳ 429 - waiting ${waitTime}ms, retry ${retries + 1}/${this.maxRetries}`);
                     this.paused = true;
                     this.active--;
 
-                    // Wait then retry
-                    await new Promise(r => setTimeout(r, this.retryDelay));
+                    // Wait then retry with exponential backoff
+                    await new Promise(r => setTimeout(r, waitTime));
                     this.paused = false;
                     this.queue.unshift({ ...item, retries: retries + 1 });
                     this.processQueue();
@@ -97,10 +101,11 @@ const FetchThrottler = {
     }
 };
 
-// Override global fetch for IGN LiDAR only
+// Override global fetch for ALL geopf.fr URLs
 window.fetch = function(url, options) {
     const urlStr = typeof url === 'string' ? url : url.toString();
-    if (urlStr.includes('data.geopf.fr') && urlStr.includes('.copc.laz')) {
+    // Catch ALL geopf.fr URLs (COPC chunks, WFS, etc.)
+    if (urlStr.includes('geopf.fr')) {
         return FetchThrottler.fetch(urlStr, options);
     }
     return originalFetch(url, options);
@@ -411,11 +416,17 @@ function setDisplayMode(mode) {
             case 'elevation':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Z');
-                // Create ColorMap with proper min/max bounds from bounding box
+                // Create ColorMap with viridis-like gradient
                 const elevBbox = pc.getBoundingBox();
                 if (elevBbox && !elevBbox.isEmpty()) {
+                    // Viridis-inspired gradient (dark purple → blue → green → yellow)
+                    const viridisColors = [
+                        '#440154', '#482777', '#3e4a89', '#31688e',
+                        '#26838e', '#1f9e89', '#35b779', '#6ece58',
+                        '#b5de2b', '#fde725'
+                    ];
                     const elevColorMap = new ColorMap({
-                        colors: ColorMap.VIRIDIS,
+                        colors: viridisColors,
                         min: elevBbox.min.z,
                         max: elevBbox.max.z
                     });
@@ -432,9 +443,14 @@ function setDisplayMode(mode) {
             case 'intensity':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Intensity');
-                // Create ColorMap for intensity (typically 0-65535 for 16-bit)
+                // Create ColorMap for intensity (greyscale gradient)
+                const greyColors = [
+                    '#000000', '#1a1a1a', '#333333', '#4d4d4d',
+                    '#666666', '#808080', '#999999', '#b3b3b3',
+                    '#cccccc', '#e6e6e6', '#ffffff'
+                ];
                 const intensityColorMap = new ColorMap({
-                    colors: ColorMap.GREYS,
+                    colors: greyColors,
                     min: 0,
                     max: 65535
                 });
