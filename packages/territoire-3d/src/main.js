@@ -13,9 +13,9 @@ import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
 
-// LAZ-PERF WebAssembly path
+// LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
-setLazPerfPath('https://unpkg.com/laz-perf@0.0.6/');
+setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6');
 
 // ============================================================
 // CONFIGURATION
