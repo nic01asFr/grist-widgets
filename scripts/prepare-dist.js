@@ -7,8 +7,8 @@ console.log('🚀 Préparation du dossier dist...');
 
 fs.ensureDirSync(distDir);
 
-// Widgets avec build (React, etc.)
-const builtWidgets = ['geo-map', 'smart-gis', 'smart-gis-v2', 'scrollytelling'];
+// Widgets avec build (React, Vite, etc.)
+const builtWidgets = ['geo-map', 'smart-gis', 'smart-gis-v2', 'scrollytelling', 'territoire-3d'];
 
 // Widgets statiques (HTML/CSS/JS direct)
 const staticWidgets = [
@@ -16,8 +16,7 @@ const staticWidgets = [
   { name: 'reveal-minimal-example', source: 'public' },
   { name: 'reveal-builder', source: 'public' },
   { name: 'reveal-editor', source: 'public' },
-  { name: 'panoramax-explorer', source: 'public' },
-  { name: 'territoire-3d', source: 'public' }
+  { name: 'panoramax-explorer', source: 'public' }
 ];
 
 let successCount = 0;

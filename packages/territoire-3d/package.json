@@ -1,0 +1,21 @@
+{
+  "name": "grist-territoire-3d-widget",
+  "version": "1.0.0",
+  "description": "Territoire 3D - Jumeau Numérique LiDAR HD avec Giro3D",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@giro3d/giro3d": "^0.43.7",
+    "three": "^0.165.0",
+    "ol": "^9.2.4",
+    "proj4": "^2.11.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.8"
+  }
+}
