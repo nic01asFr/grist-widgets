@@ -10,7 +10,6 @@ import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
-import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
 
@@ -24,94 +23,76 @@ setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 // ============================================================
 // FETCH THROTTLER & CACHE (avoid 429 rate limiting)
 // ============================================================
-// Save original fetch BEFORE any override
-const originalFetch = window.fetch.bind(window);
-
 const FetchThrottler = {
-    maxConcurrent: 4,        // Start with 4 concurrent requests
-    minConcurrent: 1,        // Reduce to 1 on 429
-    delayBetween: 50,        // Fast start - 50ms between requests
-    retryDelay: 3000,        // 3s to wait after 429
-    maxRetries: 5,
+    maxConcurrent: 4,        // Max simultaneous requests
+    delayBetween: 100,       // ms between requests
     queue: [],
     active: 0,
-    paused: false,
-    currentConcurrent: 4,    // Dynamic concurrency
+    cache: new Map(),
+    cacheMaxSize: 100,       // Max cached responses
 
     async fetch(url, options = {}) {
+        // Check cache first for GET requests
+        const cacheKey = `${url}_${options.headers?.Range || 'full'}`;
+        if (this.cache.has(cacheKey)) {
+            console.log('📦 Cache hit:', url.slice(-50));
+            return this.cache.get(cacheKey).clone();
+        }
+
+        // Queue the request
         return new Promise((resolve, reject) => {
-            this.queue.push({ url, options, resolve, reject, retries: 0 });
+            this.queue.push({ url, options, resolve, reject, cacheKey });
             this.processQueue();
         });
     },
 
     async processQueue() {
-        if (this.paused || this.active >= this.currentConcurrent || this.queue.length === 0) return;
+        if (this.active >= this.maxConcurrent || this.queue.length === 0) return;
 
         this.active++;
-        const item = this.queue.shift();
-        const { url, options, resolve, reject, retries } = item;
+        const { url, options, resolve, reject, cacheKey } = this.queue.shift();
 
         try {
-            // Small delay between requests
-            if (this.delayBetween > 0) {
+            // Add delay to avoid burst
+            if (this.active > 1) {
                 await new Promise(r => setTimeout(r, this.delayBetween));
             }
 
-            // Use ORIGINAL fetch, not the overridden one!
-            const response = await originalFetch(url, options);
+            const response = await fetch(url, options);
 
-            if (response.status === 429) {
-                // Slow down on rate limit
-                this.currentConcurrent = this.minConcurrent;
-                this.delayBetween = 500; // Increase delay
+            // Cache successful responses
+            if (response.ok && response.status !== 429) {
+                // Clone for cache (response can only be read once)
+                const cloned = response.clone();
+                this.cache.set(cacheKey, cloned);
 
-                if (retries < this.maxRetries) {
-                    const waitTime = this.retryDelay * (retries + 1);
-                    console.log(`⏳ 429 - slowing down, waiting ${waitTime}ms, retry ${retries + 1}/${this.maxRetries}`);
-                    this.paused = true;
-                    this.active--;
-
-                    await new Promise(r => setTimeout(r, waitTime));
-                    this.paused = false;
-                    this.queue.unshift({ ...item, retries: retries + 1 });
-                    this.processQueue();
-                    return;
+                // Limit cache size
+                if (this.cache.size > this.cacheMaxSize) {
+                    const firstKey = this.cache.keys().next().value;
+                    this.cache.delete(firstKey);
                 }
-                console.warn('❌ Max retries for:', url.slice(-50));
             }
+
             resolve(response);
         } catch (error) {
             reject(error);
         } finally {
-            if (!this.paused) {
-                this.active--;
-                // Continue processing queue
-                setTimeout(() => this.processQueue(), this.delayBetween);
-            }
+            this.active--;
+            // Process next in queue
+            setTimeout(() => this.processQueue(), this.delayBetween);
         }
     }
 };
 
-// Override global fetch for ALL geopf.fr URLs
+// Override global fetch for IGN domains
+const originalFetch = window.fetch;
 window.fetch = function(url, options) {
-    // Properly extract URL string from different input types
-    let urlStr;
-    if (typeof url === 'string') {
-        urlStr = url;
-    } else if (url instanceof URL) {
-        urlStr = url.href;
-    } else if (url instanceof Request) {
-        urlStr = url.url;
-    } else {
-        urlStr = String(url);
-    }
-
-    // Catch ALL geopf.fr URLs (COPC chunks, WFS, etc.)
-    if (urlStr.includes('geopf.fr')) {
+    const urlStr = typeof url === 'string' ? url : url.toString();
+    // Throttle only IGN LiDAR requests
+    if (urlStr.includes('data.geopf.fr') && urlStr.includes('.copc.laz')) {
         return FetchThrottler.fetch(urlStr, options);
     }
-    return originalFetch(url, options);
+    return originalFetch.call(this, url, options);
 };
 
 // ============================================================
@@ -416,51 +397,19 @@ function setDisplayMode(mode) {
                 loadOrthoColorization();
                 return; // loadOrthoColorization handles notifyChange
 
-            case 'elevation': {
-                // Use elevationColorMap property (dedicated for Z coloring)
-                const elevBbox = pc.getBoundingBox();
-                if (elevBbox && !elevBbox.isEmpty()) {
-                    // Viridis-inspired gradient (dark purple → blue → green → yellow)
-                    const viridisColors = [
-                        '#440154', '#482777', '#3e4a89', '#31688e',
-                        '#26838e', '#1f9e89', '#35b779', '#6ece58',
-                        '#b5de2b', '#fde725'
-                    ];
-                    const elevColorMap = new ColorMap({
-                        colors: viridisColors,
-                        min: elevBbox.min.z,
-                        max: elevBbox.max.z
-                    });
-                    // Use dedicated elevationColorMap property
-                    pc.elevationColorMap = elevColorMap;
-                    console.log('🎨 Display mode: elevation', {
-                        zMin: elevBbox.min.z.toFixed(1),
-                        zMax: elevBbox.max.z.toFixed(1)
-                    });
-                } else {
-                    console.warn('⚠️ Cannot get elevation bounds');
-                }
+            case 'elevation':
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Z');
+                pc.colorMap = 'viridis';
+                console.log('🎨 Display mode: elevation');
                 break;
-            }
 
-            case 'intensity': {
+            case 'intensity':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Intensity');
-                // Create ColorMap for intensity (greyscale gradient)
-                const greyColors = [
-                    '#000000', '#1a1a1a', '#333333', '#4d4d4d',
-                    '#666666', '#808080', '#999999', '#b3b3b3',
-                    '#cccccc', '#e6e6e6', '#ffffff'
-                ];
-                const intensityColorMap = new ColorMap({
-                    colors: greyColors,
-                    min: 0,
-                    max: 65535
-                });
-                pc.setAttributeColorMap('Intensity', intensityColorMap);
+                pc.colorMap = 'greys';
                 console.log('🎨 Display mode: intensity');
                 break;
-            }
         }
 
         state.instance.notifyChange();
