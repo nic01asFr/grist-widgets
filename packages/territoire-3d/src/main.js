@@ -303,39 +303,48 @@ function setDisplayMode(mode) {
 
     if (!state.pointCloud) return;
 
-    switch (mode) {
-        case 'classification':
-            state.pointCloud.setColoringMode('attribute');
-            state.pointCloud.setColorAttribute('Classification');
-            if (state.colorLayer) {
-                state.pointCloud.setColorLayer(null);
-            }
-            break;
+    try {
+        // Giro3D 1.0.0: Use style.colorMap for coloring
+        const pc = state.pointCloud;
 
-        case 'ortho':
-            loadOrthoColorization();
-            break;
+        switch (mode) {
+            case 'classification':
+                // In Giro3D 1.0.0, use activeAttribute and colorization style
+                if (typeof pc.setActiveAttribute === 'function') {
+                    pc.setActiveAttribute('Classification');
+                } else if (pc.source && typeof pc.source.setActiveAttribute === 'function') {
+                    pc.source.setActiveAttribute('Classification');
+                }
+                console.log('🎨 Display mode: classification');
+                break;
 
-        case 'elevation':
-            state.pointCloud.setColoringMode('attribute');
-            state.pointCloud.setColorAttribute('Z');
-            state.pointCloud.setColorMap('viridis');
-            if (state.colorLayer) {
-                state.pointCloud.setColorLayer(null);
-            }
-            break;
+            case 'ortho':
+                loadOrthoColorization();
+                break;
 
-        case 'intensity':
-            state.pointCloud.setColoringMode('attribute');
-            state.pointCloud.setColorAttribute('Intensity');
-            state.pointCloud.setColorMap('greys');
-            if (state.colorLayer) {
-                state.pointCloud.setColorLayer(null);
-            }
-            break;
+            case 'elevation':
+                if (typeof pc.setActiveAttribute === 'function') {
+                    pc.setActiveAttribute('Z');
+                } else if (pc.source && typeof pc.source.setActiveAttribute === 'function') {
+                    pc.source.setActiveAttribute('Z');
+                }
+                console.log('🎨 Display mode: elevation');
+                break;
+
+            case 'intensity':
+                if (typeof pc.setActiveAttribute === 'function') {
+                    pc.setActiveAttribute('Intensity');
+                } else if (pc.source && typeof pc.source.setActiveAttribute === 'function') {
+                    pc.source.setActiveAttribute('Intensity');
+                }
+                console.log('🎨 Display mode: intensity');
+                break;
+        }
+
+        state.instance.notifyChange();
+    } catch (error) {
+        console.warn('⚠️ Error setting display mode:', error.message);
     }
-
-    state.instance.notifyChange();
 }
 
 async function loadOrthoColorization() {
@@ -528,50 +537,30 @@ async function withTimeout(promise, ms, fallback) {
 }
 
 // Check if table exists, create if not
+// Strategy: Try to create directly, catch "already exists" error
 async function ensureTableExists(tableName, schema) {
-    console.log(`🔍 Checking table ${tableName}...`);
+    console.log(`🔍 Ensuring table ${tableName} exists...`);
 
-    // First, check if table already exists by trying to fetch it
     try {
-        const data = await withTimeout(
-            grist.docApi.fetchTable(tableName),
-            5000,
-            null
-        );
-        if (data !== null) {
-            console.log(`ℹ️ Table ${tableName} already exists`);
-            return { created: false, exists: true };
-        }
-    } catch (fetchError) {
-        // Table doesn't exist, we'll create it
-        console.log(`📋 Table ${tableName} not found, creating...`);
-    }
-
-    // Create the table
-    try {
-        const result = await withTimeout(
-            grist.docApi.applyUserActions([
-                ['AddTable', tableName, schema]
-            ]),
-            10000, // 10 second timeout
-            { timeout: true }
-        );
-
-        if (result?.timeout) {
-            console.log(`⏱️ Table ${tableName} creation timed out (may have succeeded)`);
-            return { created: true, timeout: true };
-        }
-
+        // Directly try to create the table
+        // If it already exists, Grist will throw an error
+        await grist.docApi.applyUserActions([
+            ['AddTable', tableName, schema]
+        ]);
         console.log(`✅ Table ${tableName} created`);
         return { created: true };
     } catch (error) {
-        // Table probably already exists (race condition)
         const errorMsg = error?.message || String(error);
-        if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
-            console.log(`ℹ️ Table ${tableName} already exists (race condition)`);
+
+        // Check if error indicates table already exists
+        if (errorMsg.includes('already exists') ||
+            errorMsg.includes('duplicate') ||
+            errorMsg.includes('Table') && errorMsg.includes('exists')) {
+            console.log(`ℹ️ Table ${tableName} already exists`);
             return { created: false, exists: true };
         }
-        // Unknown error - log and continue
+
+        // For other errors, log but continue
         console.warn(`⚠️ Table ${tableName} error:`, errorMsg);
         return { created: false, error: errorMsg };
     }
