@@ -1353,12 +1353,11 @@ async function runFullSetup() {
     console.log('🚀 Starting full setup...');
 
     const statusEl = document.getElementById('setupStatus');
-    const statusTables = document.getElementById('statusTables');
     const statusCopc = document.getElementById('statusCopc');
     const statusImport = document.getElementById('statusImport');
 
     // Reset all status icons to waiting state
-    [statusTables, statusCopc, statusImport].forEach(el => {
+    [statusCopc, statusImport].forEach(el => {
         el.classList.remove('active', 'done', 'error');
         el.querySelector('.status-icon').textContent = '○';
     });
@@ -1392,10 +1391,9 @@ async function runFullSetup() {
         copcUrl = await buildCopcUrl(tileRef, source);
     }
 
-    const autoTables = document.getElementById('setupAutoTables').checked;
     const autoImport = document.getElementById('setupAutoImport').checked;
 
-    console.log('📋 Setup config:', { copcUrl, tileRef, tileName, source, autoTables, autoImport, gristReady: state.gristReady });
+    console.log('📋 Setup config:', { copcUrl, tileRef, tileName, source, autoImport, gristReady: state.gristReady });
 
     // Validate
     if (!copcUrl) {
@@ -1413,23 +1411,8 @@ async function runFullSetup() {
     // Get bbox from tile ref
     const bbox = tileRef ? getTileBbox(tileRef) : null;
 
-    // Tables are created at init, just mark as done
-    if (state.tablesReady) {
-        statusTables.classList.add('done');
-        statusTables.querySelector('.status-icon').textContent = '✅';
-    } else if (state.gristReady) {
-        // Fallback: tables should be ready, but ensure they exist
-        statusTables.querySelector('.status-icon').textContent = '⏳';
-        await createGristTables();
-        statusTables.classList.add('done');
-        statusTables.querySelector('.status-icon').textContent = '✅';
-    } else {
-        statusTables.querySelector('.status-icon').textContent = '⏭️';
-        statusTables.querySelector('span:last-child').textContent = 'Tables (standalone)';
-    }
-
-    // Step 2: Load point cloud
-    console.log('☁️ Step 2: Loading point cloud from:', copcUrl);
+    // Load point cloud
+    console.log('☁️ Loading point cloud from:', copcUrl);
     statusCopc.classList.add('active');
     statusCopc.querySelector('.status-icon').textContent = '⏳';
 
