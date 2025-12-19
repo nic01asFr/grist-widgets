@@ -28,53 +28,50 @@ setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 const originalFetch = window.fetch.bind(window);
 
 const FetchThrottler = {
-    maxConcurrent: 1,        // Only 1 request at a time - IGN is very strict
-    delayBetween: 500,       // 500ms between requests
-    retryDelay: 5000,        // 5s to wait after 429
+    maxConcurrent: 4,        // Start with 4 concurrent requests
+    minConcurrent: 1,        // Reduce to 1 on 429
+    delayBetween: 50,        // Fast start - 50ms between requests
+    retryDelay: 3000,        // 3s to wait after 429
     maxRetries: 5,
     queue: [],
     active: 0,
-    cache: new Map(),
-    cacheMaxSize: 200,
     paused: false,
+    currentConcurrent: 4,    // Dynamic concurrency
 
     async fetch(url, options = {}) {
-        const cacheKey = `${url}_${options.headers?.Range || 'full'}`;
-        if (this.cache.has(cacheKey)) {
-            console.log('📦 Cache hit:', url.slice(-40));
-            return this.cache.get(cacheKey).clone();
-        }
-
         return new Promise((resolve, reject) => {
-            this.queue.push({ url, options, resolve, reject, cacheKey, retries: 0 });
+            this.queue.push({ url, options, resolve, reject, retries: 0 });
             this.processQueue();
         });
     },
 
     async processQueue() {
-        if (this.paused || this.active >= this.maxConcurrent || this.queue.length === 0) return;
+        if (this.paused || this.active >= this.currentConcurrent || this.queue.length === 0) return;
 
         this.active++;
         const item = this.queue.shift();
-        const { url, options, resolve, reject, cacheKey, retries } = item;
+        const { url, options, resolve, reject, retries } = item;
 
         try {
-            // Always delay between requests
-            await new Promise(r => setTimeout(r, this.delayBetween));
-
-            console.log(`🌐 Fetching (${this.queue.length} queued):`, url.slice(-50));
+            // Small delay between requests
+            if (this.delayBetween > 0) {
+                await new Promise(r => setTimeout(r, this.delayBetween));
+            }
 
             // Use ORIGINAL fetch, not the overridden one!
             const response = await originalFetch(url, options);
 
             if (response.status === 429) {
+                // Slow down on rate limit
+                this.currentConcurrent = this.minConcurrent;
+                this.delayBetween = 500; // Increase delay
+
                 if (retries < this.maxRetries) {
-                    const waitTime = this.retryDelay * (retries + 1); // Exponential backoff
-                    console.log(`⏳ 429 - waiting ${waitTime}ms, retry ${retries + 1}/${this.maxRetries}`);
+                    const waitTime = this.retryDelay * (retries + 1);
+                    console.log(`⏳ 429 - slowing down, waiting ${waitTime}ms, retry ${retries + 1}/${this.maxRetries}`);
                     this.paused = true;
                     this.active--;
 
-                    // Wait then retry with exponential backoff
                     await new Promise(r => setTimeout(r, waitTime));
                     this.paused = false;
                     this.queue.unshift({ ...item, retries: retries + 1 });
@@ -82,12 +79,6 @@ const FetchThrottler = {
                     return;
                 }
                 console.warn('❌ Max retries for:', url.slice(-50));
-            } else if (response.ok) {
-                const cloned = response.clone();
-                this.cache.set(cacheKey, cloned);
-                if (this.cache.size > this.cacheMaxSize) {
-                    this.cache.delete(this.cache.keys().next().value);
-                }
             }
             resolve(response);
         } catch (error) {
@@ -95,6 +86,7 @@ const FetchThrottler = {
         } finally {
             if (!this.paused) {
                 this.active--;
+                // Continue processing queue
                 setTimeout(() => this.processQueue(), this.delayBetween);
             }
         }
