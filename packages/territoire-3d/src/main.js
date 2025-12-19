@@ -491,14 +491,40 @@ async function loadConfigFromGrist() {
 // AUTO-CONFIGURATION
 // ============================================================
 
+// Helper: wrap RPC call with timeout to avoid hanging
+async function withTimeout(promise, ms, fallback) {
+    const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), ms)
+    );
+    try {
+        return await Promise.race([promise, timeout]);
+    } catch (error) {
+        if (error.message === 'Timeout') {
+            console.warn(`⚠️ RPC timeout after ${ms}ms, continuing...`);
+            return fallback;
+        }
+        throw error;
+    }
+}
+
 // Try to create table, ignore error if already exists
 async function ensureTableExists(tableName, schema) {
     console.log(`🔍 Checking table ${tableName}...`);
     try {
-        // Try to create the table directly
-        await grist.docApi.applyUserActions([
-            ['AddTable', tableName, schema]
-        ]);
+        // Try to create the table directly with timeout
+        const result = await withTimeout(
+            grist.docApi.applyUserActions([
+                ['AddTable', tableName, schema]
+            ]),
+            10000, // 10 second timeout
+            { timeout: true }
+        );
+
+        if (result?.timeout) {
+            console.log(`⏱️ Table ${tableName} creation timed out (may have succeeded)`);
+            return { created: true, timeout: true };
+        }
+
         console.log(`✅ Table ${tableName} created`);
         return { created: true };
     } catch (error) {
