@@ -491,19 +491,26 @@ async function loadConfigFromGrist() {
 // AUTO-CONFIGURATION
 // ============================================================
 
-// Pattern from Grist documentation: use fetchTable to check existence
+// Try to create table, ignore error if already exists
 async function ensureTableExists(tableName, schema) {
+    console.log(`🔍 Checking table ${tableName}...`);
     try {
-        await grist.docApi.fetchTable(tableName);
-        console.log(`ℹ️ Table ${tableName} already exists`);
-        return { exists: true, created: false };
-    } catch (error) {
-        console.log(`📋 Creating table ${tableName}...`);
+        // Try to create the table directly
         await grist.docApi.applyUserActions([
             ['AddTable', tableName, schema]
         ]);
         console.log(`✅ Table ${tableName} created`);
-        return { exists: true, created: true };
+        return { created: true };
+    } catch (error) {
+        // Table probably already exists
+        const errorMsg = error?.message || String(error);
+        if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
+            console.log(`ℹ️ Table ${tableName} already exists`);
+            return { created: false };
+        }
+        // Unknown error - log and continue
+        console.warn(`⚠️ Table ${tableName} error:`, errorMsg);
+        return { created: false, error: errorMsg };
     }
 }
 
