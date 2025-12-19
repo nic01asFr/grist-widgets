@@ -103,7 +103,18 @@ const FetchThrottler = {
 
 // Override global fetch for ALL geopf.fr URLs
 window.fetch = function(url, options) {
-    const urlStr = typeof url === 'string' ? url : url.toString();
+    // Properly extract URL string from different input types
+    let urlStr;
+    if (typeof url === 'string') {
+        urlStr = url;
+    } else if (url instanceof URL) {
+        urlStr = url.href;
+    } else if (url instanceof Request) {
+        urlStr = url.url;
+    } else {
+        urlStr = String(url);
+    }
+
     // Catch ALL geopf.fr URLs (COPC chunks, WFS, etc.)
     if (urlStr.includes('geopf.fr')) {
         return FetchThrottler.fetch(urlStr, options);
@@ -413,10 +424,8 @@ function setDisplayMode(mode) {
                 loadOrthoColorization();
                 return; // loadOrthoColorization handles notifyChange
 
-            case 'elevation':
-                pc.setColoringMode('attribute');
-                pc.setActiveAttribute('Z');
-                // Create ColorMap with viridis-like gradient
+            case 'elevation': {
+                // Use elevationColorMap property (dedicated for Z coloring)
                 const elevBbox = pc.getBoundingBox();
                 if (elevBbox && !elevBbox.isEmpty()) {
                     // Viridis-inspired gradient (dark purple → blue → green → yellow)
@@ -430,7 +439,8 @@ function setDisplayMode(mode) {
                         min: elevBbox.min.z,
                         max: elevBbox.max.z
                     });
-                    pc.setAttributeColorMap('Z', elevColorMap);
+                    // Use dedicated elevationColorMap property
+                    pc.elevationColorMap = elevColorMap;
                     console.log('🎨 Display mode: elevation', {
                         zMin: elevBbox.min.z.toFixed(1),
                         zMax: elevBbox.max.z.toFixed(1)
@@ -439,8 +449,9 @@ function setDisplayMode(mode) {
                     console.warn('⚠️ Cannot get elevation bounds');
                 }
                 break;
+            }
 
-            case 'intensity':
+            case 'intensity': {
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Intensity');
                 // Create ColorMap for intensity (greyscale gradient)
@@ -457,6 +468,7 @@ function setDisplayMode(mode) {
                 pc.setAttributeColorMap('Intensity', intensityColorMap);
                 console.log('🎨 Display mode: intensity');
                 break;
+            }
         }
 
         state.instance.notifyChange();
