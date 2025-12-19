@@ -452,46 +452,61 @@ async function initGrist() {
 async function loadConfigFromGrist() {
     if (!state.gristReady) return;
 
+    // Try to load Config table
     try {
-        const tables = await grist.docApi.listTables();
+        const data = await grist.docApi.fetchTable(CONFIG.tables.config);
 
-        if (tables.includes(CONFIG.tables.config)) {
-            const data = await grist.docApi.fetchTable(CONFIG.tables.config);
+        if (data.id && data.id.length > 0) {
+            const config = {
+                copcUrl: data.CopcUrl?.[0],
+                tileName: data.TileName?.[0] || data.Name?.[0],
+                bboxMinX: data.Bbox_MinX?.[0],
+                bboxMinY: data.Bbox_MinY?.[0],
+                bboxMaxX: data.Bbox_MaxX?.[0],
+                bboxMaxY: data.Bbox_MaxY?.[0]
+            };
 
-            if (data.id && data.id.length > 0) {
-                const config = {
-                    copcUrl: data.CopcUrl?.[0],
-                    tileName: data.TileName?.[0] || data.Name?.[0],
-                    bboxMinX: data.Bbox_MinX?.[0],
-                    bboxMinY: data.Bbox_MinY?.[0],
-                    bboxMaxX: data.Bbox_MaxX?.[0],
-                    bboxMaxY: data.Bbox_MaxY?.[0]
-                };
+            if (config.copcUrl) {
+                console.log('📋 Config loaded from Grist:', config);
+                state.gristConfig = config;
 
-                if (config.copcUrl) {
-                    console.log('📋 Config loaded from Grist:', config);
-                    state.gristConfig = config;
-
-                    // Auto-load point cloud
-                    document.getElementById('setupOverlay').classList.add('hidden');
-                    await loadPointCloud(config.copcUrl, config.tileName || 'Dalle');
-                }
+                // Auto-load point cloud
+                document.getElementById('setupOverlay').classList.add('hidden');
+                await loadPointCloud(config.copcUrl, config.tileName || 'Dalle');
             }
         }
-
-        // Load objects
-        if (tables.includes(CONFIG.tables.objects)) {
-            await loadObjectsFromGrist();
-        }
-
     } catch (error) {
-        console.warn('⚠️ Error loading Grist config:', error);
+        console.log('ℹ️ Config table not found or empty');
+    }
+
+    // Try to load Objects table
+    try {
+        await loadObjectsFromGrist();
+    } catch (error) {
+        console.log('ℹ️ Objects table not found or empty');
     }
 }
 
 // ============================================================
 // AUTO-CONFIGURATION
 // ============================================================
+
+// Pattern from Grist documentation: use fetchTable to check existence
+async function ensureTableExists(tableName, schema) {
+    try {
+        await grist.docApi.fetchTable(tableName);
+        console.log(`ℹ️ Table ${tableName} already exists`);
+        return { exists: true, created: false };
+    } catch (error) {
+        console.log(`📋 Creating table ${tableName}...`);
+        await grist.docApi.applyUserActions([
+            ['AddTable', tableName, schema]
+        ]);
+        console.log(`✅ Table ${tableName} created`);
+        return { exists: true, created: true };
+    }
+}
+
 async function createGristTables() {
     if (!state.gristReady) {
         console.log('⚠️ createGristTables: Grist not ready');
@@ -499,54 +514,34 @@ async function createGristTables() {
     }
 
     try {
-        console.log('📋 Fetching existing tables list...');
-        const tables = await grist.docApi.listTables();
-        console.log('📋 Existing tables:', tables);
-
         // Create Config table if not exists
-        if (!tables.includes(CONFIG.tables.config)) {
-            console.log('📋 Creating Config table...');
-            await grist.docApi.applyUserActions([
-                ['AddTable', CONFIG.tables.config, [
-                    { id: 'TileName', type: 'Text' },
-                    { id: 'TileRef', type: 'Text' },
-                    { id: 'CopcUrl', type: 'Text' },
-                    { id: 'Bbox_MinX', type: 'Numeric' },
-                    { id: 'Bbox_MinY', type: 'Numeric' },
-                    { id: 'Bbox_MaxX', type: 'Numeric' },
-                    { id: 'Bbox_MaxY', type: 'Numeric' },
-                    { id: 'PointCount', type: 'Int' },
-                    { id: 'Source', type: 'Text' },
-                    { id: 'CreatedAt', type: 'DateTime' }
-                ]]
-            ]);
-            console.log('✅ Config table created');
-        } else {
-            console.log('ℹ️ Config table already exists');
-        }
+        await ensureTableExists(CONFIG.tables.config, [
+            { id: 'TileName', type: 'Text' },
+            { id: 'TileRef', type: 'Text' },
+            { id: 'CopcUrl', type: 'Text' },
+            { id: 'Bbox_MinX', type: 'Numeric' },
+            { id: 'Bbox_MinY', type: 'Numeric' },
+            { id: 'Bbox_MaxX', type: 'Numeric' },
+            { id: 'Bbox_MaxY', type: 'Numeric' },
+            { id: 'PointCount', type: 'Int' },
+            { id: 'Source', type: 'Text' },
+            { id: 'CreatedAt', type: 'DateTime' }
+        ]);
 
         // Create Objects table if not exists
-        if (!tables.includes(CONFIG.tables.objects)) {
-            console.log('📦 Creating Objects table...');
-            await grist.docApi.applyUserActions([
-                ['AddTable', CONFIG.tables.objects, [
-                    { id: 'Name', type: 'Text' },
-                    { id: 'Type', type: 'Text' },
-                    { id: 'Category', type: 'Choice' },
-                    { id: 'X', type: 'Numeric' },
-                    { id: 'Y', type: 'Numeric' },
-                    { id: 'Z', type: 'Numeric' },
-                    { id: 'Status', type: 'Choice' },
-                    { id: 'SourceBD', type: 'Text' },
-                    { id: 'OsmId', type: 'Text' },
-                    { id: 'Lon', type: 'Numeric' },
-                    { id: 'Lat', type: 'Numeric' }
-                ]]
-            ]);
-            console.log('✅ Objects table created');
-        } else {
-            console.log('ℹ️ Objects table already exists');
-        }
+        await ensureTableExists(CONFIG.tables.objects, [
+            { id: 'Name', type: 'Text' },
+            { id: 'Type', type: 'Text' },
+            { id: 'Category', type: 'Choice' },
+            { id: 'X', type: 'Numeric' },
+            { id: 'Y', type: 'Numeric' },
+            { id: 'Z', type: 'Numeric' },
+            { id: 'Status', type: 'Choice' },
+            { id: 'SourceBD', type: 'Text' },
+            { id: 'OsmId', type: 'Text' },
+            { id: 'Lon', type: 'Numeric' },
+            { id: 'Lat', type: 'Numeric' }
+        ]);
 
         console.log('✅ All Grist tables ready');
         return true;
@@ -561,14 +556,18 @@ async function saveConfigToGrist(config) {
     if (!state.gristReady) return;
 
     try {
-        const tables = await grist.docApi.listTables();
-        if (!tables.includes(CONFIG.tables.config)) return;
-
-        // Check if config exists
-        const existing = await grist.docApi.fetchTable(CONFIG.tables.config);
+        // Use fetchTable to check if table exists and get existing data
+        let existing;
+        try {
+            existing = await grist.docApi.fetchTable(CONFIG.tables.config);
+        } catch (e) {
+            console.log('ℹ️ Config table not found, skipping save');
+            return;
+        }
 
         if (existing.id && existing.id.length > 0) {
             // Update existing
+            console.log('📝 Updating existing config record...');
             await grist.docApi.applyUserActions([
                 ['UpdateRecord', CONFIG.tables.config, existing.id[0], {
                     TileName: config.tileName,
@@ -584,6 +583,7 @@ async function saveConfigToGrist(config) {
             ]);
         } else {
             // Create new
+            console.log('📝 Creating new config record...');
             await grist.docApi.applyUserActions([
                 ['AddRecord', CONFIG.tables.config, null, {
                     TileName: config.tileName,
@@ -595,7 +595,7 @@ async function saveConfigToGrist(config) {
                     Bbox_MaxY: config.bboxMaxY,
                     PointCount: config.pointCount,
                     Source: config.source,
-                    CreatedAt: new Date().toISOString()
+                    CreatedAt: Math.floor(Date.now() / 1000) // Grist DateTime = seconds
                 }]
             ]);
         }
@@ -981,9 +981,7 @@ async function loadObjectsFromGrist() {
     if (!state.gristReady) return;
 
     try {
-        const tables = await grist.docApi.listTables();
-        if (!tables.includes(CONFIG.tables.objects)) return;
-
+        // Use fetchTable directly - it will throw if table doesn't exist
         const data = await grist.docApi.fetchTable(CONFIG.tables.objects);
 
         if (!data.id || data.id.length === 0) {
@@ -1014,7 +1012,10 @@ async function loadObjectsFromGrist() {
         document.getElementById('infoObjects').textContent = state.objects.length;
 
     } catch (error) {
-        console.warn('⚠️ Error loading objects:', error);
+        // Table doesn't exist or other error - just log and continue
+        console.log('ℹ️ Objects table not available:', error.message);
+        state.objects = [];
+        updateObjectsList();
     }
 }
 
