@@ -78,7 +78,8 @@ const state = {
 
     // Grist
     gristReady: false,
-    gristConfig: null
+    gristConfig: null,
+    tablesReady: false
 };
 
 // ============================================================
@@ -463,6 +464,9 @@ async function initGrist() {
         state.gristReady = true;
         console.log('✅ Grist connected');
 
+        // Create tables immediately (non-blocking)
+        createGristTables().catch(e => console.warn('⚠️ Table creation:', e.message));
+
         // Listen for record selection
         grist.onRecord(handleGristRecord);
         grist.onRecords(handleGristRecords);
@@ -566,53 +570,77 @@ async function ensureTableExists(tableName, schema) {
     }
 }
 
+// Table schemas
+const TABLE_SCHEMAS = {
+    [CONFIG.tables.config]: [
+        { id: 'TileName', type: 'Text' },
+        { id: 'TileRef', type: 'Text' },
+        { id: 'CopcUrl', type: 'Text' },
+        { id: 'Bbox_MinX', type: 'Numeric' },
+        { id: 'Bbox_MinY', type: 'Numeric' },
+        { id: 'Bbox_MaxX', type: 'Numeric' },
+        { id: 'Bbox_MaxY', type: 'Numeric' },
+        { id: 'PointCount', type: 'Int' },
+        { id: 'Source', type: 'Text' },
+        { id: 'CreatedAt', type: 'DateTime' }
+    ],
+    [CONFIG.tables.objects]: [
+        { id: 'Name', type: 'Text' },
+        { id: 'Type', type: 'Text' },
+        { id: 'Category', type: 'Choice' },
+        { id: 'X', type: 'Numeric' },
+        { id: 'Y', type: 'Numeric' },
+        { id: 'Z', type: 'Numeric' },
+        { id: 'Status', type: 'Choice' },
+        { id: 'SourceBD', type: 'Text' },
+        { id: 'OsmId', type: 'Text' },
+        { id: 'Lon', type: 'Numeric' },
+        { id: 'Lat', type: 'Numeric' }
+    ]
+};
+
 async function createGristTables() {
+    // Skip if already done
+    if (state.tablesReady) {
+        console.log('✅ Tables already ready (cached)');
+        return true;
+    }
+
     if (!state.gristReady) {
         console.log('⚠️ createGristTables: Grist not ready');
         return false;
     }
 
+    const startTime = performance.now();
+    console.log('📊 Creating Grist tables (batch mode)...');
+
     try {
-        // Create Config table if not exists
-        const configResult = await ensureTableExists(CONFIG.tables.config, [
-            { id: 'TileName', type: 'Text' },
-            { id: 'TileRef', type: 'Text' },
-            { id: 'CopcUrl', type: 'Text' },
-            { id: 'Bbox_MinX', type: 'Numeric' },
-            { id: 'Bbox_MinY', type: 'Numeric' },
-            { id: 'Bbox_MaxX', type: 'Numeric' },
-            { id: 'Bbox_MaxY', type: 'Numeric' },
-            { id: 'PointCount', type: 'Int' },
-            { id: 'Source', type: 'Text' },
-            { id: 'CreatedAt', type: 'DateTime' }
-        ]);
-        console.log('📋 Config table result:', configResult);
+        // Build batch actions for all tables
+        const actions = Object.entries(TABLE_SCHEMAS).map(([tableName, schema]) =>
+            ['AddTable', tableName, schema]
+        );
 
-        // Small delay to let Grist process the table creation
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Single batch call to create all tables
+        await grist.docApi.applyUserActions(actions);
 
-        // Create Objects table if not exists
-        const objectsResult = await ensureTableExists(CONFIG.tables.objects, [
-            { id: 'Name', type: 'Text' },
-            { id: 'Type', type: 'Text' },
-            { id: 'Category', type: 'Choice' },
-            { id: 'X', type: 'Numeric' },
-            { id: 'Y', type: 'Numeric' },
-            { id: 'Z', type: 'Numeric' },
-            { id: 'Status', type: 'Choice' },
-            { id: 'SourceBD', type: 'Text' },
-            { id: 'OsmId', type: 'Text' },
-            { id: 'Lon', type: 'Numeric' },
-            { id: 'Lat', type: 'Numeric' }
-        ]);
-        console.log('📋 Objects table result:', objectsResult);
-
-        console.log('✅ All Grist tables ready');
+        state.tablesReady = true;
+        const elapsed = Math.round(performance.now() - startTime);
+        console.log(`✅ All tables created in ${elapsed}ms`);
         return true;
 
     } catch (error) {
-        console.error('❌ Error creating tables:', error);
-        throw error; // Re-throw to be caught by caller
+        const errorMsg = error?.message || String(error);
+
+        // If tables already exist, that's fine
+        if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
+            state.tablesReady = true;
+            const elapsed = Math.round(performance.now() - startTime);
+            console.log(`ℹ️ Tables already exist (${elapsed}ms)`);
+            return true;
+        }
+
+        console.error('❌ Error creating tables:', errorMsg);
+        throw error;
     }
 }
 
