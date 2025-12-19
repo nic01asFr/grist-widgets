@@ -15,7 +15,7 @@ import { Vector3, Box3 } from 'three';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
-setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6');
+setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 
 // ============================================================
 // CONFIGURATION
@@ -509,11 +509,28 @@ async function withTimeout(promise, ms, fallback) {
     }
 }
 
-// Try to create table, ignore error if already exists
+// Check if table exists, create if not
 async function ensureTableExists(tableName, schema) {
     console.log(`🔍 Checking table ${tableName}...`);
+
+    // First, check if table already exists by trying to fetch it
     try {
-        // Try to create the table directly with timeout
+        const data = await withTimeout(
+            grist.docApi.fetchTable(tableName),
+            5000,
+            null
+        );
+        if (data !== null) {
+            console.log(`ℹ️ Table ${tableName} already exists`);
+            return { created: false, exists: true };
+        }
+    } catch (fetchError) {
+        // Table doesn't exist, we'll create it
+        console.log(`📋 Table ${tableName} not found, creating...`);
+    }
+
+    // Create the table
+    try {
         const result = await withTimeout(
             grist.docApi.applyUserActions([
                 ['AddTable', tableName, schema]
@@ -530,11 +547,11 @@ async function ensureTableExists(tableName, schema) {
         console.log(`✅ Table ${tableName} created`);
         return { created: true };
     } catch (error) {
-        // Table probably already exists
+        // Table probably already exists (race condition)
         const errorMsg = error?.message || String(error);
         if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
-            console.log(`ℹ️ Table ${tableName} already exists`);
-            return { created: false };
+            console.log(`ℹ️ Table ${tableName} already exists (race condition)`);
+            return { created: false, exists: true };
         }
         // Unknown error - log and continue
         console.warn(`⚠️ Table ${tableName} error:`, errorMsg);
