@@ -21,27 +21,20 @@ import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
 setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 
 // ============================================================
-// FETCH THROTTLER & CACHE (avoid 429 rate limiting)
+// FETCH THROTTLER (avoid 429 rate limiting)
 // ============================================================
+// Save original fetch FIRST, before any override
+const originalFetch = window.fetch.bind(window);
+
 const FetchThrottler = {
     maxConcurrent: 4,        // Max simultaneous requests
     delayBetween: 100,       // ms between requests
     queue: [],
     active: 0,
-    cache: new Map(),
-    cacheMaxSize: 100,       // Max cached responses
 
     async fetch(url, options = {}) {
-        // Check cache first for GET requests
-        const cacheKey = `${url}_${options.headers?.Range || 'full'}`;
-        if (this.cache.has(cacheKey)) {
-            console.log('📦 Cache hit:', url.slice(-50));
-            return this.cache.get(cacheKey).clone();
-        }
-
-        // Queue the request
         return new Promise((resolve, reject) => {
-            this.queue.push({ url, options, resolve, reject, cacheKey });
+            this.queue.push({ url, options, resolve, reject });
             this.processQueue();
         });
     },
@@ -50,7 +43,7 @@ const FetchThrottler = {
         if (this.active >= this.maxConcurrent || this.queue.length === 0) return;
 
         this.active++;
-        const { url, options, resolve, reject, cacheKey } = this.queue.shift();
+        const { url, options, resolve, reject } = this.queue.shift();
 
         try {
             // Add delay to avoid burst
@@ -58,21 +51,8 @@ const FetchThrottler = {
                 await new Promise(r => setTimeout(r, this.delayBetween));
             }
 
-            const response = await fetch(url, options);
-
-            // Cache successful responses
-            if (response.ok && response.status !== 429) {
-                // Clone for cache (response can only be read once)
-                const cloned = response.clone();
-                this.cache.set(cacheKey, cloned);
-
-                // Limit cache size
-                if (this.cache.size > this.cacheMaxSize) {
-                    const firstKey = this.cache.keys().next().value;
-                    this.cache.delete(firstKey);
-                }
-            }
-
+            // Use ORIGINAL fetch, not the overridden one!
+            const response = await originalFetch(url, options);
             resolve(response);
         } catch (error) {
             reject(error);
@@ -85,14 +65,22 @@ const FetchThrottler = {
 };
 
 // Override global fetch for IGN domains
-const originalFetch = window.fetch;
 window.fetch = function(url, options) {
-    const urlStr = typeof url === 'string' ? url : url.toString();
+    // Properly extract URL string
+    let urlStr;
+    if (typeof url === 'string') {
+        urlStr = url;
+    } else if (url instanceof Request) {
+        urlStr = url.url;
+    } else {
+        urlStr = String(url);
+    }
+
     // Throttle only IGN LiDAR requests
     if (urlStr.includes('data.geopf.fr') && urlStr.includes('.copc.laz')) {
         return FetchThrottler.fetch(urlStr, options);
     }
-    return originalFetch.call(this, url, options);
+    return originalFetch(url, options);
 };
 
 // ============================================================
