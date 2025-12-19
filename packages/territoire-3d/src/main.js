@@ -10,6 +10,7 @@ import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
+import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
 
@@ -410,14 +411,34 @@ function setDisplayMode(mode) {
             case 'elevation':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Z');
-                pc.colorMap = 'viridis';
-                console.log('🎨 Display mode: elevation');
+                // Create ColorMap with proper min/max bounds from bounding box
+                const elevBbox = pc.getBoundingBox();
+                if (elevBbox && !elevBbox.isEmpty()) {
+                    const elevColorMap = new ColorMap({
+                        colors: ColorMap.VIRIDIS,
+                        min: elevBbox.min.z,
+                        max: elevBbox.max.z
+                    });
+                    pc.setAttributeColorMap('Z', elevColorMap);
+                    console.log('🎨 Display mode: elevation', {
+                        zMin: elevBbox.min.z.toFixed(1),
+                        zMax: elevBbox.max.z.toFixed(1)
+                    });
+                } else {
+                    console.warn('⚠️ Cannot get elevation bounds');
+                }
                 break;
 
             case 'intensity':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Intensity');
-                pc.colorMap = 'greys';
+                // Create ColorMap for intensity (typically 0-65535 for 16-bit)
+                const intensityColorMap = new ColorMap({
+                    colors: ColorMap.GREYS,
+                    min: 0,
+                    max: 65535
+                });
+                pc.setAttributeColorMap('Intensity', intensityColorMap);
                 console.log('🎨 Display mode: intensity');
                 break;
         }
