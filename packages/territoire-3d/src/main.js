@@ -184,10 +184,12 @@ async function loadPointCloud(url, name = 'Dalle') {
         // Initialize source to get metadata
         await source.initialize();
 
+        const pointCount = source.metadata?.pointCount || source.pointCount || 0;
         console.log('📊 COPC metadata:', {
-            pointCount: source.metadata.pointCount,
+            pointCount,
             crs: source.crs,
-            bounds: source.bounds
+            bounds: source.bounds,
+            metadata: source.metadata
         });
 
         showLoading('Création du nuage de points...', 30);
@@ -212,7 +214,7 @@ async function loadPointCloud(url, name = 'Dalle') {
         state.copcUrl = url;
         state.tileName = name;
         document.getElementById('tileName').textContent = name;
-        document.getElementById('infoPoints').textContent = formatNumber(source.metadata.pointCount);
+        document.getElementById('infoPoints').textContent = formatNumber(pointCount);
 
         // Populate classification toggles
         populateClassificationToggles();
@@ -221,8 +223,8 @@ async function loadPointCloud(url, name = 'Dalle') {
         setDisplayMode('classification');
 
         hideLoading();
-        setStatus('ready', `${formatNumber(source.metadata.pointCount)} pts`);
-        showToast(`Nuage chargé: ${formatNumber(source.metadata.pointCount)} points`, 'success');
+        setStatus('ready', `${formatNumber(pointCount)} pts`);
+        showToast(`Nuage chargé: ${formatNumber(pointCount)} points`, 'success');
 
         console.log('✅ Point cloud loaded successfully');
 
