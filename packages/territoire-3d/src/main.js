@@ -182,14 +182,30 @@ async function loadPointCloud(url, name = 'Dalle') {
         showLoading('Initialisation du nuage de points...', 10);
 
         // Initialize source to get metadata
+        console.log('🔄 Initializing COPC source...');
         await source.initialize();
+        console.log('✅ COPC source initialized');
 
-        const pointCount = source.metadata?.pointCount || source.pointCount || 0;
+        // Debug: Log entire source object to see what's available
+        console.log('🔍 Source object keys:', Object.keys(source));
+        console.log('🔍 Source.metadata:', source.metadata);
+
+        // Safely get point count - try multiple possible locations
+        let pointCount = 0;
+        if (source.metadata && typeof source.metadata.pointCount === 'number') {
+            pointCount = source.metadata.pointCount;
+        } else if (typeof source.pointCount === 'number') {
+            pointCount = source.pointCount;
+        } else if (source.header && typeof source.header.pointCount === 'number') {
+            pointCount = source.header.pointCount;
+        }
+
         console.log('📊 COPC metadata:', {
             pointCount,
             crs: source.crs,
             bounds: source.bounds,
-            metadata: source.metadata
+            metadata: source.metadata,
+            header: source.header
         });
 
         showLoading('Création du nuage de points...', 30);
@@ -1437,7 +1453,7 @@ async function runFullSetup() {
             bboxMinY: actualBbox?.minY,
             bboxMaxX: actualBbox?.maxX,
             bboxMaxY: actualBbox?.maxY,
-            pointCount: state.pointCloud?.source?.metadata?.pointCount || 0,
+            pointCount: state.pointCloud?.source?.metadata?.pointCount || state.pointCloud?.source?.pointCount || state.pointCloud?.source?.header?.pointCount || 0,
             source
         };
 
