@@ -13,6 +13,9 @@ import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
 
+// OpenLayers for WMS/WMTS sources (static import)
+import TileWMS from 'ol/source/TileWMS.js';
+
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
 setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
@@ -342,37 +345,35 @@ function setDisplayMode(mode) {
 async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
-    showToast('Chargement de l\'orthophoto...', 'info');
+    showToast('Chargement de l\'orthophoto IGN...', 'info');
 
     try {
-        // Dynamic import for OpenLayers
-        const { default: TileWMS } = await import('ol/source/TileWMS.js');
-
-        // Register Lambert 93 with proj4 (proj4 is loaded globally)
-        if (typeof proj4 !== 'undefined' && !proj4.defs(CONFIG.crs)) {
-            proj4.defs(CONFIG.crs, CONFIG.proj4def);
-        }
-
-        // Use WGS84 projection for WMS (IGN WMS supports it natively)
-        const orthoSource = new TiledImageSource({
-            source: new TileWMS({
-                url: CONFIG.orthoWms,
-                projection: 'EPSG:3857', // Web Mercator - widely supported
-                params: {
-                    LAYERS: CONFIG.orthoLayer,
-                    FORMAT: 'image/jpeg',
-                    CRS: 'EPSG:3857'
-                }
-            })
-        });
-
-        // Get extent from point cloud
+        // Get extent from point cloud in Lambert 93
         const bbox = state.pointCloud.getBoundingBox();
         const extent = new Extent(
             CONFIG.crs,
             bbox.min.x, bbox.max.x,
             bbox.min.y, bbox.max.y
         );
+
+        console.log('📷 Loading ortho for extent:', extent);
+
+        // IGN Geoplateforme WMS-R service in Lambert 93
+        // HR.ORTHOIMAGERY.ORTHOPHOTOS = ortho 20cm, ORTHOIMAGERY.ORTHOPHOTOS.BDORTHO = standard
+        const orthoSource = new TiledImageSource({
+            source: new TileWMS({
+                url: 'https://data.geopf.fr/wms-r',
+                projection: CONFIG.crs,
+                params: {
+                    LAYERS: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+                    FORMAT: 'image/jpeg',
+                    CRS: CONFIG.crs,
+                    VERSION: '1.3.0'
+                },
+                crossOrigin: 'anonymous'
+            }),
+            crs: CONFIG.crs
+        });
 
         state.colorLayer = new ColorLayer({
             name: 'ortho_ign',
@@ -384,7 +385,8 @@ async function loadOrthoColorization() {
         state.pointCloud.setColoringMode('layer');
         state.instance.notifyChange();
 
-        showToast('Orthophoto appliquée', 'success');
+        console.log('✅ Orthophoto layer applied');
+        showToast('Orthophoto IGN appliquée', 'success');
 
     } catch (error) {
         console.error('❌ Error loading orthophoto:', error);
