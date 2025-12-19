@@ -493,10 +493,15 @@ async function loadConfigFromGrist() {
 // AUTO-CONFIGURATION
 // ============================================================
 async function createGristTables() {
-    if (!state.gristReady) return false;
+    if (!state.gristReady) {
+        console.log('⚠️ createGristTables: Grist not ready');
+        return false;
+    }
 
     try {
+        console.log('📋 Fetching existing tables list...');
         const tables = await grist.docApi.listTables();
+        console.log('📋 Existing tables:', tables);
 
         // Create Config table if not exists
         if (!tables.includes(CONFIG.tables.config)) {
@@ -515,6 +520,9 @@ async function createGristTables() {
                     { id: 'CreatedAt', type: 'DateTime' }
                 ]]
             ]);
+            console.log('✅ Config table created');
+        } else {
+            console.log('ℹ️ Config table already exists');
         }
 
         // Create Objects table if not exists
@@ -535,14 +543,17 @@ async function createGristTables() {
                     { id: 'Lat', type: 'Numeric' }
                 ]]
             ]);
+            console.log('✅ Objects table created');
+        } else {
+            console.log('ℹ️ Objects table already exists');
         }
 
-        console.log('✅ Grist tables ready');
+        console.log('✅ All Grist tables ready');
         return true;
 
     } catch (error) {
         console.error('❌ Error creating tables:', error);
-        return false;
+        throw error; // Re-throw to be caught by caller
     }
 }
 
@@ -1246,10 +1257,18 @@ function setupEventListeners() {
 // FULL AUTO-SETUP WORKFLOW
 // ============================================================
 async function runFullSetup() {
+    console.log('🚀 Starting full setup...');
+
     const statusEl = document.getElementById('setupStatus');
     const statusTables = document.getElementById('statusTables');
     const statusCopc = document.getElementById('statusCopc');
     const statusImport = document.getElementById('statusImport');
+
+    // Reset all status icons to waiting state
+    [statusTables, statusCopc, statusImport].forEach(el => {
+        el.classList.remove('active', 'done', 'error');
+        el.querySelector('.status-icon').textContent = '○';
+    });
 
     // Get form values
     const activeTab = document.querySelector('.setup-tab.active')?.dataset.tab;
@@ -1283,6 +1302,8 @@ async function runFullSetup() {
     const autoTables = document.getElementById('setupAutoTables').checked;
     const autoImport = document.getElementById('setupAutoImport').checked;
 
+    console.log('📋 Setup config:', { copcUrl, tileRef, tileName, source, autoTables, autoImport, gristReady: state.gristReady });
+
     // Validate
     if (!copcUrl) {
         if (activeTab === 'url') {
@@ -1300,30 +1321,37 @@ async function runFullSetup() {
     const bbox = tileRef ? getTileBbox(tileRef) : null;
 
     // Step 1: Create Grist tables if requested
+    console.log('📊 Step 1: Tables creation - autoTables:', autoTables, 'gristReady:', state.gristReady);
     if (autoTables && state.gristReady) {
         statusTables.classList.add('active');
         statusTables.querySelector('.status-icon').textContent = '⏳';
+        console.log('📊 Creating Grist tables...');
         try {
             await createGristTables();
+            console.log('✅ Tables created successfully');
             statusTables.classList.remove('active');
             statusTables.classList.add('done');
             statusTables.querySelector('.status-icon').textContent = '✅';
         } catch (err) {
+            console.error('❌ Tables creation error:', err);
             statusTables.classList.add('error');
             statusTables.querySelector('.status-icon').textContent = '❌';
         }
     } else {
+        console.log('⏭️ Skipping tables creation (autoTables:', autoTables, ', gristReady:', state.gristReady, ')');
         statusTables.querySelector('.status-icon').textContent = '⏭️';
-        statusTables.querySelector('span:last-child').textContent = 'Tables (ignoré)';
+        statusTables.querySelector('span:last-child').textContent = autoTables ? 'Tables (Grist non connecté)' : 'Tables (ignoré)';
     }
 
     // Step 2: Load point cloud
+    console.log('☁️ Step 2: Loading point cloud from:', copcUrl);
     statusCopc.classList.add('active');
     statusCopc.querySelector('.status-icon').textContent = '⏳';
 
     try {
         document.getElementById('setupOverlay').classList.add('hidden');
         await loadPointCloud(copcUrl, tileName);
+        console.log('✅ Point cloud loaded successfully');
 
         // Get actual bbox from loaded point cloud
         let actualBbox = bbox;
@@ -1336,6 +1364,7 @@ async function runFullSetup() {
                     maxX: pcBbox.max.x,
                     maxY: pcBbox.max.y
                 };
+                console.log('📦 Actual bbox from point cloud:', actualBbox);
             }
         }
 
@@ -1355,7 +1384,9 @@ async function runFullSetup() {
         state.gristConfig = config;
 
         if (state.gristReady) {
+            console.log('💾 Saving config to Grist...');
             await saveConfigToGrist(config);
+            console.log('✅ Config saved to Grist');
         }
 
         statusCopc.classList.remove('active');
@@ -1363,28 +1394,35 @@ async function runFullSetup() {
         statusCopc.querySelector('.status-icon').textContent = '✅';
 
         // Step 3: Import from OSM if requested
+        console.log('🌍 Step 3: OSM import - autoImport:', autoImport, 'hasBbox:', !!actualBbox);
         if (autoImport && actualBbox) {
             statusImport.classList.add('active');
             statusImport.querySelector('.status-icon').textContent = '⏳';
+            console.log('🌍 Importing from OSM...');
 
             try {
                 await importFromOSM(actualBbox);
                 await loadObjectsFromGrist();
+                console.log('✅ OSM import completed');
                 statusImport.classList.remove('active');
                 statusImport.classList.add('done');
                 statusImport.querySelector('.status-icon').textContent = '✅';
             } catch (err) {
+                console.error('❌ OSM import error:', err);
                 statusImport.classList.add('error');
                 statusImport.querySelector('.status-icon').textContent = '❌';
             }
         } else {
+            console.log('⏭️ Skipping OSM import');
             statusImport.querySelector('.status-icon').textContent = '⏭️';
-            statusImport.querySelector('span:last-child').textContent = 'Import OSM (ignoré)';
+            statusImport.querySelector('span:last-child').textContent = autoImport ? 'Import OSM (pas de bbox)' : 'Import OSM (ignoré)';
         }
 
+        console.log('🎉 Full setup completed!');
         showToast('Configuration complète !', 'success');
 
     } catch (err) {
+        console.error('❌ Point cloud loading error:', err);
         statusCopc.classList.add('error');
         statusCopc.querySelector('.status-icon').textContent = '❌';
         document.getElementById('setupOverlay').classList.remove('hidden');
