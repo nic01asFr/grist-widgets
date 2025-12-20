@@ -8,11 +8,10 @@ import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js
 import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
-import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
-import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -145,6 +144,13 @@ async function initGiro3D() {
     // Register Lambert 93 (Giro3D 1.0.0 API)
     CoordinateSystem.register(CONFIG.crs, CONFIG.proj4def);
     console.log('✅ CRS registered:', CONFIG.crs);
+
+    // Register EPSG:3857 (Web Mercator) for orthophoto reprojection
+    CoordinateSystem.register(
+        'EPSG:3857',
+        '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs'
+    );
+    console.log('✅ CRS registered: EPSG:3857');
 
     // Create instance
     state.instance = new Instance({
@@ -387,40 +393,31 @@ function setDisplayMode(mode) {
 async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
-    showToast('Chargement de l\'orthophoto IGN...', 'info');
+    showToast('Chargement de l\'orthophoto IGN L93...', 'info');
 
     try {
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
         const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📷 Loading ortho for extent:', extent);
+        console.log('📷 Loading ortho L93 for extent:', extent);
 
-        // Use TiledImageSource with XYZ - exactly like the COPC example
-        // (COPC example uses this pattern, not WmtsSource)
-        // IGN WMTS KVP URL pattern for orthophoto
-        state.colorLayer = new ColorLayer({
-            extent,
-            resolutionFactor: 0.5,
-            source: new TiledImageSource({
-                source: new XYZ({
-                    url: 'https://data.geopf.fr/wmts?' +
-                        'layer=HR.ORTHOIMAGERY.ORTHOPHOTOS&' +
-                        'style=normal&' +
-                        'tilematrixset=PM&' +
-                        'Service=WMTS&' +
-                        'Request=GetTile&' +
-                        'Version=1.0.0&' +
-                        'Format=image/jpeg&' +
-                        'TileMatrix={z}&' +
-                        'TileCol={x}&' +
-                        'TileRow={y}',
-                    projection: 'EPSG:3857',
-                    crossOrigin: 'anonymous',
-                }),
-            }),
+        // Use WmtsSource with L93 layer (native EPSG:2154 - no reprojection needed!)
+        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+
+        console.log('📥 Fetching WMTS capabilities for L93 layer...');
+
+        const orthoSource = await WmtsSource.fromCapabilities(wmtsUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS.L93',
         });
 
-        console.log('✅ ColorLayer created with TiledImageSource');
+        console.log('✅ WMTS L93 source created');
+
+        // Create ColorLayer with the native L93 source
+        state.colorLayer = new ColorLayer({
+            name: 'ortho_ign_l93',
+            extent: extent,
+            source: orthoSource,
+        });
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
@@ -429,8 +426,8 @@ async function loadOrthoColorization() {
         // Notify change
         state.instance.notifyChange(state.instance.view.camera);
 
-        console.log('✅ Orthophoto layer applied');
-        showToast('Orthophoto IGN appliquée', 'success');
+        console.log('✅ Orthophoto L93 layer applied');
+        showToast('Orthophoto IGN L93 appliquée', 'success');
 
     } catch (error) {
         console.error('❌ Error loading orthophoto:', error);
