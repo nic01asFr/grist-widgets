@@ -393,13 +393,6 @@ async function loadOrthoColorization() {
         const bbox = state.pointCloud.getBoundingBox();
         console.log('📷 Loading ortho WMTS for bbox:', bbox);
 
-        // Create extent from bounding box in Lambert 93
-        const extent = new Extent(
-            CONFIG.crs,
-            bbox.min.x, bbox.max.x,
-            bbox.min.y, bbox.max.y
-        );
-
         // Use Giro3D native WmtsSource.fromCapabilities()
         // This handles projection and tile grid automatically
         const wmtsCapabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
@@ -412,10 +405,11 @@ async function loadOrthoColorization() {
 
         console.log('✅ WMTS source created:', orthoSource);
 
+        // Create ColorLayer without extent - let Giro3D handle reprojection
         state.colorLayer = new ColorLayer({
             name: 'ortho_ign_wmts',
-            source: orthoSource,
-            extent
+            source: orthoSource
+            // No extent specified - Giro3D will use the source extent
         });
 
         state.pointCloud.setColorLayer(state.colorLayer);
