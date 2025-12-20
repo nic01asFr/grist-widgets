@@ -8,10 +8,11 @@ import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js
 import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
-import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
+import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
+import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -391,34 +392,41 @@ async function loadOrthoColorization() {
     try {
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
-        console.log('📷 Loading ortho for bbox:', bbox);
+        const extent = Extent.fromBox3(CONFIG.crs, bbox);
+        console.log('📷 Loading ortho for extent:', extent);
 
-        // Use exact same approach as official Giro3D lidar_hd example:
-        // WmtsSource.fromCapabilities() + ColorLayer with extent
-        const url = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
-
-        console.log('📥 Fetching WMTS capabilities...');
-
-        const orthophotoWmts = await WmtsSource.fromCapabilities(url, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-        });
-
-        console.log('✅ WMTS source created');
-
-        // Create ColorLayer with resolutionFactor (from COPC example)
+        // Use TiledImageSource with XYZ - exactly like the COPC example
+        // (COPC example uses this pattern, not WmtsSource)
+        // IGN WMTS KVP URL pattern for orthophoto
         state.colorLayer = new ColorLayer({
-            name: 'color',
-            extent: Extent.fromBox3(CONFIG.crs, bbox),
-            source: orthophotoWmts,
-            resolutionFactor: 0.5,  // Important for PointCloud colorization
+            extent,
+            resolutionFactor: 0.5,
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: 'https://data.geopf.fr/wmts?' +
+                        'layer=HR.ORTHOIMAGERY.ORTHOPHOTOS&' +
+                        'style=normal&' +
+                        'tilematrixset=PM&' +
+                        'Service=WMTS&' +
+                        'Request=GetTile&' +
+                        'Version=1.0.0&' +
+                        'Format=image/jpeg&' +
+                        'TileMatrix={z}&' +
+                        'TileCol={x}&' +
+                        'TileRow={y}',
+                    projection: 'EPSG:3857',
+                    crossOrigin: 'anonymous',
+                }),
+            }),
         });
+
+        console.log('✅ ColorLayer created with TiledImageSource');
 
         // Apply to point cloud
-        // Note: For PointCloud (vs Tiles3D), we need setColoringMode('layer')
         state.pointCloud.setColorLayer(state.colorLayer);
         state.pointCloud.setColoringMode('layer');
 
-        // Notify change like in the example
+        // Notify change
         state.instance.notifyChange(state.instance.view.camera);
 
         console.log('✅ Orthophoto layer applied');
