@@ -146,6 +146,13 @@ async function initGiro3D() {
     CoordinateSystem.register(CONFIG.crs, CONFIG.proj4def);
     console.log('✅ CRS registered:', CONFIG.crs);
 
+    // Register EPSG:3857 (Web Mercator) for orthophoto reprojection
+    CoordinateSystem.register(
+        'EPSG:3857',
+        '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs'
+    );
+    console.log('✅ CRS registered: EPSG:3857');
+
     // Create instance
     state.instance = new Instance({
         target: 'view',
