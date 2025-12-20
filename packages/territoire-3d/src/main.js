@@ -8,21 +8,10 @@ import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js
 import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
-import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
-
-// OpenLayers for WMTS source
-import WMTS from 'ol/source/WMTS.js';
-import WMTSTileGrid from 'ol/tilegrid/WMTS.js';
-import { get as getProjection } from 'ol/proj.js';
-import { register } from 'ol/proj/proj4.js';
-import proj4 from 'proj4';
-
-// Register Web Mercator projection for OpenLayers
-proj4.defs('EPSG:3857', '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs');
-register(proj4);
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -411,37 +400,17 @@ async function loadOrthoColorization() {
             bbox.min.y, bbox.max.y
         );
 
-        // IGN WMTS tile grid for PM (Web Mercator) matrix set
-        const resolutions = [];
-        const matrixIds = [];
-        const maxZoom = 19;
+        // Use Giro3D native WmtsSource.fromCapabilities()
+        // This handles projection and tile grid automatically
+        const wmtsCapabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
 
-        for (let z = 0; z <= maxZoom; z++) {
-            resolutions[z] = 156543.03392804097 / Math.pow(2, z);
-            matrixIds[z] = z.toString();
-        }
-
-        // OpenLayers WMTS source with explicit projection
-        const wmtsSource = new WMTS({
-            url: 'https://data.geopf.fr/wmts',
+        console.log('📥 Fetching WMTS capabilities...');
+        const orthoSource = await WmtsSource.fromCapabilities(wmtsCapabilitiesUrl, {
             layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-            matrixSet: 'PM',
-            format: 'image/jpeg',
-            projection: 'EPSG:3857', // Web Mercator
-            tileGrid: new WMTSTileGrid({
-                origin: [-20037508.342789244, 20037508.342789244],
-                resolutions: resolutions,
-                matrixIds: matrixIds,
-                tileSize: 256
-            }),
-            style: 'normal',
-            crossOrigin: 'anonymous'
+            matrixSet: 'PM'
         });
 
-        // TiledImageSource - don't specify CRS, let Giro3D figure it out
-        const orthoSource = new TiledImageSource({
-            source: wmtsSource
-        });
+        console.log('✅ WMTS source created:', orthoSource);
 
         state.colorLayer = new ColorLayer({
             name: 'ortho_ign_wmts',
