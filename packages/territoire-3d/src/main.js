@@ -398,7 +398,7 @@ async function loadOrthoColorization() {
         const bbox = state.pointCloud.getBoundingBox();
         console.log('📷 Loading ortho WMTS for bbox:', bbox);
 
-        // Create extent from bounding box
+        // Create extent from bounding box in Lambert 93
         const extent = new Extent(
             CONFIG.crs,
             bbox.min.x, bbox.max.x,
@@ -406,39 +406,34 @@ async function loadOrthoColorization() {
         );
 
         // IGN WMTS tile grid for PM (Web Mercator) matrix set
-        // Using PM because it's the most common and well-supported
         const resolutions = [];
         const matrixIds = [];
         const maxZoom = 19;
-        const size = 256;
 
         for (let z = 0; z <= maxZoom; z++) {
             resolutions[z] = 156543.03392804097 / Math.pow(2, z);
             matrixIds[z] = z.toString();
         }
 
-        // OpenLayers WMTS source - using Web Mercator projection
+        // OpenLayers WMTS source
         const wmtsSource = new WMTS({
             url: 'https://data.geopf.fr/wmts',
             layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
             matrixSet: 'PM',
             format: 'image/jpeg',
-            projection: 'EPSG:3857',
             tileGrid: new WMTSTileGrid({
                 origin: [-20037508.342789244, 20037508.342789244],
                 resolutions: resolutions,
                 matrixIds: matrixIds,
-                tileSize: size
+                tileSize: 256
             }),
             style: 'normal',
             crossOrigin: 'anonymous'
         });
 
-        // TiledImageSource wraps the OpenLayers source for Giro3D
-        // Giro3D will handle the reprojection from EPSG:3857 to EPSG:2154
+        // TiledImageSource - don't specify CRS, let Giro3D figure it out
         const orthoSource = new TiledImageSource({
-            source: wmtsSource,
-            crs: 'EPSG:3857'
+            source: wmtsSource
         });
 
         state.colorLayer = new ColorLayer({
