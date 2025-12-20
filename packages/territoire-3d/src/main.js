@@ -9,12 +9,10 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
-
-// OpenLayers for WMS/WMTS sources (static import)
-import TileWMS from 'ol/source/TileWMS.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -389,39 +387,30 @@ function setDisplayMode(mode) {
 async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
-    showToast('Chargement de l\'orthophoto IGN...', 'info');
+    showToast('Chargement de l\'orthophoto IGN (WMTS)...', 'info');
 
     try {
-        // Get extent from point cloud in Lambert 93
+        // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
-        const extent = new Extent(
-            CONFIG.crs,
-            bbox.min.x, bbox.max.x,
-            bbox.min.y, bbox.max.y
-        );
 
-        console.log('📷 Loading ortho for extent:', extent);
+        console.log('📷 Loading ortho WMTS for bbox:', bbox);
 
-        // IGN Geoplateforme WMS-R service in Lambert 93
-        // HR.ORTHOIMAGERY.ORTHOPHOTOS = ortho 20cm, ORTHOIMAGERY.ORTHOPHOTOS.BDORTHO = standard
-        const orthoSource = new TiledImageSource({
-            source: new TileWMS({
-                url: 'https://data.geopf.fr/wms-r',
-                projection: CONFIG.crs,
-                params: {
-                    LAYERS: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-                    FORMAT: 'image/jpeg',
-                    CRS: CONFIG.crs,
-                    VERSION: '1.3.0'
-                },
-                crossOrigin: 'anonymous'
-            }),
-            crs: CONFIG.crs
+        // Use WMTS instead of WMS - pre-cached tiles, much faster, no rate limiting
+        // IGN Géoplateforme WMTS GetCapabilities endpoint
+        const wmtsCapabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+
+        const orthophotoWmts = await WmtsSource.fromCapabilities(wmtsCapabilitiesUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
         });
 
+        console.log('✅ WMTS source loaded:', orthophotoWmts);
+
+        // Create extent from bounding box
+        const extent = Extent.fromBox3(CONFIG.crs, bbox);
+
         state.colorLayer = new ColorLayer({
-            name: 'ortho_ign',
-            source: orthoSource,
+            name: 'ortho_ign_wmts',
+            source: orthophotoWmts,
             extent
         });
 
@@ -429,8 +418,8 @@ async function loadOrthoColorization() {
         state.pointCloud.setColoringMode('layer');
         state.instance.notifyChange();
 
-        console.log('✅ Orthophoto layer applied');
-        showToast('Orthophoto IGN appliquée', 'success');
+        console.log('✅ Orthophoto WMTS layer applied');
+        showToast('Orthophoto IGN appliquée (WMTS)', 'success');
 
     } catch (error) {
         console.error('❌ Error loading orthophoto:', error);
