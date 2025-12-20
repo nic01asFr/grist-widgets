@@ -21,85 +21,10 @@ import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
 setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 
 // ============================================================
-// FETCH THROTTLER (avoid 429 rate limiting)
-// CRITICAL: Capture original fetch FIRST, before any override
+// NOTE: Fetch throttler DISABLED - it corrupts COPC Range requests
+// The 429 errors from IGN are acceptable, data loads correctly
+// Future: implement IndexedDB cache at chunk level instead
 // ============================================================
-const originalFetch = window.fetch.bind(window);
-
-// Simple throttler without cache (cache corrupts COPC binary data)
-const FetchThrottler = {
-    maxConcurrent: 2,        // Conservative to avoid 429
-    delayBetween: 200,       // ms between requests
-    queue: [],
-    active: 0,
-    retryDelay: 2000,        // Wait on 429 before retry
-
-    async fetch(url, options = {}) {
-        return new Promise((resolve, reject) => {
-            this.queue.push({ url, options, resolve, reject, retries: 0 });
-            this.processQueue();
-        });
-    },
-
-    async processQueue() {
-        if (this.active >= this.maxConcurrent || this.queue.length === 0) return;
-
-        this.active++;
-        const request = this.queue.shift();
-        const { url, options, resolve, reject, retries } = request;
-
-        try {
-            // Add delay between requests to avoid burst
-            await new Promise(r => setTimeout(r, this.delayBetween));
-
-            // CRITICAL: Use originalFetch, NOT the overridden fetch!
-            const response = await originalFetch(url, options);
-
-            // Handle 429 with exponential backoff
-            if (response.status === 429 && retries < 3) {
-                console.warn(`⏳ 429 rate limited, retry ${retries + 1}/3 in ${this.retryDelay}ms`);
-                request.retries = retries + 1;
-                // Re-queue with delay
-                setTimeout(() => {
-                    this.queue.unshift(request);
-                    this.processQueue();
-                }, this.retryDelay * (retries + 1));
-                return;
-            }
-
-            resolve(response);
-        } catch (error) {
-            reject(error);
-        } finally {
-            this.active--;
-            // Process next in queue
-            setTimeout(() => this.processQueue(), this.delayBetween);
-        }
-    }
-};
-
-// Override global fetch for IGN COPC domains only
-window.fetch = function(url, options) {
-    // Properly extract URL string (handle Request objects)
-    let urlStr;
-    if (typeof url === 'string') {
-        urlStr = url;
-    } else if (url instanceof Request) {
-        urlStr = url.url;
-    } else if (url && typeof url.toString === 'function') {
-        urlStr = url.toString();
-    } else {
-        urlStr = String(url);
-    }
-
-    // Throttle only IGN LiDAR COPC requests (not WMS, not other services)
-    if (urlStr.includes('data.geopf.fr') && urlStr.includes('.copc.laz')) {
-        return FetchThrottler.fetch(urlStr, options);
-    }
-
-    // All other requests go through normally
-    return originalFetch(url, options);
-};
 
 // ============================================================
 // CONFIGURATION
