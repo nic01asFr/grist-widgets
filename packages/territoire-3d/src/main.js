@@ -394,45 +394,31 @@ async function loadOrthoColorization() {
         console.log('📷 Loading ortho WMTS for bbox:', bbox);
 
         // Use Giro3D native WmtsSource.fromCapabilities()
-        // Try LAMB93 matrixSet to match point cloud CRS (EPSG:2154)
+        // Don't specify matrixSet - let library auto-detect (as per official examples)
         const wmtsCapabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
 
         console.log('📥 Fetching WMTS capabilities...');
 
-        let orthoSource;
-        try {
-            // Try LAMB93 first (same CRS as point cloud)
-            orthoSource = await WmtsSource.fromCapabilities(wmtsCapabilitiesUrl, {
-                layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-                matrixSet: 'LAMB93'
-            });
-            console.log('✅ WMTS source created with LAMB93 matrixSet');
-        } catch (e) {
-            console.warn('⚠️ LAMB93 matrixSet not available, trying PM:', e.message);
-            // Fallback to PM (Web Mercator)
-            orthoSource = await WmtsSource.fromCapabilities(wmtsCapabilitiesUrl, {
-                layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-                matrixSet: 'PM'
-            });
-            console.log('✅ WMTS source created with PM matrixSet');
-        }
+        const orthoSource = await WmtsSource.fromCapabilities(wmtsCapabilitiesUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS'
+        });
+        console.log('✅ WMTS source created');
 
         // Create ColorLayer with extent from point cloud bbox
+        // (matching official Giro3D colorized_pointcloud example)
         const extent = Extent.fromBox3(CONFIG.crs, bbox);
         console.log('📐 ColorLayer extent:', extent);
 
         state.colorLayer = new ColorLayer({
-            name: 'ortho_ign_wmts',
-            source: orthoSource,
-            extent: extent
+            name: 'ortho_ign',
+            extent: extent,
+            source: orthoSource
         });
 
-        // Apply to point cloud
+        // Apply to point cloud (matching official example pattern)
         state.pointCloud.setColorLayer(state.colorLayer);
         state.pointCloud.setColoringMode('layer');
 
-        // Force update
-        state.pointCloud.updateMatrixWorld(true);
         state.instance.notifyChange(state.pointCloud);
 
         console.log('✅ Orthophoto WMTS layer applied');
