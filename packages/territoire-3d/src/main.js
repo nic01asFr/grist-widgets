@@ -394,7 +394,6 @@ async function loadOrthoColorization() {
         console.log('📷 Loading ortho WMTS for bbox:', bbox);
 
         // Use Giro3D native WmtsSource.fromCapabilities()
-        // This handles projection and tile grid automatically
         const wmtsCapabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
 
         console.log('📥 Fetching WMTS capabilities...');
@@ -405,16 +404,23 @@ async function loadOrthoColorization() {
 
         console.log('✅ WMTS source created:', orthoSource);
 
-        // Create ColorLayer without extent - let Giro3D handle reprojection
+        // Create ColorLayer with extent from point cloud bbox
+        const extent = Extent.fromBox3(CONFIG.crs, bbox);
+        console.log('📐 ColorLayer extent:', extent);
+
         state.colorLayer = new ColorLayer({
             name: 'ortho_ign_wmts',
-            source: orthoSource
-            // No extent specified - Giro3D will use the source extent
+            source: orthoSource,
+            extent: extent
         });
 
+        // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
         state.pointCloud.setColoringMode('layer');
-        state.instance.notifyChange();
+
+        // Force update
+        state.pointCloud.updateMatrixWorld(true);
+        state.instance.notifyChange(state.pointCloud);
 
         console.log('✅ Orthophoto WMTS layer applied');
         showToast('Orthophoto IGN appliquée (WMTS)', 'success');
