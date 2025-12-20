@@ -521,6 +521,8 @@ async function loadConfigFromGrist() {
             const config = {
                 copcUrl: data.CopcUrl?.[0],
                 tileName: data.TileName?.[0] || data.Name?.[0],
+                tileRef: data.TileRef?.[0],
+                source: data.Source?.[0],
                 bboxMinX: data.Bbox_MinX?.[0],
                 bboxMinY: data.Bbox_MinY?.[0],
                 bboxMaxX: data.Bbox_MaxX?.[0],
@@ -530,6 +532,17 @@ async function loadConfigFromGrist() {
             if (config.copcUrl) {
                 console.log('📋 Config loaded from Grist:', config);
                 state.gristConfig = config;
+
+                // Pre-fill setup form (in case user wants to reconfigure)
+                if (config.tileRef) {
+                    document.getElementById('setupTileRef').value = config.tileRef;
+                }
+                if (config.tileName) {
+                    document.getElementById('setupTileName').value = config.tileName;
+                }
+                if (config.source) {
+                    document.getElementById('setupSource').value = config.source;
+                }
 
                 // Auto-load point cloud
                 document.getElementById('setupOverlay').classList.add('hidden');
@@ -640,30 +653,45 @@ async function createGristTables() {
     }
 
     const startTime = performance.now();
-    console.log('📊 Creating Grist tables (batch mode)...');
 
-    try {
-        // Build batch actions for all tables
-        const actions = Object.entries(TABLE_SCHEMAS).map(([tableName, schema]) =>
-            ['AddTable', tableName, schema]
-        );
+    // First, check which tables already exist by trying to fetch them
+    const tablesToCreate = [];
 
-        // Single batch call to create all tables
-        await grist.docApi.applyUserActions(actions);
+    for (const [tableName, schema] of Object.entries(TABLE_SCHEMAS)) {
+        try {
+            await grist.docApi.fetchTable(tableName);
+            console.log(`ℹ️ Table ${tableName} already exists`);
+        } catch (e) {
+            // Table doesn't exist, needs to be created
+            tablesToCreate.push(['AddTable', tableName, schema]);
+        }
+    }
 
+    // If all tables exist, we're done
+    if (tablesToCreate.length === 0) {
         state.tablesReady = true;
         const elapsed = Math.round(performance.now() - startTime);
-        console.log(`✅ All tables created in ${elapsed}ms`);
+        console.log(`✅ All tables already exist (${elapsed}ms)`);
+        return true;
+    }
+
+    // Create only missing tables
+    console.log(`📊 Creating ${tablesToCreate.length} missing table(s)...`);
+
+    try {
+        await grist.docApi.applyUserActions(tablesToCreate);
+        state.tablesReady = true;
+        const elapsed = Math.round(performance.now() - startTime);
+        console.log(`✅ Tables created in ${elapsed}ms`);
         return true;
 
     } catch (error) {
         const errorMsg = error?.message || String(error);
 
-        // If tables already exist, that's fine
+        // If tables already exist (race condition), that's fine
         if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
             state.tablesReady = true;
-            const elapsed = Math.round(performance.now() - startTime);
-            console.log(`ℹ️ Tables already exist (${elapsed}ms)`);
+            console.log(`ℹ️ Tables already exist (race condition handled)`);
             return true;
         }
 
