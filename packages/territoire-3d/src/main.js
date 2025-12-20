@@ -9,10 +9,14 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
-import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
+
+// OpenLayers for WMTS source
+import WMTS from 'ol/source/WMTS.js';
+import WMTSTileGrid from 'ol/tilegrid/WMTS.js';
+import { get as getProjection } from 'ol/proj.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -392,25 +396,54 @@ async function loadOrthoColorization() {
     try {
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
-
         console.log('📷 Loading ortho WMTS for bbox:', bbox);
 
-        // Use WMTS instead of WMS - pre-cached tiles, much faster, no rate limiting
-        // IGN Géoplateforme WMTS GetCapabilities endpoint
-        const wmtsCapabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+        // Create extent from bounding box
+        const extent = new Extent(
+            CONFIG.crs,
+            bbox.min.x, bbox.max.x,
+            bbox.min.y, bbox.max.y
+        );
 
-        const orthophotoWmts = await WmtsSource.fromCapabilities(wmtsCapabilitiesUrl, {
+        // IGN WMTS tile grid for PM (Web Mercator) matrix set
+        // Using PM because it's the most common and well-supported
+        const resolutions = [];
+        const matrixIds = [];
+        const maxZoom = 19;
+        const size = 256;
+
+        for (let z = 0; z <= maxZoom; z++) {
+            resolutions[z] = 156543.03392804097 / Math.pow(2, z);
+            matrixIds[z] = z.toString();
+        }
+
+        // OpenLayers WMTS source - using Web Mercator projection
+        const wmtsSource = new WMTS({
+            url: 'https://data.geopf.fr/wmts',
             layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+            matrixSet: 'PM',
+            format: 'image/jpeg',
+            projection: 'EPSG:3857',
+            tileGrid: new WMTSTileGrid({
+                origin: [-20037508.342789244, 20037508.342789244],
+                resolutions: resolutions,
+                matrixIds: matrixIds,
+                tileSize: size
+            }),
+            style: 'normal',
+            crossOrigin: 'anonymous'
         });
 
-        console.log('✅ WMTS source loaded:', orthophotoWmts);
-
-        // Create extent from bounding box
-        const extent = Extent.fromBox3(CONFIG.crs, bbox);
+        // TiledImageSource wraps the OpenLayers source for Giro3D
+        // Giro3D will handle the reprojection from EPSG:3857 to EPSG:2154
+        const orthoSource = new TiledImageSource({
+            source: wmtsSource,
+            crs: 'EPSG:3857'
+        });
 
         state.colorLayer = new ColorLayer({
             name: 'ortho_ign_wmts',
-            source: orthophotoWmts,
+            source: orthoSource,
             extent
         });
 
