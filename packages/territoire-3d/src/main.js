@@ -17,6 +17,12 @@ import { Vector3, Box3 } from 'three';
 import WMTS from 'ol/source/WMTS.js';
 import WMTSTileGrid from 'ol/tilegrid/WMTS.js';
 import { get as getProjection } from 'ol/proj.js';
+import { register } from 'ol/proj/proj4.js';
+import proj4 from 'proj4';
+
+// Register Web Mercator projection for OpenLayers
+proj4.defs('EPSG:3857', '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs');
+register(proj4);
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
