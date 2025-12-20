@@ -280,11 +280,21 @@ async function setupCamera() {
 
     // Position camera
     const camera = state.instance.view.camera;
+
+    // Calculate appropriate distance from point cloud
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const distance = maxDim * 1.5;
+
     camera.position.set(
-        center.x - size.x * 0.5,
-        center.y - size.y * 0.5,
-        center.z + size.z * 2
+        center.x - distance * 0.5,
+        center.y - distance * 0.5,
+        center.z + distance
     );
+
+    // Set near/far planes to avoid negative near plane errors
+    camera.near = 1; // Minimum 1 meter
+    camera.far = maxDim * 10; // 10x the max dimension
+    camera.updateProjectionMatrix();
 
     // Setup MapControls
     state.controls = new MapControls(camera, state.instance.domElement);
@@ -292,13 +302,14 @@ async function setupCamera() {
     state.controls.enableDamping = true;
     state.controls.dampingFactor = 0.15;
     state.controls.maxPolarAngle = Math.PI / 2.1;
+    state.controls.minDistance = 10; // Don't get too close
 
     state.instance.view.setControls(state.controls);
 
     // Update controls
     state.controls.update();
 
-    console.log('📷 Camera setup complete', { center, size });
+    console.log('📷 Camera setup complete', { center, size, near: camera.near, far: camera.far });
 }
 
 // ============================================================
@@ -331,16 +342,20 @@ function setDisplayMode(mode) {
 
                 // Check supported attributes first
                 const supportedAttrs = pc.getSupportedAttributes ? pc.getSupportedAttributes() : [];
-                console.log('🔍 Supported attributes:', supportedAttrs);
+                // Attributes can be objects with 'name' property or strings
+                const attrNames = supportedAttrs.map(attr =>
+                    typeof attr === 'string' ? attr : (attr?.name || attr?.id || String(attr))
+                );
+                console.log('🔍 Supported attributes:', attrNames);
 
                 // Look for Color attribute (case-sensitive, Giro3D uses "Color")
-                if (supportedAttrs.includes('Color')) {
+                if (attrNames.includes('Color')) {
                     pc.setActiveAttribute('Color');
                     console.log('🎨 Display mode: RGB (using Color attribute)');
                     showToast('Couleurs RGB natives activées', 'success');
                 } else {
                     // No RGB available - inform user and suggest orthophoto
-                    console.warn('⚠️ RGB attribute not available in this tile');
+                    console.warn('⚠️ RGB attribute not available in this tile. Available:', attrNames);
                     showToast('Pas de RGB natif - utilisez "Orthophoto IGN"', 'warning');
                     // Fall back to classification
                     pc.setActiveAttribute('Classification');
