@@ -405,11 +405,12 @@ async function loadOrthoColorization() {
 
         console.log('✅ WMTS source created');
 
-        // Create ColorLayer exactly like the lidar_hd example
+        // Create ColorLayer with resolutionFactor (from COPC example)
         state.colorLayer = new ColorLayer({
             name: 'color',
             extent: Extent.fromBox3(CONFIG.crs, bbox),
             source: orthophotoWmts,
+            resolutionFactor: 0.5,  // Important for PointCloud colorization
         });
 
         // Apply to point cloud
