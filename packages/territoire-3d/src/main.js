@@ -88,8 +88,117 @@ const state = {
     // Grist
     gristReady: false,
     gristConfig: null,
-    tablesReady: false
+    tablesReady: false,
+    widgetOptionsLoaded: false
 };
+
+// ============================================================
+// WIDGET OPTIONS (Persistent config via Grist Widget API)
+// ============================================================
+const WIDGET_OPTIONS_KEYS = {
+    TILE_REF: 'tileRef',
+    TILE_NAME: 'tileName',
+    COPC_URL: 'copcUrl',
+    SOURCE: 'source',
+    BBOX_MIN_X: 'bboxMinX',
+    BBOX_MIN_Y: 'bboxMinY',
+    BBOX_MAX_X: 'bboxMaxX',
+    BBOX_MAX_Y: 'bboxMaxY'
+};
+
+// Save configuration to Grist Widget Options (persistent)
+async function saveWidgetOptions(config) {
+    if (!state.gristReady || typeof grist?.widgetApi?.setOption !== 'function') {
+        console.log('ℹ️ Widget options not available');
+        return false;
+    }
+
+    try {
+        console.log('💾 Saving widget options:', config);
+
+        // Save each option individually
+        const promises = [];
+        if (config.tileRef !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.TILE_REF, config.tileRef));
+        }
+        if (config.tileName !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.TILE_NAME, config.tileName));
+        }
+        if (config.copcUrl !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.COPC_URL, config.copcUrl));
+        }
+        if (config.source !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.SOURCE, config.source));
+        }
+        if (config.bboxMinX !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.BBOX_MIN_X, config.bboxMinX));
+        }
+        if (config.bboxMinY !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.BBOX_MIN_Y, config.bboxMinY));
+        }
+        if (config.bboxMaxX !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.BBOX_MAX_X, config.bboxMaxX));
+        }
+        if (config.bboxMaxY !== undefined) {
+            promises.push(grist.widgetApi.setOption(WIDGET_OPTIONS_KEYS.BBOX_MAX_Y, config.bboxMaxY));
+        }
+
+        await Promise.all(promises);
+        console.log('✅ Widget options saved successfully');
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error saving widget options:', error);
+        return false;
+    }
+}
+
+// Load configuration from Grist Widget Options
+async function loadWidgetOptions() {
+    if (!state.gristReady || typeof grist?.widgetApi?.getOption !== 'function') {
+        console.log('ℹ️ Widget options not available');
+        return null;
+    }
+
+    try {
+        console.log('📥 Loading widget options...');
+
+        const [tileRef, tileName, copcUrl, source, bboxMinX, bboxMinY, bboxMaxX, bboxMaxY] = await Promise.all([
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.TILE_REF),
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.TILE_NAME),
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.COPC_URL),
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.SOURCE),
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.BBOX_MIN_X),
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.BBOX_MIN_Y),
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.BBOX_MAX_X),
+            grist.widgetApi.getOption(WIDGET_OPTIONS_KEYS.BBOX_MAX_Y)
+        ]);
+
+        // If we have a COPC URL, we have a valid config
+        if (copcUrl) {
+            const config = {
+                tileRef: tileRef || '',
+                tileName: tileName || 'Dalle',
+                copcUrl,
+                source: source || 'custom',
+                bboxMinX,
+                bboxMinY,
+                bboxMaxX,
+                bboxMaxY
+            };
+            console.log('✅ Widget options loaded:', config);
+            state.widgetOptionsLoaded = true;
+            return config;
+        }
+
+        console.log('ℹ️ No saved widget options found');
+        return null;
+
+    } catch (error) {
+        console.error('❌ Error loading widget options:', error);
+        return null;
+    }
+}
 
 // ============================================================
 // UTILITIES
@@ -513,7 +622,41 @@ async function initGrist() {
 async function loadConfigFromGrist() {
     if (!state.gristReady) return;
 
-    // Try to load Config table
+    // Priority 1: Try to load from Widget Options (most reliable)
+    try {
+        const widgetConfig = await loadWidgetOptions();
+        if (widgetConfig && widgetConfig.copcUrl) {
+            console.log('📋 Config loaded from Widget Options:', widgetConfig);
+            state.gristConfig = widgetConfig;
+
+            // Pre-fill setup form (in case user wants to reconfigure)
+            if (widgetConfig.tileRef) {
+                document.getElementById('setupTileRef').value = widgetConfig.tileRef;
+            }
+            if (widgetConfig.tileName) {
+                document.getElementById('setupTileName').value = widgetConfig.tileName;
+            }
+            if (widgetConfig.source) {
+                document.getElementById('setupSource').value = widgetConfig.source;
+            }
+
+            // Auto-load point cloud
+            document.getElementById('setupOverlay').classList.add('hidden');
+            await loadPointCloud(widgetConfig.copcUrl, widgetConfig.tileName || 'Dalle');
+
+            // Also try to load objects
+            try {
+                await loadObjectsFromGrist();
+            } catch (error) {
+                console.log('ℹ️ Objects table not found or empty');
+            }
+            return; // Successfully loaded from widget options
+        }
+    } catch (error) {
+        console.log('ℹ️ Widget options not available or empty:', error.message);
+    }
+
+    // Priority 2: Fallback to Config table
     try {
         const data = await grist.docApi.fetchTable(CONFIG.tables.config);
 
@@ -530,8 +673,12 @@ async function loadConfigFromGrist() {
             };
 
             if (config.copcUrl) {
-                console.log('📋 Config loaded from Grist:', config);
+                console.log('📋 Config loaded from Grist table:', config);
                 state.gristConfig = config;
+
+                // Migrate config to widget options for future sessions
+                await saveWidgetOptions(config);
+                console.log('✅ Config migrated to widget options');
 
                 // Pre-fill setup form (in case user wants to reconfigure)
                 if (config.tileRef) {
@@ -1508,9 +1655,17 @@ async function runFullSetup() {
         state.gristConfig = config;
 
         if (state.gristReady) {
-            console.log('💾 Saving config to Grist...');
+            console.log('💾 Saving config...');
+
+            // Priority: Save to Widget Options (persistent, reliable)
+            const widgetOptionsSaved = await saveWidgetOptions(config);
+            if (widgetOptionsSaved) {
+                console.log('✅ Config saved to Widget Options (persistent)');
+            }
+
+            // Also save to Grist table for backward compatibility
             await saveConfigToGrist(config);
-            console.log('✅ Config saved to Grist');
+            console.log('✅ Config also saved to Grist table');
         }
 
         statusCopc.classList.remove('active');
