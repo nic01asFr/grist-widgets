@@ -9,11 +9,9 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
-import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
-import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -395,44 +393,32 @@ async function loadOrthoColorization() {
         const bbox = state.pointCloud.getBoundingBox();
         console.log('📷 Loading ortho for bbox:', bbox);
 
-        // Create extent in Lambert 93 (from point cloud)
-        const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📐 ColorLayer extent (EPSG:2154):', extent);
+        // Use exact same approach as official Giro3D lidar_hd example:
+        // WmtsSource.fromCapabilities() + ColorLayer with extent
+        const url = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
 
-        // Use TiledImageSource with OpenLayers XYZ (like official Giro3D examples)
-        // This handles CRS reprojection automatically from EPSG:3857 to EPSG:2154
-        // Using IGN Géoplateforme WMTS with KVP URL pattern
-        const orthoSource = new TiledImageSource({
-            source: new XYZ({
-                url: 'https://data.geopf.fr/wmts?' +
-                    'layer=HR.ORTHOIMAGERY.ORTHOPHOTOS&' +
-                    'style=normal&' +
-                    'tilematrixset=PM&' +
-                    'Service=WMTS&' +
-                    'Request=GetTile&' +
-                    'Version=1.0.0&' +
-                    'Format=image/jpeg&' +
-                    'TileMatrix={z}&' +
-                    'TileCol={x}&' +
-                    'TileRow={y}',
-                projection: 'EPSG:3857',
-                crossOrigin: 'anonymous'
-            })
+        console.log('📥 Fetching WMTS capabilities...');
+
+        const orthophotoWmts = await WmtsSource.fromCapabilities(url, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
         });
 
-        console.log('✅ TiledImageSource created with EPSG:3857 → EPSG:2154 reprojection');
+        console.log('✅ WMTS source created');
 
+        // Create ColorLayer exactly like the lidar_hd example
         state.colorLayer = new ColorLayer({
-            name: 'ortho_ign',
-            extent: extent,
-            source: orthoSource
+            name: 'color',
+            extent: Extent.fromBox3(CONFIG.crs, bbox),
+            source: orthophotoWmts,
         });
 
         // Apply to point cloud
+        // Note: For PointCloud (vs Tiles3D), we need setColoringMode('layer')
         state.pointCloud.setColorLayer(state.colorLayer);
         state.pointCloud.setColoringMode('layer');
 
-        state.instance.notifyChange(state.pointCloud);
+        // Notify change like in the example
+        state.instance.notifyChange(state.instance.view.camera);
 
         console.log('✅ Orthophoto layer applied');
         showToast('Orthophoto IGN appliquée', 'success');
