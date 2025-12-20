@@ -9,9 +9,11 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
+import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
+import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -386,44 +388,54 @@ function setDisplayMode(mode) {
 async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
-    showToast('Chargement de l\'orthophoto IGN (WMTS)...', 'info');
+    showToast('Chargement de l\'orthophoto IGN...', 'info');
 
     try {
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
-        console.log('📷 Loading ortho WMTS for bbox:', bbox);
+        console.log('📷 Loading ortho for bbox:', bbox);
 
-        // Use Giro3D native WmtsSource.fromCapabilities()
-        const wmtsCapabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+        // Create extent in Lambert 93 (from point cloud)
+        const extent = Extent.fromBox3(CONFIG.crs, bbox);
+        console.log('📐 ColorLayer extent (EPSG:2154):', extent);
 
-        console.log('📥 Fetching WMTS capabilities...');
-        const orthoSource = await WmtsSource.fromCapabilities(wmtsCapabilitiesUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-            matrixSet: 'PM'
+        // Use TiledImageSource with OpenLayers XYZ (like official Giro3D examples)
+        // This handles CRS reprojection automatically from EPSG:3857 to EPSG:2154
+        // Using IGN Géoplateforme WMTS with KVP URL pattern
+        const orthoSource = new TiledImageSource({
+            source: new XYZ({
+                url: 'https://data.geopf.fr/wmts?' +
+                    'layer=HR.ORTHOIMAGERY.ORTHOPHOTOS&' +
+                    'style=normal&' +
+                    'tilematrixset=PM&' +
+                    'Service=WMTS&' +
+                    'Request=GetTile&' +
+                    'Version=1.0.0&' +
+                    'Format=image/jpeg&' +
+                    'TileMatrix={z}&' +
+                    'TileCol={x}&' +
+                    'TileRow={y}',
+                projection: 'EPSG:3857',
+                crossOrigin: 'anonymous'
+            })
         });
 
-        console.log('✅ WMTS source created:', orthoSource);
-
-        // Create ColorLayer with extent from point cloud bbox
-        const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📐 ColorLayer extent:', extent);
+        console.log('✅ TiledImageSource created with EPSG:3857 → EPSG:2154 reprojection');
 
         state.colorLayer = new ColorLayer({
-            name: 'ortho_ign_wmts',
-            source: orthoSource,
-            extent: extent
+            name: 'ortho_ign',
+            extent: extent,
+            source: orthoSource
         });
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
         state.pointCloud.setColoringMode('layer');
 
-        // Force update
-        state.pointCloud.updateMatrixWorld(true);
         state.instance.notifyChange(state.pointCloud);
 
-        console.log('✅ Orthophoto WMTS layer applied');
-        showToast('Orthophoto IGN appliquée (WMTS)', 'success');
+        console.log('✅ Orthophoto layer applied');
+        showToast('Orthophoto IGN appliquée', 'success');
 
     } catch (error) {
         console.error('❌ Error loading orthophoto:', error);
