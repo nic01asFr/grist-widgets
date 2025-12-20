@@ -325,23 +325,24 @@ function setDisplayMode(mode) {
                 break;
 
             case 'rgb':
-                // Native RGB colors from LiDAR HD (PDRF 8 = RGB + NIR)
+                // Native RGB colors from LiDAR HD (PDRF 7/8 = RGB)
+                // Note: Many IGN LiDAR HD tiles don't have RGB - use orthophoto instead
                 pc.setColoringMode('attribute');
-                // Try different attribute names for RGB
-                const rgbAttrs = ['Color', 'Rgb', 'RGB', 'color'];
-                let rgbFound = false;
-                for (const attr of rgbAttrs) {
-                    try {
-                        pc.setActiveAttribute(attr);
-                        rgbFound = true;
-                        console.log(`🎨 Display mode: rgb (using ${attr})`);
-                        break;
-                    } catch (e) {
-                        // Try next
-                    }
-                }
-                if (!rgbFound) {
-                    console.warn('⚠️ RGB attribute not found, falling back to classification');
+
+                // Check supported attributes first
+                const supportedAttrs = pc.getSupportedAttributes ? pc.getSupportedAttributes() : [];
+                console.log('🔍 Supported attributes:', supportedAttrs);
+
+                // Look for Color attribute (case-sensitive, Giro3D uses "Color")
+                if (supportedAttrs.includes('Color')) {
+                    pc.setActiveAttribute('Color');
+                    console.log('🎨 Display mode: RGB (using Color attribute)');
+                    showToast('Couleurs RGB natives activées', 'success');
+                } else {
+                    // No RGB available - inform user and suggest orthophoto
+                    console.warn('⚠️ RGB attribute not available in this tile');
+                    showToast('Pas de RGB natif - utilisez "Orthophoto IGN"', 'warning');
+                    // Fall back to classification
                     pc.setActiveAttribute('Classification');
                 }
                 break;
