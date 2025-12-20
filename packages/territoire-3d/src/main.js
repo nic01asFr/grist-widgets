@@ -415,12 +415,13 @@ async function loadOrthoColorization() {
             matrixIds[z] = z.toString();
         }
 
-        // OpenLayers WMTS source
+        // OpenLayers WMTS source with explicit projection
         const wmtsSource = new WMTS({
             url: 'https://data.geopf.fr/wmts',
             layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
             matrixSet: 'PM',
             format: 'image/jpeg',
+            projection: 'EPSG:3857', // Web Mercator
             tileGrid: new WMTSTileGrid({
                 origin: [-20037508.342789244, 20037508.342789244],
                 resolutions: resolutions,
