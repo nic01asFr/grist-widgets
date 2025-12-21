@@ -452,25 +452,32 @@ async function loadOrthoColorization() {
         console.log('📷 Point cloud CRS:', CONFIG.crs);
         console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
-        // Use WmtsSource.fromCapabilities() following official Giro3D examples
-        // This is the pattern used in colorized_pointcloud.html
-        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+        // Use TiledImageSource with XYZ pattern (following official COPC example)
+        // IGN Orthophoto WMTS in XYZ tile format, using PM (Web Mercator) tileset
+        const orthoUrl = 'https://data.geopf.fr/wmts?' +
+            'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+            '&LAYER=HR.ORTHOIMAGERY.ORTHOPHOTOS' +
+            '&STYLE=normal' +
+            '&FORMAT=image/jpeg' +
+            '&TILEMATRIXSET=PM' +
+            '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
 
-        console.log('📷 Fetching WMTS capabilities from:', wmtsUrl);
-
-        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-        });
-
-        console.log('✅ WMTS source created');
+        console.log('📷 Using TiledImageSource with XYZ pattern');
 
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            source: wmtsSource,
+            resolutionFactor: 0.5,
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: orthoUrl,
+                    projection: 'EPSG:3857',
+                    crossOrigin: 'anonymous',
+                }),
+            }),
         });
 
-        console.log('✅ ColorLayer created with IGN Orthophoto');
+        console.log('✅ ColorLayer created with IGN Orthophoto (TiledImageSource/XYZ)');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
