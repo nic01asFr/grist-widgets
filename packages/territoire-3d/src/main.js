@@ -376,7 +376,7 @@ function setDisplayMode(mode) {
                 return; // loadOrthoColorization handles notifyChange
 
             case 'elevation':
-                // Set a colormap for elevation visualization
+                // Set a colormap for elevation visualization using setAttributeColorMap API
                 const elevBbox = pc.getBoundingBox();
                 if (elevBbox && !elevBbox.isEmpty()) {
                     const minZ = elevBbox.min.z;
@@ -405,11 +405,12 @@ function setDisplayMode(mode) {
                         const color = new Color().lerpColors(stop1.color, stop2.color, localT);
                         elevColors.push(color);
                     }
-                    // First set the colorMap, then set the mode and attribute
-                    pc.colorMap = new ColorMap({ colors: elevColors, min: minZ, max: maxZ });
-                    console.log('🎨 Elevation colormap set:', minZ, 'to', maxZ, 'with', elevColors.length, 'colors');
+                    // Use setAttributeColorMap API to set colormap for Z attribute
+                    const elevColorMap = new ColorMap({ colors: elevColors, min: minZ, max: maxZ });
+                    pc.setAttributeColorMap('Z', elevColorMap);
+                    console.log('🎨 Elevation colormap set via setAttributeColorMap:', minZ, 'to', maxZ, 'with', elevColors.length, 'colors');
                 }
-                // Set mode and attribute AFTER colormap
+                // Set mode and attribute
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Z');
                 console.log('🎨 Display mode: elevation');
