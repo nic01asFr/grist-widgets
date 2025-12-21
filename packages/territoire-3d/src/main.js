@@ -378,7 +378,7 @@ function setDisplayMode(mode) {
             case 'elevation':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Z');
-                // Set a colormap for elevation visualization using correct PointCloud API
+                // Set a colormap for elevation visualization
                 const elevBbox = pc.getBoundingBox();
                 if (elevBbox && !elevBbox.isEmpty()) {
                     const minZ = elevBbox.min.z;
@@ -394,7 +394,6 @@ function setDisplayMode(mode) {
                     ];
                     for (let i = 0; i < 256; i++) {
                         const t = i / 255;
-                        // Find the two gradient stops to interpolate between
                         let stop1 = gradientStops[0];
                         let stop2 = gradientStops[gradientStops.length - 1];
                         for (let j = 0; j < gradientStops.length - 1; j++) {
@@ -408,9 +407,8 @@ function setDisplayMode(mode) {
                         const color = new Color().lerpColors(stop1.color, stop2.color, localT);
                         elevColors.push(color);
                     }
-                    const colorMap = new ColorMap({ colors: elevColors, min: minZ, max: maxZ });
-                    // Use setAttributeColorMap for the Z attribute
-                    pc.setAttributeColorMap('Z', colorMap);
+                    // Use direct property assignment (not a method)
+                    pc.colorMap = new ColorMap({ colors: elevColors, min: minZ, max: maxZ });
                     console.log('🎨 Elevation colormap set:', minZ, 'to', maxZ, 'with', elevColors.length, 'colors');
                 }
                 console.log('🎨 Display mode: elevation');
