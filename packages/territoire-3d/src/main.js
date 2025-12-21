@@ -10,6 +10,7 @@ import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
+import { MODE } from '@giro3d/giro3d/renderer/PointCloudMaterial.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
 import XYZ from 'ol/source/XYZ.js';
@@ -333,17 +334,21 @@ function setDisplayMode(mode) {
     try {
         const pc = state.pointCloud;
 
+        // Hide ColorLayer when not in ortho mode
+        if (state.colorLayer && mode !== 'ortho') {
+            state.colorLayer.visible = false;
+        }
+
         switch (mode) {
             case 'classification':
-                pc.setColoringMode('attribute');
-                pc.setActiveAttribute('Classification');
-                console.log('🎨 Display mode: classification');
+                // Use MODE.CLASSIFICATION for classification coloring
+                pc.pointCloudMode = MODE.CLASSIFICATION;
+                console.log('🎨 Display mode: classification (MODE.CLASSIFICATION =', MODE.CLASSIFICATION, ')');
                 break;
 
             case 'rgb':
                 // Native RGB colors from LiDAR HD (PDRF 7/8 = RGB)
                 // Note: Many IGN LiDAR HD tiles don't have RGB - use orthophoto instead
-                pc.setColoringMode('attribute');
 
                 // Check supported attributes first
                 const supportedAttrs = pc.getSupportedAttributes ? pc.getSupportedAttributes() : [];
@@ -355,15 +360,16 @@ function setDisplayMode(mode) {
 
                 // Look for Color attribute (case-sensitive, Giro3D uses "Color")
                 if (attrNames.includes('Color')) {
-                    pc.setActiveAttribute('Color');
-                    console.log('🎨 Display mode: RGB (using Color attribute)');
+                    // MODE.COLOR = 0 (point cloud colors)
+                    pc.pointCloudMode = MODE.COLOR;
+                    console.log('🎨 Display mode: RGB (MODE.COLOR =', MODE.COLOR, ')');
                     showToast('Couleurs RGB natives activées', 'success');
                 } else {
                     // No RGB available - inform user and suggest orthophoto
                     console.warn('⚠️ RGB attribute not available in this tile. Available:', attrNames);
                     showToast('Pas de RGB natif - utilisez "Orthophoto IGN"', 'warning');
                     // Fall back to classification
-                    pc.setActiveAttribute('Classification');
+                    pc.pointCloudMode = MODE.CLASSIFICATION;
                 }
                 break;
 
@@ -372,20 +378,19 @@ function setDisplayMode(mode) {
                 return; // loadOrthoColorization handles notifyChange
 
             case 'elevation':
-                pc.setColoringMode('attribute');
-                pc.setActiveAttribute('Z');
-                // Use a bright elevation colormap with proper bounds
-                console.log('🎨 Display mode: elevation');
+                // MODE.ELEVATION = 5 (elevation gradient)
+                pc.pointCloudMode = MODE.ELEVATION;
+                console.log('🎨 Display mode: elevation (MODE.ELEVATION =', MODE.ELEVATION, ')');
                 break;
 
             case 'intensity':
-                pc.setColoringMode('attribute');
-                pc.setActiveAttribute('Intensity');
-                console.log('🎨 Display mode: intensity');
+                // MODE.INTENSITY for intensity display
+                pc.pointCloudMode = MODE.INTENSITY;
+                console.log('🎨 Display mode: intensity (MODE.INTENSITY =', MODE.INTENSITY, ')');
                 break;
         }
 
-        state.instance.notifyChange();
+        state.instance.notifyChange(pc);
     } catch (error) {
         console.warn('⚠️ Error setting display mode:', error.message);
     }
@@ -394,17 +399,30 @@ function setDisplayMode(mode) {
 async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
-    showToast('Chargement de l\'imagerie satellite...', 'info');
-
     try {
+        // If ColorLayer already exists, just show it and switch mode
+        if (state.colorLayer) {
+            console.log('📷 Reusing existing ColorLayer');
+            state.colorLayer.visible = true;
+            state.pointCloud.pointCloudMode = MODE.TEXTURE;
+            state.instance.notifyChange(state.pointCloud);
+            showToast('Imagerie satellite activée', 'success');
+            return;
+        }
+
+        showToast('Chargement de l\'imagerie satellite...', 'info');
+
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
         const extent = Extent.fromBox3(CONFIG.crs, bbox);
         console.log('📷 Loading imagery for extent:', extent);
+        console.log('📷 Point cloud CRS:', CONFIG.crs);
+        console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
         // Use TiledImageSource with satellite imagery (ESRI World Imagery - free, no API key)
         // This follows the COPC example pattern exactly
         state.colorLayer = new ColorLayer({
+            name: 'ortho',
             extent,
             resolutionFactor: 0.5,
             source: new TiledImageSource({
@@ -418,12 +436,17 @@ async function loadOrthoColorization() {
 
         console.log('✅ ColorLayer created with ESRI World Imagery');
 
-        // Apply to point cloud (following COPC example pattern)
+        // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
-        state.pointCloud.setColoringMode('layer');
+
+        // Set point cloud mode to TEXTURE (critical for ColorLayer to work!)
+        // MODE.TEXTURE = colorize points using the ColorLayer texture
+        state.pointCloud.pointCloudMode = MODE.TEXTURE;
+
+        console.log('📷 pointCloudMode set to:', state.pointCloud.pointCloudMode, '(MODE.TEXTURE =', MODE.TEXTURE, ')');
 
         // Notify change
-        state.instance.notifyChange(state.instance.view.camera);
+        state.instance.notifyChange(state.pointCloud);
 
         console.log('✅ Imagery layer applied');
         showToast('Imagerie satellite appliquée', 'success');
