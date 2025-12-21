@@ -383,21 +383,33 @@ function setDisplayMode(mode) {
                 if (elevBbox && !elevBbox.isEmpty()) {
                     const minZ = elevBbox.min.z;
                     const maxZ = elevBbox.max.z;
-                    // ColorMap with object-style constructor
-                    const elevColors = [
-                        new Color('#0000ff'),  // Blue (low)
-                        new Color('#00ffff'),  // Cyan
-                        new Color('#00ff00'),  // Green
-                        new Color('#ffff00'),  // Yellow
-                        new Color('#ff0000'),  // Red (high)
+                    // Create color ramp (256 colors for smooth gradient)
+                    const elevColors = [];
+                    const gradientStops = [
+                        { pos: 0, color: new Color('#0000ff') },    // Blue (low)
+                        { pos: 0.25, color: new Color('#00ffff') }, // Cyan
+                        { pos: 0.5, color: new Color('#00ff00') },  // Green
+                        { pos: 0.75, color: new Color('#ffff00') }, // Yellow
+                        { pos: 1, color: new Color('#ff0000') },    // Red (high)
                     ];
-                    const colorMap = new ColorMap({
-                        colors: elevColors,
-                        min: minZ,
-                        max: maxZ,
-                    });
-                    pc.setColorMap(colorMap);
-                    console.log('🎨 Elevation colormap set:', minZ, 'to', maxZ);
+                    for (let i = 0; i < 256; i++) {
+                        const t = i / 255;
+                        let stop1 = gradientStops[0];
+                        let stop2 = gradientStops[gradientStops.length - 1];
+                        for (let j = 0; j < gradientStops.length - 1; j++) {
+                            if (t >= gradientStops[j].pos && t <= gradientStops[j + 1].pos) {
+                                stop1 = gradientStops[j];
+                                stop2 = gradientStops[j + 1];
+                                break;
+                            }
+                        }
+                        const localT = (t - stop1.pos) / (stop2.pos - stop1.pos);
+                        const color = new Color().lerpColors(stop1.color, stop2.color, localT);
+                        elevColors.push(color);
+                    }
+                    // Use direct property assignment (not a method)
+                    pc.colorMap = new ColorMap({ colors: elevColors, min: minZ, max: maxZ });
+                    console.log('🎨 Elevation colormap set:', minZ, 'to', maxZ, 'with', elevColors.length, 'colors');
                 }
                 console.log('🎨 Display mode: elevation');
                 break;
