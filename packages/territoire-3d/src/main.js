@@ -9,9 +9,11 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
+import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
-import { Vector3, Box3 } from 'three';
+import { Vector3, Box3, Color } from 'three';
 import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
@@ -376,6 +378,21 @@ function setDisplayMode(mode) {
             case 'elevation':
                 pc.setColoringMode('attribute');
                 pc.setActiveAttribute('Z');
+                // Set a colormap for elevation visualization
+                const elevBbox = pc.getBoundingBox();
+                if (elevBbox && !elevBbox.isEmpty()) {
+                    const minZ = elevBbox.min.z;
+                    const maxZ = elevBbox.max.z;
+                    const colorMap = new ColorMap([
+                        { value: 0, color: new Color('#0000ff') },    // Blue (low)
+                        { value: 0.25, color: new Color('#00ffff') }, // Cyan
+                        { value: 0.5, color: new Color('#00ff00') },  // Green
+                        { value: 0.75, color: new Color('#ffff00') }, // Yellow
+                        { value: 1, color: new Color('#ff0000') },    // Red (high)
+                    ], minZ, maxZ);
+                    pc.setColorMap(colorMap);
+                    console.log('🎨 Elevation colormap set:', minZ, 'to', maxZ);
+                }
                 console.log('🎨 Display mode: elevation');
                 break;
 
@@ -406,30 +423,34 @@ async function loadOrthoColorization() {
             return;
         }
 
-        showToast('Chargement de l\'imagerie satellite...', 'info');
+        showToast('Chargement de l\'orthophoto IGN...', 'info');
 
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
         const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📷 Loading imagery for extent:', extent);
+        console.log('📷 Loading orthophoto for extent:', extent);
         console.log('📷 Point cloud CRS:', CONFIG.crs);
         console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
-        // Use TiledImageSource with satellite imagery (ESRI World Imagery - free, no API key)
+        // Use WmtsSource.fromCapabilities() following official Giro3D examples
+        // This is the pattern used in colorized_pointcloud.html
+        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+
+        console.log('📷 Fetching WMTS capabilities from:', wmtsUrl);
+
+        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+        });
+
+        console.log('✅ WMTS source created');
+
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            resolutionFactor: 0.5,
-            source: new TiledImageSource({
-                source: new XYZ({
-                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    projection: 'EPSG:3857',
-                    crossOrigin: 'anonymous',
-                }),
-            }),
+            source: wmtsSource,
         });
 
-        console.log('✅ ColorLayer created with ESRI World Imagery');
+        console.log('✅ ColorLayer created with IGN Orthophoto');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
@@ -442,12 +463,12 @@ async function loadOrthoColorization() {
         // Notify change
         state.instance.notifyChange(state.pointCloud);
 
-        console.log('✅ Imagery layer applied');
-        showToast('Imagerie satellite appliquée', 'success');
+        console.log('✅ Orthophoto layer applied');
+        showToast('Orthophoto IGN appliquée', 'success');
 
     } catch (error) {
-        console.error('❌ Error loading imagery:', error);
-        showToast('Erreur imagerie: ' + error.message, 'error');
+        console.error('❌ Error loading orthophoto:', error);
+        showToast('Erreur orthophoto: ' + error.message, 'error');
     }
 }
 
