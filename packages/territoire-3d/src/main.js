@@ -321,6 +321,13 @@ async function setupCamera() {
 // ============================================================
 // DISPLAY MODES
 // ============================================================
+// MODE enum values (from PointCloudMaterial.js):
+// MODE.COLOR = 0 (native RGB)
+// MODE.CLASSIFICATION = 2
+// MODE.TEXTURE = 4 (ColorLayer)
+// MODE.ELEVATION = 5
+// Note: MODE.INTENSITY doesn't exist - use setColoringMode('attribute') instead
+
 function setDisplayMode(mode) {
     state.currentDisplay = mode;
 
@@ -341,34 +348,27 @@ function setDisplayMode(mode) {
 
         switch (mode) {
             case 'classification':
-                // Use MODE.CLASSIFICATION for classification coloring
                 pc.pointCloudMode = MODE.CLASSIFICATION;
                 console.log('🎨 Display mode: classification (MODE.CLASSIFICATION =', MODE.CLASSIFICATION, ')');
                 break;
 
             case 'rgb':
                 // Native RGB colors from LiDAR HD (PDRF 7/8 = RGB)
-                // Note: Many IGN LiDAR HD tiles don't have RGB - use orthophoto instead
-
                 // Check supported attributes first
                 const supportedAttrs = pc.getSupportedAttributes ? pc.getSupportedAttributes() : [];
-                // Attributes can be objects with 'name' property or strings
                 const attrNames = supportedAttrs.map(attr =>
                     typeof attr === 'string' ? attr : (attr?.name || attr?.id || String(attr))
                 );
                 console.log('🔍 Supported attributes:', attrNames);
 
-                // Look for Color attribute (case-sensitive, Giro3D uses "Color")
                 if (attrNames.includes('Color')) {
-                    // MODE.COLOR = 0 (point cloud colors)
+                    // MODE.COLOR = 0 for native RGB
                     pc.pointCloudMode = MODE.COLOR;
                     console.log('🎨 Display mode: RGB (MODE.COLOR =', MODE.COLOR, ')');
                     showToast('Couleurs RGB natives activées', 'success');
                 } else {
-                    // No RGB available - inform user and suggest orthophoto
-                    console.warn('⚠️ RGB attribute not available in this tile. Available:', attrNames);
+                    console.warn('⚠️ RGB attribute not available. Available:', attrNames);
                     showToast('Pas de RGB natif - utilisez "Orthophoto IGN"', 'warning');
-                    // Fall back to classification
                     pc.pointCloudMode = MODE.CLASSIFICATION;
                 }
                 break;
@@ -378,15 +378,15 @@ function setDisplayMode(mode) {
                 return; // loadOrthoColorization handles notifyChange
 
             case 'elevation':
-                // MODE.ELEVATION = 5 (elevation gradient)
                 pc.pointCloudMode = MODE.ELEVATION;
                 console.log('🎨 Display mode: elevation (MODE.ELEVATION =', MODE.ELEVATION, ')');
                 break;
 
             case 'intensity':
-                // MODE.INTENSITY for intensity display
-                pc.pointCloudMode = MODE.INTENSITY;
-                console.log('🎨 Display mode: intensity (MODE.INTENSITY =', MODE.INTENSITY, ')');
+                // MODE.INTENSITY doesn't exist - use attribute-based coloring
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Intensity');
+                console.log('🎨 Display mode: intensity (attribute-based)');
                 break;
         }
 
