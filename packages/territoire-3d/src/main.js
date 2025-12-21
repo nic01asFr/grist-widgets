@@ -8,10 +8,11 @@ import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js
 import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
-import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
+import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3 } from 'three';
+import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -393,45 +394,43 @@ function setDisplayMode(mode) {
 async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
-    showToast('Chargement de l\'orthophoto IGN L93...', 'info');
+    showToast('Chargement de l\'imagerie satellite...', 'info');
 
     try {
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
         const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📷 Loading ortho L93 for extent:', extent);
+        console.log('📷 Loading imagery for extent:', extent);
 
-        // Use WmtsSource with L93 layer (native EPSG:2154 - no reprojection needed!)
-        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
-
-        console.log('📥 Fetching WMTS capabilities for L93 layer...');
-
-        const orthoSource = await WmtsSource.fromCapabilities(wmtsUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS.L93',
-        });
-
-        console.log('✅ WMTS L93 source created');
-
-        // Create ColorLayer with the native L93 source
+        // Use TiledImageSource with satellite imagery (ESRI World Imagery - free, no API key)
+        // This follows the COPC example pattern exactly
         state.colorLayer = new ColorLayer({
-            name: 'ortho_ign_l93',
-            extent: extent,
-            source: orthoSource,
+            extent,
+            resolutionFactor: 0.5,
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    projection: 'EPSG:3857',
+                    crossOrigin: 'anonymous',
+                }),
+            }),
         });
 
-        // Apply to point cloud
+        console.log('✅ ColorLayer created with ESRI World Imagery');
+
+        // Apply to point cloud (following COPC example pattern)
         state.pointCloud.setColorLayer(state.colorLayer);
         state.pointCloud.setColoringMode('layer');
 
         // Notify change
         state.instance.notifyChange(state.instance.view.camera);
 
-        console.log('✅ Orthophoto L93 layer applied');
-        showToast('Orthophoto IGN L93 appliquée', 'success');
+        console.log('✅ Imagery layer applied');
+        showToast('Imagerie satellite appliquée', 'success');
 
     } catch (error) {
-        console.error('❌ Error loading orthophoto:', error);
-        showToast('Erreur orthophoto: ' + error.message, 'error');
+        console.error('❌ Error loading imagery:', error);
+        showToast('Erreur imagerie: ' + error.message, 'error');
     }
 }
 
