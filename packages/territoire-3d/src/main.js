@@ -452,32 +452,24 @@ async function loadOrthoColorization() {
         console.log('📷 Point cloud CRS:', CONFIG.crs);
         console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
-        // Use TiledImageSource with XYZ pattern (following official COPC example)
-        // IGN Orthophoto WMTS in XYZ tile format, using PM (Web Mercator) tileset
-        const orthoUrl = 'https://data.geopf.fr/wmts?' +
-            'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
-            '&LAYER=HR.ORTHOIMAGERY.ORTHOPHOTOS' +
-            '&STYLE=normal' +
-            '&FORMAT=image/jpeg' +
-            '&TILEMATRIXSET=PM' +
-            '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+        // Use WmtsSource.fromCapabilities() - this gave us dark (not black) result
+        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
 
-        console.log('📷 Using TiledImageSource with XYZ pattern');
+        console.log('📷 Fetching WMTS capabilities from:', wmtsUrl);
+
+        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+        });
+
+        console.log('✅ WMTS source created');
 
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            resolutionFactor: 0.5,
-            source: new TiledImageSource({
-                source: new XYZ({
-                    url: orthoUrl,
-                    projection: 'EPSG:3857',
-                    crossOrigin: 'anonymous',
-                }),
-            }),
+            source: wmtsSource,
         });
 
-        console.log('✅ ColorLayer created with IGN Orthophoto (TiledImageSource/XYZ)');
+        console.log('✅ ColorLayer created with IGN Orthophoto');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
@@ -485,7 +477,13 @@ async function loadOrthoColorization() {
         // Switch to layer coloring mode
         state.pointCloud.setColoringMode('layer');
 
-        console.log('📷 ColoringMode set to: layer');
+        // Adjust brightness/contrast for better visibility
+        // The layer mode often appears dark, so we boost these values
+        state.pointCloud.brightness = 1.5;
+        state.pointCloud.contrast = 1.2;
+        state.pointCloud.saturation = 1.0;
+
+        console.log('📷 ColoringMode set to: layer, brightness:', state.pointCloud.brightness, 'contrast:', state.pointCloud.contrast);
 
         // Notify change
         state.instance.notifyChange(state.pointCloud);
