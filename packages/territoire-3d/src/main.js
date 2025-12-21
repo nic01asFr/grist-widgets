@@ -383,13 +383,15 @@ function setDisplayMode(mode) {
                 if (elevBbox && !elevBbox.isEmpty()) {
                     const minZ = elevBbox.min.z;
                     const maxZ = elevBbox.max.z;
-                    const colorMap = new ColorMap([
-                        { value: 0, color: new Color('#0000ff') },    // Blue (low)
-                        { value: 0.25, color: new Color('#00ffff') }, // Cyan
-                        { value: 0.5, color: new Color('#00ff00') },  // Green
-                        { value: 0.75, color: new Color('#ffff00') }, // Yellow
-                        { value: 1, color: new Color('#ff0000') },    // Red (high)
-                    ], minZ, maxZ);
+                    // ColorMap expects: (colors[], min, max)
+                    const colors = [
+                        new Color('#0000ff'),  // Blue (low)
+                        new Color('#00ffff'),  // Cyan
+                        new Color('#00ff00'),  // Green
+                        new Color('#ffff00'),  // Yellow
+                        new Color('#ff0000'),  // Red (high)
+                    ];
+                    const colorMap = new ColorMap(colors, minZ, maxZ);
                     pc.setColorMap(colorMap);
                     console.log('🎨 Elevation colormap set:', minZ, 'to', maxZ);
                 }
