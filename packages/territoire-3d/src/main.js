@@ -389,8 +389,19 @@ function setDisplayMode(mode) {
                 break;
 
             case 'ortho':
+                // TEMPORARILY DISABLED - ortho mode corrupts other display modes
+                // The setColoringMode('layer') + ColorLayer approach doesn't work correctly
+                // with PointCloud entities (COPC). It works with Tiles3D but not PointCloud.
+                console.warn('⚠️ Ortho mode temporarily disabled - corrupts other modes');
+                showToast('Mode Ortho temporairement désactivé (bug Giro3D)', 'warning');
+                // Fall back to classification
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Classification');
+                break;
+                /* Original code (disabled):
                 loadOrthoColorization();
                 return; // loadOrthoColorization handles notifyChange
+                */
 
             case 'elevation':
                 // Set a colormap for elevation visualization using setAttributeColorMap API
