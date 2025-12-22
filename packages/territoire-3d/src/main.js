@@ -380,19 +380,9 @@ function setDisplayMode(mode) {
                 break;
 
             case 'ortho':
-                // TEMPORARILY DISABLED - ortho mode corrupts other display modes
-                // The setColoringMode('layer') + ColorLayer approach doesn't work correctly
-                // with PointCloud entities (COPC). It works with Tiles3D but not PointCloud.
-                console.warn('⚠️ Ortho mode temporarily disabled - corrupts other modes');
-                showToast('Mode Ortho temporairement désactivé (bug Giro3D)', 'warning');
-                // Fall back to classification
-                pc.setColoringMode('attribute');
-                pc.setActiveAttribute('Classification');
-                break;
-                /* Original code (disabled):
+                // Re-enabled: Testing WmtsSource + LAMB93 + brightness boost on ColorLayer
                 loadOrthoColorization();
                 return; // loadOrthoColorization handles notifyChange
-                */
 
             case 'elevation':
                 // Set a colormap for elevation visualization using setAttributeColorMap API
@@ -462,40 +452,44 @@ async function loadOrthoColorization() {
             return;
         }
 
-        showToast('Chargement de l\'imagerie satellite...', 'info');
+        showToast('Chargement de l\'orthophoto IGN...', 'info');
 
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
-        // Add 20% margin like official COPC example
-        const extent = Extent.fromBox3(CONFIG.crs, bbox).withRelativeMargin(0.2);
-        console.log('📷 Loading imagery for extent (with margin):', extent);
-        console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
+        const extent = Extent.fromBox3(CONFIG.crs, bbox);
+        console.log('📷 Loading orthophoto for extent:', extent);
+        console.log('📷 Extent CRS:', CONFIG.crs);
 
-        // Use TiledImageSource + XYZ exactly like official COPC example
-        // ESRI World Imagery (free, no API key, EPSG:3857)
-        state.colorLayer = new ColorLayer({
-            extent,
-            resolutionFactor: 0.5,  // Same as official example
-            source: new TiledImageSource({
-                source: new XYZ({
-                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    projection: 'EPSG:3857',
-                    crossOrigin: 'anonymous',
-                }),
-            }),
+        // WmtsSource + LAMB93 gave us "dark" result (not black) = tiles ARE loading!
+        // This is the same CRS as our point cloud (EPSG:2154)
+        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+        console.log('📷 Using WmtsSource with LAMB93 matrixSet (same CRS as point cloud)');
+
+        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+            matrixSet: 'LAMB93',  // Same CRS as point cloud!
         });
 
-        console.log('✅ ColorLayer created with ESRI World Imagery');
+        console.log('✅ WMTS source created');
+
+        state.colorLayer = new ColorLayer({
+            name: 'ortho',
+            extent,
+            source: wmtsSource,
+            // Boost brightness/contrast on the ColorLayer itself!
+            brightness: 2.0,
+            contrast: 1.5,
+            saturation: 1.2,
+        });
+
+        console.log('✅ ColorLayer created with brightness/contrast boost');
+        console.log('📷 ColorLayer brightness:', state.colorLayer.brightness);
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
-
-        // Use setColoringMode('layer') - this is the documented API for PointCloud
-        // Note: For Tiles3D entities, use pointCloudMode = MODE.TEXTURE instead
         state.pointCloud.setColoringMode('layer');
 
-        // Boost brightness/contrast for layer mode - similar fix as elevation
-        // Layer mode often appears dark, so we boost visibility
+        // Also try boosting on PointCloud
         state.pointCloud.brightness = 2.0;
         state.pointCloud.contrast = 1.5;
         state.pointCloud.saturation = 1.2;
