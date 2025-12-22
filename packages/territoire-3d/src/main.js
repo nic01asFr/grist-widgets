@@ -452,13 +452,15 @@ async function loadOrthoColorization() {
         console.log('📷 Point cloud CRS:', CONFIG.crs);
         console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
-        // Use WmtsSource.fromCapabilities() - this gave us dark (not black) result
+        // Use WmtsSource.fromCapabilities() with LAMB93 matrixSet to match point cloud CRS
         const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
 
         console.log('📷 Fetching WMTS capabilities from:', wmtsUrl);
+        console.log('📷 Using matrixSet LAMB93 to match point cloud CRS:', CONFIG.crs);
 
         const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
             layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+            matrixSet: 'LAMB93',  // Use LAMB93 to match point cloud CRS (EPSG:2154)
         });
 
         console.log('✅ WMTS source created');
