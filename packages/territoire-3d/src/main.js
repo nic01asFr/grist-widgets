@@ -355,32 +355,35 @@ function setDisplayMode(mode) {
         if (previousMode === 'ortho' && mode !== 'ortho') {
             console.log('🔄 Cleaning up from ortho mode...');
 
-            // 1. Hide Map entity (keeps it cached for reuse)
+            // 1. Remove Map entity from instance completely
             if (state.orthoMap) {
-                state.orthoMap.visible = false;
+                state.instance.remove(state.orthoMap);
+                state.orthoMap = null;
+                console.log('✅ Map entity removed from instance');
             }
 
-            // 2. Hide and detach ColorLayer from PointCloud
+            // 2. Clear ColorLayer reference
             if (state.colorLayer) {
-                state.colorLayer.visible = false;
+                state.colorLayer = null;
             }
 
-            // 3. Explicitly clear ColorLayer reference on PointCloud
-            // ⚠️ CRITICAL: setColorLayer(null) + removeColorLayer() both needed!
+            // 3. Detach ColorLayer from PointCloud
             pc.setColorLayer(null);
             pc.removeColorLayer();
-            console.log('✅ ColorLayer cleared and removed from PointCloud');
+            console.log('✅ ColorLayer detached from PointCloud');
 
-            // 4. Reset rendering parameters (ortho mode may have modified these)
+            // 4. Reset rendering parameters
             pc.brightness = 1.0;
             pc.contrast = 1.0;
             pc.saturation = 1.0;
 
-            // 5. Switch back to attribute mode BEFORE setting specific attribute
+            // 5. Switch back to attribute mode AND set attribute to force shader rebuild
+            // ⚠️ CRITICAL: Must set both to force Giro3D shader recompilation
             pc.setColoringMode('attribute');
-            console.log('✅ Reset to attribute coloring mode');
+            pc.setActiveAttribute('Classification');
+            console.log('✅ Reset to attribute mode with Classification');
 
-            // 6. Force an update to apply cleanup before switching modes
+            // 6. Force update
             state.instance.notifyChange(pc);
         }
 
@@ -499,18 +502,8 @@ async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
     try {
-        // If ColorLayer already exists, re-apply it and switch mode
-        if (state.colorLayer) {
-            console.log('📷 Reusing existing ColorLayer');
-            state.colorLayer.visible = true;
-            if (state.orthoMap) state.orthoMap.visible = true;
-            state.pointCloud.setColorLayer(state.colorLayer);
-            state.pointCloud.setColoringMode('layer');
-            state.instance.notifyChange(state.pointCloud);
-            showToast('Imagerie satellite activée', 'success');
-            return;
-        }
-
+        // Always create fresh Map entity and ColorLayer
+        // (previous ones are destroyed when leaving ortho mode to prevent white points bug)
         showToast('Chargement imagerie satellite...', 'info');
 
         // Get bounding box from point cloud
