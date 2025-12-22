@@ -363,19 +363,25 @@ function setDisplayMode(mode) {
             // 2. Hide and detach ColorLayer from PointCloud
             if (state.colorLayer) {
                 state.colorLayer.visible = false;
-                pc.removeColorLayer();  // ← Critical: detach from PointCloud
-                console.log('✅ ColorLayer removed from PointCloud');
             }
 
-            // 3. Reset rendering parameters (ortho mode may have modified these)
+            // 3. Explicitly clear ColorLayer reference on PointCloud
+            // ⚠️ CRITICAL: setColorLayer(null) + removeColorLayer() both needed!
+            pc.setColorLayer(null);
+            pc.removeColorLayer();
+            console.log('✅ ColorLayer cleared and removed from PointCloud');
+
+            // 4. Reset rendering parameters (ortho mode may have modified these)
             pc.brightness = 1.0;
             pc.contrast = 1.0;
             pc.saturation = 1.0;
 
-            // 4. Switch back to attribute mode BEFORE setting specific attribute
-            // ⚠️ Without this, other modes may show white points
+            // 5. Switch back to attribute mode BEFORE setting specific attribute
             pc.setColoringMode('attribute');
             console.log('✅ Reset to attribute coloring mode');
+
+            // 6. Force an update to apply cleanup before switching modes
+            state.instance.notifyChange(pc);
         }
 
         switch (mode) {
