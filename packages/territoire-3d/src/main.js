@@ -15,6 +15,7 @@ import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3, Color } from 'three';
 import XYZ from 'ol/source/XYZ.js';
+import TileWMS from 'ol/source/TileWMS.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -460,26 +461,31 @@ async function loadOrthoColorization() {
         console.log('📷 Loading orthophoto for extent:', extent);
         console.log('📷 Extent CRS:', CONFIG.crs);
 
-        // WmtsSource + LAMB93 gave us "dark" result (not black) = tiles ARE loading!
-        // This is the same CRS as our point cloud (EPSG:2154)
-        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
-        console.log('📷 Using WmtsSource with LAMB93 matrixSet (same CRS as point cloud)');
+        // Use TileWMS like the official Giro3D example (getting-started tutorial)
+        // https://giro3d.org/latest/tutorials/getting-started.html
+        console.log('📷 Using TileWMS with IGN WMS-R (like official example)');
 
-        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-            matrixSet: 'LAMB93',  // Same CRS as point cloud!
+        const satelliteSource = new TiledImageSource({
+            source: new TileWMS({
+                url: 'https://data.geopf.fr/wms-r',
+                projection: CONFIG.crs,  // EPSG:2154
+                params: {
+                    LAYERS: 'ORTHOIMAGERY.ORTHOPHOTOS',
+                    FORMAT: 'image/jpeg',
+                },
+                crossOrigin: 'anonymous',
+            }),
         });
 
-        console.log('✅ WMTS source created');
+        console.log('✅ TileWMS source created');
 
-        // Version minimale - pas de brightness/contrast pour ne pas corrompre
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            source: wmtsSource,
+            source: satelliteSource,
         });
 
-        console.log('✅ ColorLayer created (minimal config)');
+        console.log('✅ ColorLayer created with TileWMS');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
