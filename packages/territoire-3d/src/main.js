@@ -464,7 +464,7 @@ async function loadOrthoColorization() {
 
         showToast('Chargement orthophoto IGN...', 'info');
 
-        // Get bounding box from point cloud for logging
+        // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
         console.log('📷 Loading orthophoto IGN (LAMB93 - same CRS as point cloud)');
         console.log('📷 Point cloud bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
@@ -481,13 +481,23 @@ async function loadOrthoColorization() {
 
         console.log('✅ WmtsSource created with LAMB93 matrixSet');
 
+        // Get the CRS object from the instance (not just a string)
+        // This is how the Lidar HD example does it
+        const crs = state.instance.referenceCrs;
+        console.log('📷 Instance CRS:', crs);
+
+        // Create extent with proper CRS object (like Lidar HD example)
+        const extent = Extent.fromBox3(crs, bbox);
+        console.log('📷 Extent created:', extent);
+
         state.colorLayer = new ColorLayer({
             name: 'ortho',
+            extent,  // Add extent like Lidar HD example
             source: wmtsSource,
             resolutionFactor: 0.5,
         });
 
-        console.log('✅ ColorLayer created with IGN WMTS (LAMB93)');
+        console.log('✅ ColorLayer created with IGN WMTS (LAMB93) + extent');
 
         // Apply directly to point cloud (without Map entity)
         state.pointCloud.setColorLayer(state.colorLayer);
