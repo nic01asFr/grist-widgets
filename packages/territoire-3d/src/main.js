@@ -481,10 +481,10 @@ async function loadOrthoColorization() {
 
         console.log('✅ WmtsSource created with LAMB93 matrixSet');
 
-        // Get the CRS object from the instance (not just a string)
-        // This is how the Lidar HD example does it
-        const crs = state.instance.referenceCrs;
-        console.log('📷 Instance CRS:', crs);
+        // Get the CRS object using CoordinateSystem.get()
+        // instance.referenceCrs was undefined, so use the registered CRS
+        const crs = CoordinateSystem.get(CONFIG.crs);
+        console.log('📷 CRS object:', crs);
 
         // Create extent with proper CRS object (like Lidar HD example)
         const extent = Extent.fromBox3(crs, bbox);
@@ -1730,7 +1730,7 @@ async function init() {
     }
 }
 
-// Start
+// Start - Build timestamp: 2025-12-22T14:30:00
 console.log('🚀 Starting Territoire 3D...');
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
