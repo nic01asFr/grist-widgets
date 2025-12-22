@@ -487,14 +487,17 @@ async function loadOrthoColorization() {
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
-        state.pointCloud.setColoringMode('layer');
+
+        // TEST: Don't call setColoringMode('layer') - it seems to corrupt PointCloud state
+        // Instead, let's see if just setColorLayer is enough
+        // state.pointCloud.setColoringMode('layer');  // DISABLED - corrupts state!
 
         // Also try boosting on PointCloud
         state.pointCloud.brightness = 2.0;
         state.pointCloud.contrast = 1.5;
         state.pointCloud.saturation = 1.2;
 
-        console.log('📷 ColoringMode set to: layer');
+        console.log('📷 ColorLayer applied WITHOUT setColoringMode(layer)');
         console.log('📷 brightness:', state.pointCloud.brightness, 'contrast:', state.pointCloud.contrast);
         console.log('📷 ColorLayer extent:', state.colorLayer.extent);
 
