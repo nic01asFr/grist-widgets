@@ -464,20 +464,18 @@ async function loadOrthoColorization() {
 
         showToast('Chargement imagerie satellite...', 'info');
 
-        // Get bounding box from point cloud
+        // Get bounding box from point cloud for logging
         const bbox = state.pointCloud.getBoundingBox();
-        const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📷 Loading satellite imagery for extent:', extent);
-        console.log('📷 Extent CRS:', CONFIG.crs);
-        console.log('📷 Bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
+        console.log('📷 Loading satellite imagery');
+        console.log('📷 Point cloud bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
 
-        // Try without Map entity - just set ColorLayer directly on PointCloud
-        // Using TiledImageSource + XYZ (ESRI World Imagery - free, no API key)
+        // Create ColorLayer WITHOUT extent - let Giro3D handle the reprojection
+        // The source has its own projection (EPSG:3857), Giro3D will reproject as needed
         console.log('📷 Using TiledImageSource+XYZ (ESRI World Imagery, EPSG:3857)');
 
         state.colorLayer = new ColorLayer({
             name: 'ortho',
-            extent,
+            // Don't specify extent - let the source define its own coverage
             resolutionFactor: 0.5,
             source: new TiledImageSource({
                 source: new XYZ({
