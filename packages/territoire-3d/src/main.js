@@ -452,38 +452,40 @@ async function loadOrthoColorization() {
         console.log('📷 Point cloud CRS:', CONFIG.crs);
         console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
-        // Use TiledImageSource + XYZ like the official COPC example
-        // IGN Orthophoto in XYZ format (PM = Web Mercator tiles)
-        const orthoUrl = 'https://data.geopf.fr/wmts?' +
-            'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
-            '&LAYER=HR.ORTHOIMAGERY.ORTHOPHOTOS' +
-            '&STYLE=normal' +
-            '&FORMAT=image/jpeg' +
-            '&TILEMATRIXSET=PM' +
-            '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+        // Use WmtsSource with LAMB93 - this gave us "dark" (not black) result
+        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+        console.log('📷 Fetching WMTS capabilities...');
 
-        console.log('📷 Using TiledImageSource + XYZ (like official COPC example)');
+        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+            matrixSet: 'LAMB93',
+        });
+
+        console.log('✅ WMTS source created');
 
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            resolutionFactor: 0.5,  // Same as official example
-            source: new TiledImageSource({
-                source: new XYZ({
-                    url: orthoUrl,
-                    projection: 'EPSG:3857',  // PM tiles are in Web Mercator
-                    crossOrigin: 'anonymous',
-                }),
-            }),
+            source: wmtsSource,
         });
 
-        console.log('✅ ColorLayer created with IGN Orthophoto (TiledImageSource/XYZ)');
+        console.log('✅ ColorLayer created with IGN Orthophoto');
 
-        // Apply to point cloud - following official COPC example exactly
+        // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
+
+        // Use setColoringMode('layer') - this is the documented API for PointCloud
+        // Note: For Tiles3D entities, use pointCloudMode = MODE.TEXTURE instead
         state.pointCloud.setColoringMode('layer');
 
+        // Boost brightness/contrast for layer mode - similar fix as elevation
+        // Layer mode often appears dark, so we boost visibility
+        state.pointCloud.brightness = 2.0;
+        state.pointCloud.contrast = 1.5;
+        state.pointCloud.saturation = 1.2;
+
         console.log('📷 ColoringMode set to: layer');
+        console.log('📷 brightness:', state.pointCloud.brightness, 'contrast:', state.pointCloud.contrast);
         console.log('📷 ColorLayer extent:', state.colorLayer.extent);
 
         // Notify change
