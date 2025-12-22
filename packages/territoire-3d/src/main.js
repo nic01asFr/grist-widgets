@@ -9,11 +9,12 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
-import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
+import Map from '@giro3d/giro3d/entities/Map.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3, Color } from 'three';
+import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -72,6 +73,7 @@ const state = {
     instance: null,
     pointCloud: null,
     colorLayer: null,
+    orthoMap: null,  // Map entity for ColorLayer (required by Giro3D to load tiles)
     controls: null,
 
     // Data
@@ -342,7 +344,10 @@ function setDisplayMode(mode) {
         if (previousMode === 'ortho' && mode !== 'ortho') {
             console.log('🔄 Cleaning up from ortho mode...');
 
-            // Hide and remove the color layer
+            // Hide the Map entity and ColorLayer
+            if (state.orthoMap) {
+                state.orthoMap.visible = false;
+            }
             if (state.colorLayer) {
                 state.colorLayer.visible = false;
                 pc.removeColorLayer();
@@ -454,7 +459,7 @@ async function loadOrthoColorization() {
         if (state.colorLayer) {
             console.log('📷 Reusing existing ColorLayer');
             state.colorLayer.visible = true;
-            // Need to re-set the color layer since we removed it when leaving ortho mode
+            if (state.orthoMap) state.orthoMap.visible = true;
             state.pointCloud.setColorLayer(state.colorLayer);
             state.pointCloud.setColoringMode('layer');
             state.instance.notifyChange(state.pointCloud);
@@ -462,59 +467,77 @@ async function loadOrthoColorization() {
             return;
         }
 
-        showToast('Chargement orthophoto IGN...', 'info');
+        showToast('Chargement imagerie satellite...', 'info');
 
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
-        console.log('📷 Loading orthophoto IGN (LAMB93 - same CRS as point cloud)');
+        console.log('📷 Loading satellite imagery (following official COPC example pattern)');
         console.log('📷 Point cloud bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
 
-        // Use IGN WMTS with LAMB93 TileMatrixSet - native EPSG:2154 (same as point cloud)
-        console.log('📷 Using WmtsSource.fromCapabilities with LAMB93 matrixSet');
-
-        const capabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
-
-        const wmtsSource = await WmtsSource.fromCapabilities(capabilitiesUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-            matrixSet: 'LAMB93',  // Native EPSG:2154 - same as point cloud
-        });
-
-        console.log('✅ WmtsSource created with LAMB93 matrixSet');
-
-        // Get the CRS object using CoordinateSystem.get()
-        // instance.referenceCrs was undefined, so use the registered CRS
+        // Step 1: Get CRS and create extent (like official example)
         const crs = CoordinateSystem.get(CONFIG.crs);
-        console.log('📷 CRS object:', crs);
+        console.log('📷 Step 1 - CRS object:', crs);
 
-        // Create extent with proper CRS object (like Lidar HD example)
         const extent = Extent.fromBox3(crs, bbox);
-        console.log('📷 Extent created:', extent);
+        console.log('📷 Step 1 - Extent:', extent);
+
+        // Step 2: Create Map entity with extent (REQUIRED - this is what loads tiles!)
+        // Official example: const map = new Map({ extent });
+        console.log('📷 Step 2 - Creating Map entity with extent');
+        state.orthoMap = new Map({ extent });
+
+        // Position map below point cloud so it doesn't interfere visually
+        state.orthoMap.object3d.position.z = bbox.min.z - 100;
+        state.orthoMap.visible = false;  // Hide the map plane, we only need it for tile loading
+
+        await state.instance.add(state.orthoMap);
+        console.log('✅ Step 2 - Map entity added to instance');
+
+        // Step 3: Create ColorLayer with TiledImageSource + XYZ (like official example)
+        // Official example uses MapBox, we use ESRI (free, no API key)
+        console.log('📷 Step 3 - Creating ColorLayer with TiledImageSource + XYZ');
 
         state.colorLayer = new ColorLayer({
-            name: 'ortho',
-            extent,  // Add extent like Lidar HD example
-            source: wmtsSource,
+            extent,
             resolutionFactor: 0.5,
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    projection: 'EPSG:3857',
+                    crossOrigin: 'anonymous',
+                }),
+            }),
         });
 
-        console.log('✅ ColorLayer created with IGN WMTS (LAMB93) + extent');
+        console.log('✅ Step 3 - ColorLayer created');
 
-        // Apply directly to point cloud (without Map entity)
+        // Step 4: Add ColorLayer to Map first (CRITICAL - this triggers tile loading!)
+        // Official example: map.addLayer(colorLayer);
+        console.log('📷 Step 4 - Adding ColorLayer to Map entity');
+        await state.orthoMap.addLayer(state.colorLayer);
+        console.log('✅ Step 4 - ColorLayer added to Map');
+
+        // Step 5: Set ColorLayer on PointCloud
+        // Official example: entity.setColorLayer(colorLayer);
+        console.log('📷 Step 5 - Setting ColorLayer on PointCloud');
         state.pointCloud.setColorLayer(state.colorLayer);
-        console.log('✅ ColorLayer set on PointCloud');
+        console.log('✅ Step 5 - ColorLayer set on PointCloud');
 
-        // Switch to layer coloring mode
+        // Step 6: Switch to layer coloring mode
+        // Official example: entity.setColoringMode("layer");
+        console.log('📷 Step 6 - Setting coloring mode to layer');
         state.pointCloud.setColoringMode('layer');
-        console.log('📷 ColoringMode set to: layer');
+        console.log('✅ Step 6 - ColoringMode set to: layer');
 
         // Notify change
         state.instance.notifyChange(state.pointCloud);
 
-        console.log('✅ Satellite imagery layer applied');
+        console.log('✅ Satellite imagery layer applied (following official COPC pattern)');
         showToast('Imagerie satellite appliquée', 'success');
 
     } catch (error) {
         console.error('❌ Error loading satellite imagery:', error);
+        console.error('❌ Error details:', error.stack);
         showToast('Erreur imagerie: ' + error.message, 'error');
     }
 }
