@@ -326,6 +326,7 @@ async function setupCamera() {
 // pointCloudMode (MODE enum) seems to only work with Tiles3D entities
 
 function setDisplayMode(mode) {
+    const previousMode = state.currentDisplay;
     state.currentDisplay = mode;
 
     // Update UI
@@ -338,26 +339,16 @@ function setDisplayMode(mode) {
     try {
         const pc = state.pointCloud;
 
-        // When leaving ortho mode, properly cleanup
-        if (mode !== 'ortho') {
-            // Reset to attribute mode first
-            pc.setColoringMode('attribute');
-
-            // Remove/hide ColorLayer
+        // Only cleanup if we were ACTUALLY in ortho mode before
+        // (ortho is currently disabled, so this shouldn't trigger)
+        if (previousMode === 'ortho' && mode !== 'ortho') {
+            console.log('🔄 Cleaning up from ortho mode...');
             if (state.colorLayer) {
                 state.colorLayer.visible = false;
-                // Try to remove the color layer to fully reset state
-                if (pc.removeColorLayer) {
-                    pc.removeColorLayer();
-                }
             }
-
-            // Reset brightness/contrast/saturation to defaults
             pc.brightness = 1.0;
             pc.contrast = 1.0;
             pc.saturation = 1.0;
-
-            console.log('🔄 Reset from ortho mode: brightness/contrast restored');
         }
 
         switch (mode) {
