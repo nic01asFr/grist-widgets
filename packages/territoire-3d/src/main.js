@@ -1730,7 +1730,7 @@ async function init() {
     }
 }
 
-// Start
+// Start - Build timestamp: 2025-12-22T14:30:00
 console.log('🚀 Starting Territoire 3D...');
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
