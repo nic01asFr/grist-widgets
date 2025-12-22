@@ -473,24 +473,32 @@ async function loadOrthoColorization() {
 
         console.log('✅ ColorLayer created with IGN Orthophoto');
 
-        // Apply to point cloud
+        // Debug: log PointCloud properties to understand available modes
+        console.log('📷 PointCloud properties:', Object.keys(state.pointCloud));
+        console.log('📷 PointCloud.material:', state.pointCloud.material);
+
+        // Apply to point cloud using setColorLayer (required for PointCloud entity)
         state.pointCloud.setColorLayer(state.colorLayer);
 
-        // Switch to layer coloring mode
+        // Try BOTH methods - setColoringMode('layer') is documented for PointCloud
+        // but MODE.TEXTURE works for Tiles3D, let's try both
         state.pointCloud.setColoringMode('layer');
 
-        // Boost brightness significantly - layer mode is very dark
-        state.pointCloud.brightness = 3.0;
-        state.pointCloud.contrast = 2.0;
-        state.pointCloud.saturation = 1.5;
+        // Also try setting pointCloudMode if it exists
+        if ('pointCloudMode' in state.pointCloud) {
+            state.pointCloud.pointCloudMode = MODE.TEXTURE;
+            console.log('📷 Also set pointCloudMode = MODE.TEXTURE');
+        }
+
+        // Reset brightness/contrast to normal (let's see raw result first)
+        state.pointCloud.brightness = 1.0;
+        state.pointCloud.contrast = 1.0;
+        state.pointCloud.saturation = 1.0;
 
         console.log('📷 ColoringMode set to: layer');
         console.log('📷 ColorLayer visible:', state.colorLayer.visible);
-        console.log('📷 brightness:', state.pointCloud.brightness, 'contrast:', state.pointCloud.contrast);
-
-        // Debug: check if color layer is actually providing colors
-        console.log('📷 ColorLayer source:', state.colorLayer.source);
         console.log('📷 ColorLayer extent:', state.colorLayer.extent);
+        console.log('📷 ColorLayer source type:', state.colorLayer.source?.constructor?.name);
 
         // Notify change
         state.instance.notifyChange(state.pointCloud);
