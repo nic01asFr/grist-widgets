@@ -9,7 +9,6 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
-import Map from '@giro3d/giro3d/entities/Map.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
@@ -73,7 +72,6 @@ const state = {
     instance: null,
     pointCloud: null,
     colorLayer: null,
-    orthoMap: null,  // Map entity for ColorLayer (like official COPC example)
     controls: null,
 
     // Data
@@ -473,34 +471,14 @@ async function loadOrthoColorization() {
         console.log('📷 Extent CRS:', CONFIG.crs);
         console.log('📷 Bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
 
-        // Use EXACTLY the same pattern as official COPC example:
-        // https://gitlab.com/giro3d/giro3d/-/raw/main/examples/copc.js
-        // 1. Create a Map entity
-        // 2. Create ColorLayer with TiledImageSource+XYZ
-        // 3. Add ColorLayer to Map
-        // 4. Set ColorLayer on PointCloud
-        console.log('📷 Using TiledImageSource+XYZ like official COPC example');
+        // Try without Map entity - just set ColorLayer directly on PointCloud
+        // Using TiledImageSource + XYZ (ESRI World Imagery - free, no API key)
+        console.log('📷 Using TiledImageSource+XYZ (ESRI World Imagery, EPSG:3857)');
 
-        // Create Map entity for the ColorLayer (like official example)
-        // The Map needs to be at the same location as the point cloud
-        if (!state.orthoMap) {
-            state.orthoMap = new Map({
-                extent,
-                backgroundColor: 'black',
-                hillshading: false,
-            });
-            // Position the map just below the point cloud to not interfere
-            state.orthoMap.object3d.position.z = bbox.min.z - 10;
-            await state.instance.add(state.orthoMap);
-            console.log('✅ Map entity created for ColorLayer');
-        }
-
-        // Create ColorLayer with TiledImageSource + XYZ (ESRI World Imagery - free, no API key)
-        // Using EPSG:3857 like the official example
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            resolutionFactor: 0.5,  // Like official COPC example
+            resolutionFactor: 0.5,
             source: new TiledImageSource({
                 source: new XYZ({
                     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -510,13 +488,9 @@ async function loadOrthoColorization() {
             }),
         });
 
-        console.log('✅ ColorLayer created with TiledImageSource+XYZ (ESRI World Imagery)');
+        console.log('✅ ColorLayer created with TiledImageSource+XYZ');
 
-        // Add ColorLayer to Map first (like official example: map.addLayer(colorLayer))
-        await state.orthoMap.addLayer(state.colorLayer);
-        console.log('✅ ColorLayer added to Map entity');
-
-        // Apply to point cloud
+        // Apply directly to point cloud (without Map entity)
         state.pointCloud.setColorLayer(state.colorLayer);
         console.log('✅ ColorLayer set on PointCloud');
 
