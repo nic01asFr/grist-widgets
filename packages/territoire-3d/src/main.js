@@ -8,14 +8,11 @@ import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js
 import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
-import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
 import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3, Color } from 'three';
-import XYZ from 'ol/source/XYZ.js';
-import TileWMS from 'ol/source/TileWMS.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -340,16 +337,25 @@ function setDisplayMode(mode) {
     try {
         const pc = state.pointCloud;
 
-        // Only cleanup if we were ACTUALLY in ortho mode before
-        // (ortho is currently disabled, so this shouldn't trigger)
+        // Cleanup when leaving ortho mode - remove the ColorLayer completely
         if (previousMode === 'ortho' && mode !== 'ortho') {
             console.log('🔄 Cleaning up from ortho mode...');
+
+            // Hide and remove the color layer
             if (state.colorLayer) {
                 state.colorLayer.visible = false;
+                pc.removeColorLayer();
+                console.log('✅ ColorLayer removed from PointCloud');
             }
+
+            // Reset any brightness/contrast/saturation modifications
             pc.brightness = 1.0;
             pc.contrast = 1.0;
             pc.saturation = 1.0;
+
+            // Force switch back to attribute mode BEFORE setting specific attribute
+            pc.setColoringMode('attribute');
+            console.log('✅ Reset to attribute coloring mode');
         }
 
         switch (mode) {
@@ -443,10 +449,12 @@ async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
     try {
-        // If ColorLayer already exists, just show it and switch mode
+        // If ColorLayer already exists, re-apply it and switch mode
         if (state.colorLayer) {
             console.log('📷 Reusing existing ColorLayer');
             state.colorLayer.visible = true;
+            // Need to re-set the color layer since we removed it when leaving ortho mode
+            state.pointCloud.setColorLayer(state.colorLayer);
             state.pointCloud.setColoringMode('layer');
             state.instance.notifyChange(state.pointCloud);
             showToast('Imagerie satellite activée', 'success');
@@ -460,39 +468,35 @@ async function loadOrthoColorization() {
         const extent = Extent.fromBox3(CONFIG.crs, bbox);
         console.log('📷 Loading orthophoto for extent:', extent);
         console.log('📷 Extent CRS:', CONFIG.crs);
+        console.log('📷 Bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
 
-        // Use TileWMS like the official Giro3D example (getting-started tutorial)
-        // https://giro3d.org/latest/tutorials/getting-started.html
-        console.log('📷 Using TileWMS with IGN WMS-R (like official example)');
+        // Use WmtsSource.fromCapabilities() like official colorized_pointcloud example
+        // https://giro3d.org/next/examples/colorized_pointcloud.html
+        console.log('📷 Using WmtsSource.fromCapabilities (like official example)');
 
-        const satelliteSource = new TiledImageSource({
-            source: new TileWMS({
-                url: 'https://data.geopf.fr/wms-r',
-                projection: CONFIG.crs,  // EPSG:2154
-                params: {
-                    LAYERS: 'ORTHOIMAGERY.ORTHOPHOTOS',
-                    FORMAT: 'image/jpeg',
-                },
-                crossOrigin: 'anonymous',
-            }),
+        const capabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+
+        const orthophotoWmts = await WmtsSource.fromCapabilities(capabilitiesUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
         });
 
-        console.log('✅ TileWMS source created');
+        console.log('✅ WmtsSource created from capabilities');
 
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            source: satelliteSource,
+            source: orthophotoWmts,
+            resolutionFactor: 0.5,  // Like official COPC example
         });
 
-        console.log('✅ ColorLayer created with TileWMS');
+        console.log('✅ ColorLayer created with WmtsSource');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
+        console.log('✅ ColorLayer set on PointCloud');
 
-        // Activer le mode layer pour voir le canvas sombre
+        // Switch to layer coloring mode
         state.pointCloud.setColoringMode('layer');
-
         console.log('📷 ColoringMode set to: layer');
 
         // Notify change
