@@ -338,15 +338,26 @@ function setDisplayMode(mode) {
     try {
         const pc = state.pointCloud;
 
-        // Hide ColorLayer and reset brightness/contrast when not in ortho mode
+        // When leaving ortho mode, properly cleanup
         if (mode !== 'ortho') {
+            // Reset to attribute mode first
+            pc.setColoringMode('attribute');
+
+            // Remove/hide ColorLayer
             if (state.colorLayer) {
                 state.colorLayer.visible = false;
+                // Try to remove the color layer to fully reset state
+                if (pc.removeColorLayer) {
+                    pc.removeColorLayer();
+                }
             }
-            // Reset brightness/contrast/saturation to defaults (ortho mode changes these)
+
+            // Reset brightness/contrast/saturation to defaults
             pc.brightness = 1.0;
             pc.contrast = 1.0;
             pc.saturation = 1.0;
+
+            console.log('🔄 Reset from ortho mode: brightness/contrast restored');
         }
 
         switch (mode) {
