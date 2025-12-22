@@ -472,34 +472,22 @@ async function loadOrthoColorization() {
 
         console.log('✅ WMTS source created');
 
+        // Version minimale - pas de brightness/contrast pour ne pas corrompre
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
             source: wmtsSource,
-            // Boost brightness/contrast on the ColorLayer itself!
-            brightness: 2.0,
-            contrast: 1.5,
-            saturation: 1.2,
         });
 
-        console.log('✅ ColorLayer created with brightness/contrast boost');
-        console.log('📷 ColorLayer brightness:', state.colorLayer.brightness);
+        console.log('✅ ColorLayer created (minimal config)');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
 
-        // TEST: Don't call setColoringMode('layer') - it seems to corrupt PointCloud state
-        // Instead, let's see if just setColorLayer is enough
-        // state.pointCloud.setColoringMode('layer');  // DISABLED - corrupts state!
+        // Activer le mode layer pour voir le canvas sombre
+        state.pointCloud.setColoringMode('layer');
 
-        // Also try boosting on PointCloud
-        state.pointCloud.brightness = 2.0;
-        state.pointCloud.contrast = 1.5;
-        state.pointCloud.saturation = 1.2;
-
-        console.log('📷 ColorLayer applied WITHOUT setColoringMode(layer)');
-        console.log('📷 brightness:', state.pointCloud.brightness, 'contrast:', state.pointCloud.contrast);
-        console.log('📷 ColorLayer extent:', state.colorLayer.extent);
+        console.log('📷 ColoringMode set to: layer');
 
         // Notify change
         state.instance.notifyChange(state.pointCloud);
