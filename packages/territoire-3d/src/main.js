@@ -449,33 +449,30 @@ async function loadOrthoColorization() {
             return;
         }
 
-        showToast('Chargement de l\'orthophoto IGN...', 'info');
+        showToast('Chargement de l\'imagerie satellite...', 'info');
 
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
-        const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📷 Loading orthophoto for extent:', extent);
-        console.log('📷 Point cloud CRS:', CONFIG.crs);
+        // Add 20% margin like official COPC example
+        const extent = Extent.fromBox3(CONFIG.crs, bbox).withRelativeMargin(0.2);
+        console.log('📷 Loading imagery for extent (with margin):', extent);
         console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
-        // Use WmtsSource with LAMB93 - this gave us "dark" (not black) result
-        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
-        console.log('📷 Fetching WMTS capabilities...');
-
-        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-            matrixSet: 'LAMB93',
-        });
-
-        console.log('✅ WMTS source created');
-
+        // Use TiledImageSource + XYZ exactly like official COPC example
+        // ESRI World Imagery (free, no API key, EPSG:3857)
         state.colorLayer = new ColorLayer({
-            name: 'ortho',
             extent,
-            source: wmtsSource,
+            resolutionFactor: 0.5,  // Same as official example
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    projection: 'EPSG:3857',
+                    crossOrigin: 'anonymous',
+                }),
+            }),
         });
 
-        console.log('✅ ColorLayer created with IGN Orthophoto');
+        console.log('✅ ColorLayer created with ESRI World Imagery');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
