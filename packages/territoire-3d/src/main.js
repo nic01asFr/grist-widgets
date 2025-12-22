@@ -9,11 +9,11 @@ import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
 import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3, Color } from 'three';
-import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -462,31 +462,32 @@ async function loadOrthoColorization() {
             return;
         }
 
-        showToast('Chargement imagerie satellite...', 'info');
+        showToast('Chargement orthophoto IGN...', 'info');
 
         // Get bounding box from point cloud for logging
         const bbox = state.pointCloud.getBoundingBox();
-        console.log('📷 Loading satellite imagery');
+        console.log('📷 Loading orthophoto IGN (LAMB93 - same CRS as point cloud)');
         console.log('📷 Point cloud bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
 
-        // Create ColorLayer WITHOUT extent - let Giro3D handle the reprojection
-        // The source has its own projection (EPSG:3857), Giro3D will reproject as needed
-        console.log('📷 Using TiledImageSource+XYZ (ESRI World Imagery, EPSG:3857)');
+        // Use IGN WMTS with LAMB93 TileMatrixSet - native EPSG:2154 (same as point cloud)
+        console.log('📷 Using WmtsSource.fromCapabilities with LAMB93 matrixSet');
+
+        const capabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+
+        const wmtsSource = await WmtsSource.fromCapabilities(capabilitiesUrl, {
+            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+            matrixSet: 'LAMB93',  // Native EPSG:2154 - same as point cloud
+        });
+
+        console.log('✅ WmtsSource created with LAMB93 matrixSet');
 
         state.colorLayer = new ColorLayer({
             name: 'ortho',
-            // Don't specify extent - let the source define its own coverage
+            source: wmtsSource,
             resolutionFactor: 0.5,
-            source: new TiledImageSource({
-                source: new XYZ({
-                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    projection: 'EPSG:3857',
-                    crossOrigin: 'anonymous',
-                }),
-            }),
         });
 
-        console.log('✅ ColorLayer created with TiledImageSource+XYZ');
+        console.log('✅ ColorLayer created with IGN WMTS (LAMB93)');
 
         // Apply directly to point cloud (without Map entity)
         state.pointCloud.setColorLayer(state.colorLayer);
