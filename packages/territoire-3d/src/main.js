@@ -452,53 +452,39 @@ async function loadOrthoColorization() {
         console.log('📷 Point cloud CRS:', CONFIG.crs);
         console.log('📷 Extent bounds:', extent.west, extent.south, extent.east, extent.north);
 
-        // Use WmtsSource.fromCapabilities() with LAMB93 matrixSet to match point cloud CRS
-        const wmtsUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+        // Use TiledImageSource + XYZ like the official COPC example
+        // IGN Orthophoto in XYZ format (PM = Web Mercator tiles)
+        const orthoUrl = 'https://data.geopf.fr/wmts?' +
+            'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+            '&LAYER=HR.ORTHOIMAGERY.ORTHOPHOTOS' +
+            '&STYLE=normal' +
+            '&FORMAT=image/jpeg' +
+            '&TILEMATRIXSET=PM' +
+            '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
 
-        console.log('📷 Fetching WMTS capabilities from:', wmtsUrl);
-        console.log('📷 Using matrixSet LAMB93 to match point cloud CRS:', CONFIG.crs);
-
-        const wmtsSource = await WmtsSource.fromCapabilities(wmtsUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-            matrixSet: 'LAMB93',  // Use LAMB93 to match point cloud CRS (EPSG:2154)
-        });
-
-        console.log('✅ WMTS source created');
+        console.log('📷 Using TiledImageSource + XYZ (like official COPC example)');
 
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            source: wmtsSource,
+            resolutionFactor: 0.5,  // Same as official example
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: orthoUrl,
+                    projection: 'EPSG:3857',  // PM tiles are in Web Mercator
+                    crossOrigin: 'anonymous',
+                }),
+            }),
         });
 
-        console.log('✅ ColorLayer created with IGN Orthophoto');
+        console.log('✅ ColorLayer created with IGN Orthophoto (TiledImageSource/XYZ)');
 
-        // Debug: log PointCloud properties to understand available modes
-        console.log('📷 PointCloud properties:', Object.keys(state.pointCloud));
-        console.log('📷 PointCloud.material:', state.pointCloud.material);
-
-        // Apply to point cloud using setColorLayer (required for PointCloud entity)
+        // Apply to point cloud - following official COPC example exactly
         state.pointCloud.setColorLayer(state.colorLayer);
-
-        // Try BOTH methods - setColoringMode('layer') is documented for PointCloud
-        // but MODE.TEXTURE works for Tiles3D, let's try both
         state.pointCloud.setColoringMode('layer');
 
-        // Also try setting pointCloudMode if it exists
-        if ('pointCloudMode' in state.pointCloud) {
-            state.pointCloud.pointCloudMode = MODE.TEXTURE;
-            console.log('📷 Also set pointCloudMode = MODE.TEXTURE');
-        }
-
-        // Reset brightness/contrast to normal (let's see raw result first)
-        state.pointCloud.brightness = 1.0;
-        state.pointCloud.contrast = 1.0;
-        state.pointCloud.saturation = 1.0;
-
         console.log('📷 ColoringMode set to: layer');
-        console.log('📷 ColorLayer visible:', state.colorLayer.visible);
         console.log('📷 ColorLayer extent:', state.colorLayer.extent);
-        console.log('📷 ColorLayer source type:', state.colorLayer.source?.constructor?.name);
 
         // Notify change
         state.instance.notifyChange(state.pointCloud);
