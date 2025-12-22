@@ -333,7 +333,7 @@ async function setupCamera() {
 // For PointCloud entities (COPC), use setColoringMode() + setActiveAttribute()
 // pointCloudMode (MODE enum) seems to only work with Tiles3D entities
 
-function setDisplayMode(mode) {
+async function setDisplayMode(mode) {
     const previousMode = state.currentDisplay;
     state.currentDisplay = mode;
 
@@ -369,7 +369,9 @@ function setDisplayMode(mode) {
 
             // 3. Detach ColorLayer from PointCloud
             pc.setColorLayer(null);
-            pc.removeColorLayer();
+            if (typeof pc.removeColorLayer === 'function') {
+                pc.removeColorLayer();
+            }
             console.log('✅ ColorLayer detached from PointCloud');
 
             // 4. Reset rendering parameters
@@ -377,13 +379,18 @@ function setDisplayMode(mode) {
             pc.contrast = 1.0;
             pc.saturation = 1.0;
 
-            // 5. Switch back to attribute mode AND set attribute to force shader rebuild
-            // ⚠️ CRITICAL: Must set both to force Giro3D shader recompilation
+            // 5. NUCLEAR OPTION: Remove and re-add PointCloud to fully reset state
+            console.log('🔄 Re-adding PointCloud to reset internal state...');
+            state.instance.remove(pc);
+            await state.instance.add(pc);
+            console.log('✅ PointCloud re-added to instance');
+
+            // 6. Switch back to attribute mode
             pc.setColoringMode('attribute');
             pc.setActiveAttribute('Classification');
             console.log('✅ Reset to attribute mode with Classification');
 
-            // 6. Force update
+            // 7. Force update
             state.instance.notifyChange(pc);
         }
 
