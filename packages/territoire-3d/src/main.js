@@ -157,6 +157,10 @@ async function initGiro3D() {
     console.log('✅ CRS registered: EPSG:3857');
 
     // Create instance with proper CRS object (required for Map entity)
+    // ⚠️ CRITICAL: Must use CoordinateSystem.get() to get CRS object, NOT string!
+    // - String CRS (e.g., 'EPSG:2154') will cause Map entity validation to fail
+    // - The error "Expected: undefined, got: EPSG:2154" means Instance CRS wasn't set
+    // - Map entity checks instance.referenceCrs which requires proper CRS object
     const instanceCrs = CoordinateSystem.get(CONFIG.crs);
     console.log('📷 Instance CRS object:', instanceCrs);
 
@@ -343,26 +347,33 @@ function setDisplayMode(mode) {
     try {
         const pc = state.pointCloud;
 
-        // Cleanup when leaving ortho mode - remove the ColorLayer completely
+        // ──────────────────────────────────────────────────────────
+        // ORTHO MODE CLEANUP
+        // When leaving ortho mode, we must properly reset the PointCloud
+        // to avoid white points or corrupted state
+        // ──────────────────────────────────────────────────────────
         if (previousMode === 'ortho' && mode !== 'ortho') {
             console.log('🔄 Cleaning up from ortho mode...');
 
-            // Hide the Map entity and ColorLayer
+            // 1. Hide Map entity (keeps it cached for reuse)
             if (state.orthoMap) {
                 state.orthoMap.visible = false;
             }
+
+            // 2. Hide and detach ColorLayer from PointCloud
             if (state.colorLayer) {
                 state.colorLayer.visible = false;
-                pc.removeColorLayer();
+                pc.removeColorLayer();  // ← Critical: detach from PointCloud
                 console.log('✅ ColorLayer removed from PointCloud');
             }
 
-            // Reset any brightness/contrast/saturation modifications
+            // 3. Reset rendering parameters (ortho mode may have modified these)
             pc.brightness = 1.0;
             pc.contrast = 1.0;
             pc.saturation = 1.0;
 
-            // Force switch back to attribute mode BEFORE setting specific attribute
+            // 4. Switch back to attribute mode BEFORE setting specific attribute
+            // ⚠️ Without this, other modes may show white points
             pc.setColoringMode('attribute');
             console.log('✅ Reset to attribute coloring mode');
         }
@@ -454,6 +465,30 @@ function setDisplayMode(mode) {
     }
 }
 
+// ============================================================
+// ORTHO COLORIZATION - SATELLITE IMAGERY ON POINT CLOUD
+// ============================================================
+// Pattern based on official Giro3D COPC colorize example
+// https://giro3d.org/examples/copc_colorize.html
+//
+// ⚠️ CRITICAL REQUIREMENTS FOR ORTHO COLORIZATION:
+// 1. Instance MUST be created with CRS object (not string!)
+//    → Use: CoordinateSystem.get('EPSG:2154'), NOT: 'EPSG:2154'
+// 2. Map entity MUST be created and added to Instance
+//    → Without Map entity, tiles are NEVER loaded (black canvas)
+// 3. ColorLayer MUST be added to Map first with map.addLayer()
+//    → This is what triggers the tile loading mechanism
+// 4. Then set ColorLayer on PointCloud with pc.setColorLayer()
+// 5. Finally set coloring mode with pc.setColoringMode('layer')
+//
+// PARAMETERS:
+// - extent: Must use CRS object from CoordinateSystem.get()
+// - resolutionFactor: 0.5 = lower resolution (faster), 1.0 = full resolution
+// - TiledImageSource + XYZ: OpenLayers-based tile source
+// - projection: 'EPSG:3857' for most web tile services (reprojected automatically)
+// - crossOrigin: 'anonymous' for CORS requests
+// ============================================================
+
 async function loadOrthoColorization() {
     if (!state.pointCloud) return;
 
@@ -477,57 +512,76 @@ async function loadOrthoColorization() {
         console.log('📷 Loading satellite imagery (following official COPC example pattern)');
         console.log('📷 Point cloud bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
 
-        // Step 1: Get CRS and create extent (like official example)
+        // ──────────────────────────────────────────────────────────
+        // STEP 1: Create CRS object and Extent
+        // ⚠️ Must use CoordinateSystem.get() - strings don't work!
+        // ──────────────────────────────────────────────────────────
         const crs = CoordinateSystem.get(CONFIG.crs);
         console.log('📷 Step 1 - CRS object:', crs);
 
         const extent = Extent.fromBox3(crs, bbox);
         console.log('📷 Step 1 - Extent:', extent);
 
-        // Step 2: Create Map entity with extent (REQUIRED - this is what loads tiles!)
-        // Official example: const map = new Map({ extent });
+        // ──────────────────────────────────────────────────────────
+        // STEP 2: Create Map entity (CRITICAL!)
+        // ⚠️ Without Map entity, tiles are NEVER loaded → black canvas
+        // The Map entity is Giro3D's tile loading mechanism
+        // ──────────────────────────────────────────────────────────
         console.log('📷 Step 2 - Creating Map entity with extent');
         state.orthoMap = new Map({ extent });
 
-        // Position map below point cloud so it doesn't interfere visually
+        // Position map below point cloud (not visible, only used for tile loading)
         state.orthoMap.object3d.position.z = bbox.min.z - 100;
         state.orthoMap.visible = false;  // Hide the map plane, we only need it for tile loading
 
         await state.instance.add(state.orthoMap);
         console.log('✅ Step 2 - Map entity added to instance');
 
-        // Step 3: Create ColorLayer with TiledImageSource + XYZ (like official example)
-        // Official example uses MapBox, we use ESRI (free, no API key)
+        // ──────────────────────────────────────────────────────────
+        // STEP 3: Create ColorLayer with TiledImageSource + XYZ
+        // Available tile sources:
+        // - ESRI World Imagery (used here): Free, no API key, global coverage
+        // - MapBox: Requires API key
+        // - IGN WMTS: French territory only, higher resolution for France
+        // ──────────────────────────────────────────────────────────
         console.log('📷 Step 3 - Creating ColorLayer with TiledImageSource + XYZ');
 
         state.colorLayer = new ColorLayer({
-            extent,
-            resolutionFactor: 0.5,
+            extent,                    // ← Extent from point cloud bbox
+            resolutionFactor: 0.5,     // ← 0.5 = half resolution (faster), 1.0 = full
             source: new TiledImageSource({
                 source: new XYZ({
+                    // ESRI World Imagery - free global satellite imagery
                     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    projection: 'EPSG:3857',
-                    crossOrigin: 'anonymous',
+                    projection: 'EPSG:3857',   // ← Web Mercator (auto-reprojected to LAMB93)
+                    crossOrigin: 'anonymous',  // ← Required for CORS
                 }),
             }),
         });
 
         console.log('✅ Step 3 - ColorLayer created');
 
-        // Step 4: Add ColorLayer to Map first (CRITICAL - this triggers tile loading!)
-        // Official example: map.addLayer(colorLayer);
+        // ──────────────────────────────────────────────────────────
+        // STEP 4: Add ColorLayer to Map entity (CRITICAL!)
+        // ⚠️ This is what triggers tile loading - without this = black canvas
+        // map.addLayer() starts the tile fetching mechanism
+        // ──────────────────────────────────────────────────────────
         console.log('📷 Step 4 - Adding ColorLayer to Map entity');
         await state.orthoMap.addLayer(state.colorLayer);
         console.log('✅ Step 4 - ColorLayer added to Map');
 
-        // Step 5: Set ColorLayer on PointCloud
-        // Official example: entity.setColorLayer(colorLayer);
+        // ──────────────────────────────────────────────────────────
+        // STEP 5: Set ColorLayer on PointCloud
+        // This tells the PointCloud which layer to use for color sampling
+        // ──────────────────────────────────────────────────────────
         console.log('📷 Step 5 - Setting ColorLayer on PointCloud');
         state.pointCloud.setColorLayer(state.colorLayer);
         console.log('✅ Step 5 - ColorLayer set on PointCloud');
 
-        // Step 6: Switch to layer coloring mode
-        // Official example: entity.setColoringMode("layer");
+        // ──────────────────────────────────────────────────────────
+        // STEP 6: Switch to layer coloring mode
+        // Modes: 'attribute' (Classification, Intensity, etc.) | 'layer' (ColorLayer)
+        // ──────────────────────────────────────────────────────────
         console.log('📷 Step 6 - Setting coloring mode to layer');
         state.pointCloud.setColoringMode('layer');
         console.log('✅ Step 6 - ColoringMode set to: layer');
