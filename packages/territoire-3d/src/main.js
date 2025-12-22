@@ -477,13 +477,18 @@ async function loadOrthoColorization() {
         // Switch to layer coloring mode
         state.pointCloud.setColoringMode('layer');
 
-        // Adjust brightness/contrast for better visibility
-        // The layer mode often appears dark, so we boost these values
-        state.pointCloud.brightness = 1.5;
-        state.pointCloud.contrast = 1.2;
-        state.pointCloud.saturation = 1.0;
+        // Boost brightness significantly - layer mode is very dark
+        state.pointCloud.brightness = 3.0;
+        state.pointCloud.contrast = 2.0;
+        state.pointCloud.saturation = 1.5;
 
-        console.log('📷 ColoringMode set to: layer, brightness:', state.pointCloud.brightness, 'contrast:', state.pointCloud.contrast);
+        console.log('📷 ColoringMode set to: layer');
+        console.log('📷 ColorLayer visible:', state.colorLayer.visible);
+        console.log('📷 brightness:', state.pointCloud.brightness, 'contrast:', state.pointCloud.contrast);
+
+        // Debug: check if color layer is actually providing colors
+        console.log('📷 ColorLayer source:', state.colorLayer.source);
+        console.log('📷 ColorLayer extent:', state.colorLayer.extent);
 
         // Notify change
         state.instance.notifyChange(state.pointCloud);
