@@ -156,10 +156,13 @@ async function initGiro3D() {
     );
     console.log('✅ CRS registered: EPSG:3857');
 
-    // Create instance
+    // Create instance with proper CRS object (required for Map entity)
+    const instanceCrs = CoordinateSystem.get(CONFIG.crs);
+    console.log('📷 Instance CRS object:', instanceCrs);
+
     state.instance = new Instance({
         target: 'view',
-        crs: CONFIG.crs,
+        crs: instanceCrs,
         renderer: {
             logarithmicDepthBuffer: true
         }
