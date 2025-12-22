@@ -8,11 +8,13 @@ import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js
 import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
 import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
 import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
-import WmtsSource from '@giro3d/giro3d/sources/WmtsSource.js';
+import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+import Map from '@giro3d/giro3d/entities/Map.js';
 import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
 import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { Vector3, Box3, Color } from 'three';
+import XYZ from 'ol/source/XYZ.js';
 
 // LAZ-PERF WebAssembly path (use jsDelivr for better CORS support)
 import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
@@ -71,6 +73,7 @@ const state = {
     instance: null,
     pointCloud: null,
     colorLayer: null,
+    orthoMap: null,  // Map entity for ColorLayer (like official COPC example)
     controls: null,
 
     // Data
@@ -461,35 +464,57 @@ async function loadOrthoColorization() {
             return;
         }
 
-        showToast('Chargement de l\'orthophoto IGN...', 'info');
+        showToast('Chargement imagerie satellite...', 'info');
 
         // Get bounding box from point cloud
         const bbox = state.pointCloud.getBoundingBox();
         const extent = Extent.fromBox3(CONFIG.crs, bbox);
-        console.log('📷 Loading orthophoto for extent:', extent);
+        console.log('📷 Loading satellite imagery for extent:', extent);
         console.log('📷 Extent CRS:', CONFIG.crs);
         console.log('📷 Bbox:', { minX: bbox.min.x, minY: bbox.min.y, maxX: bbox.max.x, maxY: bbox.max.y });
 
-        // Use WmtsSource.fromCapabilities() like official colorized_pointcloud example
-        // https://giro3d.org/next/examples/colorized_pointcloud.html
-        console.log('📷 Using WmtsSource.fromCapabilities (like official example)');
+        // Use EXACTLY the same pattern as official COPC example:
+        // https://gitlab.com/giro3d/giro3d/-/raw/main/examples/copc.js
+        // 1. Create a Map entity
+        // 2. Create ColorLayer with TiledImageSource+XYZ
+        // 3. Add ColorLayer to Map
+        // 4. Set ColorLayer on PointCloud
+        console.log('📷 Using TiledImageSource+XYZ like official COPC example');
 
-        const capabilitiesUrl = 'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities';
+        // Create Map entity for the ColorLayer (like official example)
+        // The Map needs to be at the same location as the point cloud
+        if (!state.orthoMap) {
+            state.orthoMap = new Map({
+                extent,
+                backgroundColor: 'black',
+                hillshading: false,
+            });
+            // Position the map just below the point cloud to not interfere
+            state.orthoMap.object3d.position.z = bbox.min.z - 10;
+            await state.instance.add(state.orthoMap);
+            console.log('✅ Map entity created for ColorLayer');
+        }
 
-        const orthophotoWmts = await WmtsSource.fromCapabilities(capabilitiesUrl, {
-            layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
-        });
-
-        console.log('✅ WmtsSource created from capabilities');
-
+        // Create ColorLayer with TiledImageSource + XYZ (ESRI World Imagery - free, no API key)
+        // Using EPSG:3857 like the official example
         state.colorLayer = new ColorLayer({
             name: 'ortho',
             extent,
-            source: orthophotoWmts,
             resolutionFactor: 0.5,  // Like official COPC example
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    projection: 'EPSG:3857',
+                    crossOrigin: 'anonymous',
+                }),
+            }),
         });
 
-        console.log('✅ ColorLayer created with WmtsSource');
+        console.log('✅ ColorLayer created with TiledImageSource+XYZ (ESRI World Imagery)');
+
+        // Add ColorLayer to Map first (like official example: map.addLayer(colorLayer))
+        await state.orthoMap.addLayer(state.colorLayer);
+        console.log('✅ ColorLayer added to Map entity');
 
         // Apply to point cloud
         state.pointCloud.setColorLayer(state.colorLayer);
@@ -502,12 +527,12 @@ async function loadOrthoColorization() {
         // Notify change
         state.instance.notifyChange(state.pointCloud);
 
-        console.log('✅ Orthophoto layer applied');
-        showToast('Orthophoto IGN appliquée', 'success');
+        console.log('✅ Satellite imagery layer applied');
+        showToast('Imagerie satellite appliquée', 'success');
 
     } catch (error) {
-        console.error('❌ Error loading orthophoto:', error);
-        showToast('Erreur orthophoto: ' + error.message, 'error');
+        console.error('❌ Error loading satellite imagery:', error);
+        showToast('Erreur imagerie: ' + error.message, 'error');
     }
 }
 
