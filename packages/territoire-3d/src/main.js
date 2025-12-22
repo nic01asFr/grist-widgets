@@ -379,22 +379,26 @@ function setDisplayMode(mode) {
             pc.contrast = 1.0;
             pc.saturation = 1.0;
 
-            // 5. Force visibility toggle to reset rendering state
-            pc.visible = false;
-            state.instance.notifyChange(pc);
-
-            // 6. Switch back to attribute mode
+            // 5. Switch back to attribute mode (required before switch block)
             pc.setColoringMode('attribute');
-            pc.setActiveAttribute('Classification');
-            console.log('✅ Reset to attribute mode with Classification');
-
-            // 7. Re-enable visibility and force update
-            pc.visible = true;
-            pc.object3d.updateMatrixWorld(true);
             state.instance.notifyChange(pc);
-            console.log('✅ PointCloud visibility toggled to reset state');
+            console.log('✅ Reset to attribute coloring mode');
+
+            // 6. Wait for render cycle then apply new mode
+            requestAnimationFrame(() => {
+                applyDisplayMode(mode, pc);
+            });
+            return; // Exit early, applyDisplayMode will handle the rest
         }
 
+        applyDisplayMode(mode, pc);
+    } catch (error) {
+        console.warn('⚠️ Error setting display mode:', error.message);
+    }
+}
+
+function applyDisplayMode(mode, pc) {
+    try {
         switch (mode) {
             case 'classification':
                 pc.setColoringMode('attribute');
@@ -478,7 +482,7 @@ function setDisplayMode(mode) {
 
         state.instance.notifyChange(pc);
     } catch (error) {
-        console.warn('⚠️ Error setting display mode:', error.message);
+        console.warn('⚠️ Error applying display mode:', error.message);
     }
 }
 
