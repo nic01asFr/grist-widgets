@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Territoire 3D Component</title>
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Container 3D -->
+    <div id="view"></div>
+    
+    <!-- UI Overlay -->
+    <div id="ui-overlay">
+        <!-- Barre de test URL (mode standalone) -->
+        <div id="url-bar">
+            <input type="text" id="url-input" placeholder="Coller une URL COPC (.copc.laz)...">
+            <button id="url-load">Charger</button>
+        </div>
+        
+        <!-- Status bar -->
+        <div id="status-bar">
+            <span id="mode-badge">Classification</span>
+            <span id="sync-status"></span>
+            <span id="points-count"></span>
+        </div>
+        
+        <!-- Contrôles -->
+        <div id="controls">
+            <select id="display-select">
+                <option value="classification">Classification IGN</option>
+                <option value="elevation">Élévation</option>
+                <option value="intensity">Intensité</option>
+                <option value="ortho">Orthophoto</option>
+                <option value="rgb">RGB</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Loading overlay -->
+    <div id="loading" class="hidden">
+        <div class="spinner"></div>
+        <span>Chargement...</span>
+    </div>
+    
+    <!-- Error overlay -->
+    <div id="error" class="hidden">
+        <span id="error-message"></span>
+        <button id="error-close">✕</button>
+    </div>
+
+    <!-- Import Maps pour ES Modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+            "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/",
+            "@giro3d/giro3d": "https://cdn.jsdelivr.net/npm/@giro3d/giro3d@0.43.7/dist/giro3d.esm.js"
+        }
+    }
+    </script>
+    
+    <script type="module" src="app.js"></script>
+</body>
+</html>
