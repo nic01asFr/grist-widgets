@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@giro3d/giro3d": "1.0.0",
-    "three": "^0.170.0"
+    "ol": "^10.0.0"
   },
   "devDependencies": {
     "vite": "^5.4.0"
