@@ -16,7 +16,7 @@ const staticWidgets = [
   { name: 'reveal-minimal-example', source: 'public' },
   { name: 'reveal-builder', source: 'public' },
   { name: 'reveal-editor', source: 'public' },
-  { name: 'panoramax-explorer', source: 'public' } 
+  { name: 'panoramax-explorer', source: 'public' }
 ];
 
 let successCount = 0;
