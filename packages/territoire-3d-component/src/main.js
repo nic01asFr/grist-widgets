@@ -2,28 +2,38 @@
  * ════════════════════════════════════════════════════════════
  * TERRITOIRE 3D COMPONENT
  * Widget Grist pour visualisation LiDAR HD IGN (COPC)
- * 
- * Fonctionnalités :
- * - Chargement nuages de points COPC
- * - 5 modes de colorisation
- * - Synchronisation multi-vues
- * - Mode standalone pour tests
  * ════════════════════════════════════════════════════════════
  */
 
-import * as THREE from 'three';
-import { 
-    Instance, 
-    Map as Giro3DMap,
-    Tiles3D,
-    ColorLayer
-} from '@giro3d/giro3d';
-import { CoordinateSystem } from '@giro3d/giro3d/core/system';
-import { COPCSource } from '@giro3d/giro3d/sources';
-import { TiledImageSource } from '@giro3d/giro3d/sources';
-import { PointCloudMaterial, MODE } from '@giro3d/giro3d/renderer/pointcloud';
+// CSS import for Vite
+import './styles.css';
 
+// Three.js imports
+import { Vector3, Color } from 'three';
+import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
+
+// Giro3D imports - explicit paths required
+import Instance from '@giro3d/giro3d/core/Instance.js';
+import CoordinateSystem from '@giro3d/giro3d/core/geographic/CoordinateSystem.js';
+import PointCloud from '@giro3d/giro3d/entities/PointCloud.js';
+import COPCSource from '@giro3d/giro3d/sources/COPCSource.js';
+import ColorLayer from '@giro3d/giro3d/core/layer/ColorLayer.js';
+import TiledImageSource from '@giro3d/giro3d/sources/TiledImageSource.js';
+import Map from '@giro3d/giro3d/entities/Map.js';
+import Extent from '@giro3d/giro3d/core/geographic/Extent.js';
+import ColorMap from '@giro3d/giro3d/core/ColorMap.js';
+import { setLazPerfPath } from '@giro3d/giro3d/sources/las/config.js';
+
+// OpenLayers for tile source
+import XYZ from 'ol/source/XYZ.js';
+
+// Sync module
 import { MultiViewSync } from './sync.js';
+
+// ════════════════════════════════════════════════════════════
+// LAZ-PERF CONFIGURATION
+// ════════════════════════════════════════════════════════════
+setLazPerfPath('https://cdn.jsdelivr.net/npm/laz-perf@0.0.6/lib');
 
 // ════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -35,43 +45,36 @@ const CONFIG = {
     display: PARAMS.get('display') || 'classification',
     ui: PARAMS.get('ui') || 'full',
     master: PARAMS.get('master') === 'true',
-    initialUrl: PARAMS.get('url') || ''
-};
-
-const DISPLAY_MODES = {
-    classification: { mode: MODE.CLASSIFICATION, label: 'Classification IGN', color: '#6366f1' },
-    elevation:      { mode: MODE.ELEVATION,      label: 'Élévation',         color: '#10b981' },
-    intensity:      { mode: MODE.INTENSITY,      label: 'Intensité',         color: '#f59e0b' },
-    ortho:          { mode: MODE.TEXTURE,        label: 'Orthophoto',        color: '#3b82f6' },
-    rgb:            { mode: MODE.COLOR,          label: 'RGB',               color: '#ec4899' }
+    initialUrl: PARAMS.get('url') || '',
+    crs: 'EPSG:2154',
+    proj4def: '+proj=lcc +lat_0=46.5 +lon_0=3 +lat_1=49 +lat_2=44 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
 };
 
 // Classification IGN LiDAR HD
 const IGN_CLASSIFICATION = {
-    1:  new THREE.Color('#AAAAAA'),  // Non classé
-    2:  new THREE.Color('#AA5500'),  // Sol
-    3:  new THREE.Color('#00AA00'),  // Végétation basse
-    4:  new THREE.Color('#00DD00'),  // Végétation moyenne  
-    5:  new THREE.Color('#00FF00'),  // Végétation haute
-    6:  new THREE.Color('#FF0000'),  // Bâtiment
-    9:  new THREE.Color('#0000FF'),  // Eau
-    17: new THREE.Color('#FFFF00'),  // Pont
-    64: new THREE.Color('#FF00FF'),  // Sursol pérenne
-    65: new THREE.Color('#00FFFF'),  // Artefacts
-    66: new THREE.Color('#888888'),  // Points virtuels
-    67: new THREE.Color('#FF8800')   // Sursol synthétique
+    1:  { name: 'Non classifié', color: '#808080' },
+    2:  { name: 'Sol', color: '#8B4513' },
+    3:  { name: 'Végétation basse', color: '#90EE90' },
+    4:  { name: 'Végétation moyenne', color: '#32CD32' },
+    5:  { name: 'Végétation haute', color: '#228B22' },
+    6:  { name: 'Bâtiment', color: '#CD853F' },
+    9:  { name: 'Eau', color: '#4169E1' },
+    17: { name: 'Pont', color: '#808080' },
+    64: { name: 'Sursol pérenne', color: '#94a770' },
+    65: { name: 'Artefacts', color: '#d3ff00' },
+    67: { name: 'Points virtuels', color: '#00ff8d' }
 };
 
 // ════════════════════════════════════════════════════════════
-// ÉTAT GLOBAL
+// STATE
 // ════════════════════════════════════════════════════════════
 
 const state = {
     instance: null,
-    map: null,
+    pointCloud: null,
+    colorLayer: null,
+    orthoMap: null,
     controls: null,
-    copc: null,
-    orthoLayer: null,
     sync: null,
     currentDisplay: CONFIG.display,
     currentUrl: null,
@@ -79,12 +82,11 @@ const state = {
 };
 
 // ════════════════════════════════════════════════════════════
-// ÉLÉMENTS DOM
+// DOM ELEMENTS
 // ════════════════════════════════════════════════════════════
 
 const DOM = {
     view: () => document.getElementById('view'),
-    urlBar: () => document.getElementById('url-bar'),
     urlInput: () => document.getElementById('url-input'),
     urlLoad: () => document.getElementById('url-load'),
     modeBadge: () => document.getElementById('mode-badge'),
@@ -99,44 +101,41 @@ const DOM = {
 };
 
 // ════════════════════════════════════════════════════════════
-// INITIALISATION
+// INITIALIZATION
 // ════════════════════════════════════════════════════════════
 
 async function init() {
     showLoading(true);
     
     try {
-        // Détecter environnement Grist
+        // Detect Grist environment
         state.isGristEnv = detectGristEnvironment();
         
-        // Initialiser Grist si disponible
+        // Initialize Grist if available
         if (state.isGristEnv) {
             initGrist();
         }
         
-        // Initialiser le moteur 3D
+        // Initialize 3D engine
         await init3D();
         
-        // Initialiser l'interface
+        // Initialize UI
         initUI();
         
-        // Charger URL initiale si fournie
+        // Load initial URL if provided
         if (CONFIG.initialUrl) {
             DOM.urlInput().value = CONFIG.initialUrl;
             await loadPointCloud(CONFIG.initialUrl);
         }
         
     } catch (e) {
-        console.error('Erreur initialisation:', e);
+        console.error('Initialization error:', e);
         showError('Erreur d\'initialisation: ' + e.message);
     }
     
     showLoading(false);
 }
 
-/**
- * Détecter si on est dans un environnement Grist
- */
 function detectGristEnvironment() {
     try {
         return typeof grist !== 'undefined' && 
@@ -147,9 +146,6 @@ function detectGristEnvironment() {
     }
 }
 
-/**
- * Initialiser la connexion Grist
- */
 function initGrist() {
     grist.ready({
         requiredAccess: 'full',
@@ -159,7 +155,6 @@ function initGrist() {
         ]
     });
     
-    // Écouter les changements de record
     grist.onRecord(async (record, mappings) => {
         if (!record) return;
         
@@ -173,47 +168,46 @@ function initGrist() {
     });
 }
 
-/**
- * Initialiser le moteur 3D Giro3D
- */
 async function init3D() {
-    // Enregistrer le CRS Lambert 93
-    await CoordinateSystem.get('EPSG:2154');
+    console.log('🗺️ Initializing Giro3D...');
     
-    // Créer l'instance Giro3D
+    // Register Lambert 93
+    CoordinateSystem.register(CONFIG.crs, CONFIG.proj4def);
+    console.log('✅ CRS registered:', CONFIG.crs);
+    
+    // Register EPSG:3857 for orthophoto
+    CoordinateSystem.register(
+        'EPSG:3857',
+        '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs'
+    );
+    
+    // Get CRS object (required for Map entity)
+    const instanceCrs = CoordinateSystem.get(CONFIG.crs);
+    
+    // Create Giro3D instance
     state.instance = new Instance({
         target: DOM.view(),
-        crs: 'EPSG:2154',
-        backgroundColor: 0x1a1a2e
+        crs: instanceCrs,
+        renderer: {
+            logarithmicDepthBuffer: true
+        }
     });
     
-    // Créer le conteneur Map
-    state.map = new Giro3DMap({
-        hillshading: true,
-        segments: 64
-    });
-    state.instance.add(state.map);
+    // Enable post-processing
+    state.instance.renderingOptions.enableEDL = true;
+    state.instance.renderingOptions.EDLRadius = 0.6;
+    state.instance.renderingOptions.EDLStrength = 5;
+    state.instance.renderingOptions.enableInpainting = true;
+    state.instance.renderingOptions.enablePointCloudOcclusion = true;
     
-    // Configurer les contrôles
-    state.controls = state.instance.view.controls;
-    state.controls.enableDamping = true;
-    state.controls.dampingFactor = 0.1;
-    state.controls.minDistance = 10;
-    state.controls.maxDistance = 50000;
-    
-    // Initialiser la synchronisation multi-vues
+    // Initialize sync
     state.sync = new MultiViewSync();
-    state.sync.connect(state.instance, state.controls);
-    state.sync.onStatusChange = updateSyncStatus;
     
-    // Animation loop
-    state.instance.addEventListener('update', () => {
-        state.controls.update();
-    });
+    console.log('✅ Giro3D instance created');
 }
 
 // ════════════════════════════════════════════════════════════
-// CHARGEMENT NUAGE DE POINTS
+// POINT CLOUD LOADING
 // ════════════════════════════════════════════════════════════
 
 async function loadPointCloud(url) {
@@ -222,7 +216,6 @@ async function loadPointCloud(url) {
         return;
     }
     
-    // Valider l'URL
     if (!url.includes('.copc') && !url.includes('copc')) {
         showError('L\'URL doit pointer vers un fichier COPC (.copc.laz)');
         return;
@@ -232,234 +225,309 @@ async function loadPointCloud(url) {
     hideError();
     
     try {
-        // Nettoyer l'ancien nuage
-        if (state.copc) {
-            state.map.removeLayer(state.copc);
-            state.copc.dispose();
-            state.copc = null;
+        // Clean previous point cloud
+        if (state.pointCloud) {
+            state.instance.remove(state.pointCloud);
+            state.pointCloud = null;
         }
         
-        // Supprimer l'ortho si présente
+        // Remove ortho if present
         removeOrthoLayer();
         
-        console.log('📦 Chargement COPC:', url);
+        console.log('📦 Loading COPC:', url);
         
-        // Créer la source COPC
-        const source = new COPCSource({
-            url: url,
-            workerCount: 4
+        // Create COPC source
+        const source = new COPCSource({ url });
+        
+        // Initialize source
+        await source.initialize();
+        
+        // Get point count
+        let pointCount = source.metadata?.pointCount || source.pointCount || 0;
+        
+        console.log('📊 COPC metadata:', {
+            pointCount,
+            crs: source.crs,
+            bounds: source.bounds
         });
         
-        // Créer l'entité avec le matériau approprié
-        state.copc = new Tiles3D({
-            source: source,
-            material: createMaterial(state.currentDisplay)
+        // Create point cloud entity
+        state.pointCloud = new PointCloud({
+            source,
+            subdivisionThreshold: 2.5
         });
         
-        // Ajouter à la map
-        state.map.addLayer(state.copc);
-        
-        // Attendre que le nuage soit prêt
-        await state.copc.whenReady();
+        // Add to scene
+        await state.instance.add(state.pointCloud);
         
         state.currentUrl = url;
         
-        // Centrer la vue sur le nuage
-        centerOnPointCloud();
+        // Setup camera
+        await setupCamera();
         
-        // Ajouter ortho si mode texture
-        if (state.currentDisplay === 'ortho') {
-            await addOrthoLayer();
-        }
+        // Apply display mode
+        setDisplayMode(state.currentDisplay);
         
-        // Mettre à jour l'affichage
-        updatePointsCount();
+        // Update UI
+        updatePointsCount(pointCount);
         
-        console.log('✅ COPC chargé avec succès');
+        console.log('✅ COPC loaded successfully');
         
     } catch (e) {
-        console.error('❌ Erreur chargement COPC:', e);
+        console.error('❌ COPC loading error:', e);
         showError('Erreur de chargement: ' + e.message);
     }
     
     showLoading(false);
 }
 
-/**
- * Centrer la caméra sur le nuage de points
- */
-function centerOnPointCloud() {
-    if (!state.copc) return;
+async function setupCamera() {
+    if (!state.pointCloud) return;
     
-    const extent = state.copc.root?.extent || state.copc.extent;
-    
-    if (extent) {
-        const centerX = (extent.west + extent.east) / 2;
-        const centerY = (extent.south + extent.north) / 2;
-        const width = extent.east - extent.west;
-        const height = extent.north - extent.south;
-        const size = Math.max(width, height);
-        
-        // Positionner le target au centre
-        state.controls.target.set(centerX, centerY, 0);
-        
-        // Positionner la caméra
-        state.instance.view.camera.position.set(
-            centerX,
-            centerY - size * 0.5,
-            size * 0.7
-        );
-        
-        state.controls.update();
-        state.instance.notifyChange();
+    const bbox = state.pointCloud.getBoundingBox();
+    if (!bbox || bbox.isEmpty()) {
+        console.warn('⚠️ Empty bounding box');
+        return;
     }
+    
+    const center = new Vector3();
+    bbox.getCenter(center);
+    
+    const size = new Vector3();
+    bbox.getSize(size);
+    
+    const camera = state.instance.view.camera;
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const distance = maxDim * 1.5;
+    
+    camera.position.set(
+        center.x - distance * 0.5,
+        center.y - distance * 0.5,
+        center.z + distance
+    );
+    
+    camera.near = 1;
+    camera.far = maxDim * 10;
+    camera.updateProjectionMatrix();
+    
+    // Setup MapControls
+    state.controls = new MapControls(camera, state.instance.domElement);
+    state.controls.target.copy(center);
+    state.controls.enableDamping = true;
+    state.controls.dampingFactor = 0.15;
+    state.controls.maxPolarAngle = Math.PI / 2.1;
+    state.controls.minDistance = 10;
+    
+    state.instance.view.setControls(state.controls);
+    state.controls.update();
+    
+    // Connect sync
+    if (state.sync) {
+        state.sync.connect(state.instance, state.controls);
+        state.sync.onStatusChange = updateSyncStatus;
+    }
+    
+    console.log('📷 Camera setup complete');
 }
 
 // ════════════════════════════════════════════════════════════
-// MATÉRIAU & COLORISATION
+// DISPLAY MODES
 // ════════════════════════════════════════════════════════════
 
-/**
- * Créer le matériau pour le mode d'affichage
- */
-function createMaterial(displayMode) {
-    const config = DISPLAY_MODES[displayMode];
-    
-    const material = new PointCloudMaterial({
-        size: 2,
-        mode: config.mode,
-        minmax: displayMode === 'elevation' ? [0, 500] : undefined
-    });
-    
-    // Appliquer la classification IGN
-    if (displayMode === 'classification') {
-        material.classification = IGN_CLASSIFICATION;
-    }
-    
-    return material;
-}
-
-/**
- * Changer le mode d'affichage
- */
-async function setDisplayMode(mode) {
-    if (!DISPLAY_MODES[mode] || mode === state.currentDisplay) return;
-    
+function setDisplayMode(mode) {
+    const previousMode = state.currentDisplay;
     state.currentDisplay = mode;
     
-    // Mettre à jour le matériau
-    if (state.copc) {
-        state.copc.material.dispose();
-        state.copc.material = createMaterial(mode);
-    }
-    
-    // Gérer l'orthophoto
-    if (mode === 'ortho') {
-        await addOrthoLayer();
-    } else {
-        removeOrthoLayer();
-    }
-    
-    // Mettre à jour l'UI
-    updateModeBadge();
-    
-    // Rafraîchir la vue
-    if (state.instance) {
-        state.instance.notifyChange();
-    }
-}
-
-/**
- * Ajouter la couche orthophoto IGN
- */
-async function addOrthoLayer() {
-    if (state.orthoLayer) return;
+    if (!state.pointCloud) return;
     
     try {
-        state.orthoLayer = new ColorLayer({
-            name: 'ortho-ign',
-            source: new TiledImageSource({
-                url: 'https://data.geopf.fr/wmts?' +
-                     'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
-                     '&LAYER=ORTHOIMAGERY.ORTHOPHOTOS' +
-                     '&STYLE=normal&FORMAT=image/jpeg' +
-                     '&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
-                crs: 'EPSG:3857',
-                format: 'image/jpeg'
-            })
-        });
+        const pc = state.pointCloud;
         
-        state.map.addLayer(state.orthoLayer);
-        console.log('🗺️ Couche ortho ajoutée');
+        // Cleanup from ortho mode
+        if (previousMode === 'ortho' && mode !== 'ortho') {
+            if (state.orthoMap) {
+                state.instance.remove(state.orthoMap);
+                state.orthoMap = null;
+            }
+            if (state.colorLayer) {
+                state.colorLayer = null;
+            }
+            pc.setColorLayer(null);
+            pc.setColoringMode('attribute');
+            state.instance.notifyChange(pc);
+        }
         
-    } catch (e) {
-        console.warn('⚠️ Ortho non disponible:', e);
+        switch (mode) {
+            case 'classification':
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Classification');
+                break;
+                
+            case 'rgb':
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Color');
+                break;
+                
+            case 'ortho':
+                loadOrthoColorization();
+                return;
+                
+            case 'elevation':
+                const bbox = pc.getBoundingBox();
+                if (bbox && !bbox.isEmpty()) {
+                    const minZ = bbox.min.z;
+                    const maxZ = bbox.max.z;
+                    const colors = createElevationGradient(256);
+                    const colorMap = new ColorMap({ colors, min: minZ, max: maxZ });
+                    pc.setAttributeColorMap('Z', colorMap);
+                }
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Z');
+                break;
+                
+            case 'intensity':
+                pc.setColoringMode('attribute');
+                pc.setActiveAttribute('Intensity');
+                break;
+        }
+        
+        state.instance.notifyChange(pc);
+        updateModeBadge();
+        
+    } catch (error) {
+        console.warn('⚠️ Error setting display mode:', error.message);
     }
 }
 
-/**
- * Supprimer la couche orthophoto
- */
-function removeOrthoLayer() {
-    if (state.orthoLayer) {
-        state.map.removeLayer(state.orthoLayer);
-        state.orthoLayer = null;
+function createElevationGradient(steps) {
+    const colors = [];
+    const gradientStops = [
+        { pos: 0, color: new Color('#0000ff') },
+        { pos: 0.25, color: new Color('#00ffff') },
+        { pos: 0.5, color: new Color('#00ff00') },
+        { pos: 0.75, color: new Color('#ffff00') },
+        { pos: 1, color: new Color('#ff0000') },
+    ];
+    
+    for (let i = 0; i < steps; i++) {
+        const t = i / (steps - 1);
+        let stop1 = gradientStops[0];
+        let stop2 = gradientStops[gradientStops.length - 1];
+        
+        for (let j = 0; j < gradientStops.length - 1; j++) {
+            if (t >= gradientStops[j].pos && t <= gradientStops[j + 1].pos) {
+                stop1 = gradientStops[j];
+                stop2 = gradientStops[j + 1];
+                break;
+            }
+        }
+        
+        const localT = (t - stop1.pos) / (stop2.pos - stop1.pos);
+        const color = new Color().lerpColors(stop1.color, stop2.color, localT);
+        colors.push(color);
     }
+    
+    return colors;
+}
+
+async function loadOrthoColorization() {
+    if (!state.pointCloud) return;
+    
+    try {
+        const bbox = state.pointCloud.getBoundingBox();
+        const crs = CoordinateSystem.get(CONFIG.crs);
+        const extent = Extent.fromBox3(crs, bbox);
+        
+        // Create Map entity
+        state.orthoMap = new Map({ extent });
+        state.orthoMap.object3d.position.z = bbox.min.z - 100;
+        state.orthoMap.visible = false;
+        
+        await state.instance.add(state.orthoMap);
+        
+        // Create ColorLayer with ESRI imagery
+        state.colorLayer = new ColorLayer({
+            extent,
+            resolutionFactor: 0.5,
+            source: new TiledImageSource({
+                source: new XYZ({
+                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    projection: 'EPSG:3857',
+                    crossOrigin: 'anonymous',
+                }),
+            }),
+        });
+        
+        await state.orthoMap.addLayer(state.colorLayer);
+        state.pointCloud.setColorLayer(state.colorLayer);
+        state.pointCloud.setColoringMode('layer');
+        
+        state.instance.notifyChange(state.pointCloud);
+        updateModeBadge();
+        
+        console.log('✅ Ortho colorization applied');
+        
+    } catch (error) {
+        console.error('❌ Ortho error:', error);
+    }
+}
+
+function removeOrthoLayer() {
+    if (state.orthoMap) {
+        state.instance.remove(state.orthoMap);
+        state.orthoMap = null;
+    }
+    state.colorLayer = null;
 }
 
 // ════════════════════════════════════════════════════════════
-// INTERFACE UTILISATEUR
+// UI
 // ════════════════════════════════════════════════════════════
 
 function initUI() {
-    // Événement bouton charger
     DOM.urlLoad().addEventListener('click', () => {
         loadPointCloud(DOM.urlInput().value.trim());
     });
     
-    // Entrée clavier dans l'input URL
     DOM.urlInput().addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             loadPointCloud(DOM.urlInput().value.trim());
         }
     });
     
-    // Sélecteur de mode d'affichage
     DOM.displaySelect().value = CONFIG.display;
     DOM.displaySelect().addEventListener('change', (e) => {
         setDisplayMode(e.target.value);
     });
     
-    // Fermer erreur
     DOM.errorClose().addEventListener('click', hideError);
     
-    // Masquer contrôles si ui=minimal ou ui=none
     if (CONFIG.ui === 'minimal') {
-        DOM.controls().classList.add('hidden');
+        DOM.controls()?.classList.add('hidden');
     } else if (CONFIG.ui === 'none') {
-        document.getElementById('ui-overlay').style.display = 'none';
+        document.getElementById('ui-overlay')?.style.setProperty('display', 'none');
     }
     
-    // Mise à jour initiale
     updateModeBadge();
-    updateSyncStatus(state.sync?.getStatus());
 }
 
-/**
- * Mettre à jour le badge du mode
- */
+const DISPLAY_LABELS = {
+    classification: { label: 'Classification', color: '#6366f1' },
+    elevation: { label: 'Élévation', color: '#10b981' },
+    intensity: { label: 'Intensité', color: '#f59e0b' },
+    ortho: { label: 'Orthophoto', color: '#3b82f6' },
+    rgb: { label: 'RGB', color: '#ec4899' }
+};
+
 function updateModeBadge() {
     const badge = DOM.modeBadge();
-    const config = DISPLAY_MODES[state.currentDisplay];
+    if (!badge) return;
     
+    const config = DISPLAY_LABELS[state.currentDisplay];
     badge.textContent = config.label;
-    badge.className = state.currentDisplay;
     badge.style.backgroundColor = config.color;
 }
 
-/**
- * Mettre à jour le status de synchronisation
- */
 function updateSyncStatus(status) {
     const el = DOM.syncStatus();
     if (!status || !el) return;
@@ -473,14 +541,10 @@ function updateSyncStatus(status) {
     }
 }
 
-/**
- * Mettre à jour le compteur de points
- */
-function updatePointsCount() {
+function updatePointsCount(count) {
     const el = DOM.pointsCount();
-    if (!el || !state.copc) return;
+    if (!el) return;
     
-    const count = state.copc.root?.pointCount || 0;
     if (count > 0) {
         el.textContent = formatNumber(count) + ' pts';
     } else {
@@ -488,19 +552,13 @@ function updatePointsCount() {
     }
 }
 
-/**
- * Formater un nombre avec séparateurs
- */
 function formatNumber(n) {
     return new Intl.NumberFormat('fr-FR').format(n);
 }
 
-// ════════════════════════════════════════════════════════════
-// LOADING & ERREURS
-// ════════════════════════════════════════════════════════════
-
 function showLoading(show) {
     const el = DOM.loading();
+    if (!el) return;
     if (show) {
         el.classList.remove('hidden');
     } else {
@@ -510,19 +568,22 @@ function showLoading(show) {
 
 function showError(message) {
     const el = DOM.error();
-    DOM.errorMessage().textContent = message;
+    const msg = DOM.errorMessage();
+    if (!el || !msg) return;
+    msg.textContent = message;
     el.classList.remove('hidden');
 }
 
 function hideError() {
-    DOM.error().classList.add('hidden');
+    const el = DOM.error();
+    if (el) el.classList.add('hidden');
 }
 
 // ════════════════════════════════════════════════════════════
-// DÉMARRAGE
+// START
 // ════════════════════════════════════════════════════════════
 
 init().catch(console.error);
 
-// Export pour debug
+// Debug export
 window.t3d = state;
