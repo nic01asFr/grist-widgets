@@ -1,89 +1,217 @@
 /**
  * ════════════════════════════════════════════════════════════
- * MULTI-VIEW SYNC MODULE
- * Synchronisation temps réel (BroadcastChannel) + persistance Grist
+ * MULTI-VIEW SYNC MODULE v2
+ * Synchronisation temps réel + paramètres de vue relatifs
  * ════════════════════════════════════════════════════════════
+ *
+ * Paramètres URL supportés:
+ * - channel: groupe de synchronisation
+ * - master: true/false
+ * - d: coefficient distance (défaut: 1)
+ * - rx: rotation élévation (-360 à 360, signe = miroir)
+ * - ry: rotation azimut (-360 à 360, signe = miroir)
+ * - ox: offset latéral en mètres
+ * - oy: offset profondeur en mètres
+ * - oz: offset vertical en mètres
  */
+
+import { Vector3, Spherical, MathUtils } from 'three';
+
+// ════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ════════════════════════════════════════════════════════════
+
+const SYNC_TABLE = 'T3D_Sync';
+const THROTTLE_MS = 33; // ~30fps pour BroadcastChannel
+const GRIST_SAVE_DEBOUNCE = 500; // Sauvegarde Grist moins fréquente
+
+// ════════════════════════════════════════════════════════════
+// MULTI-VIEW SYNC CLASS
+// ════════════════════════════════════════════════════════════
 
 export class MultiViewSync {
     constructor() {
         // Identifiant unique du widget
         this.id = `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-        
+
         // Configuration depuis URL
         this.params = new URLSearchParams(location.search);
+        this.channel = this.params.get('channel') || 'default';
         this.isMaster = this.params.get('master') === 'true';
-        this.group = this.params.get('group') || 'default';
-        
+
+        // Paramètres de vue relative
+        this.viewParams = {
+            d: parseFloat(this.params.get('d')) || 1,
+            rx: parseFloat(this.params.get('rx')) || 0,
+            ry: parseFloat(this.params.get('ry')) || 0,
+            ox: parseFloat(this.params.get('ox')) || 0,
+            oy: parseFloat(this.params.get('oy')) || 0,
+            oz: parseFloat(this.params.get('oz')) || 0
+        };
+
+        // Calculer les modes miroir depuis le signe
+        this.mirrorX = this.viewParams.rx < 0;
+        this.mirrorY = this.viewParams.ry < 0;
+        this.viewParams.rx = Math.abs(this.viewParams.rx);
+        this.viewParams.ry = Math.abs(this.viewParams.ry);
+
         // État interne
-        this.lastState = null;
+        this.lastMasterState = null;
         this.lastTs = 0;
         this.receiving = false;
         this.enabled = true;
-        
+        this.gristReady = false;
+
         // Références 3D (connectées après init)
         this.cam = null;
         this.ctrl = null;
         this.inst = null;
-        
+
         // BroadcastChannel pour sync temps réel
         this.bc = ('BroadcastChannel' in window)
-            ? new BroadcastChannel(`t3d-${this.group}`)
+            ? new BroadcastChannel(`t3d-${this.channel}`)
             : null;
-        
-        // Throttle configuration
-        this.throttleMs = 33; // ~30fps
-        this.lastBc = 0;
-        
+
+        // Throttle/debounce
+        this.lastBcTime = 0;
+        this.gristSaveTimeout = null;
+
         // Callbacks
         this.onStatusChange = null;
-        
-        this._init();
+        this.onUrlChange = null;
+        this.onDisplayChange = null;
+
+        // Vecteurs réutilisables (performance)
+        this._tempVec = new Vector3();
+        this._tempSpherical = new Spherical();
+
+        this._initBroadcast();
+
+        console.log(`🔄 Sync [${this.id}] channel="${this.channel}" ${this.isMaster ? 'MASTER' : 'SLAVE'}`);
+        console.log(`   View params: d=${this.viewParams.d}, rx=${this.viewParams.rx}${this.mirrorX ? '(mirror)' : ''}, ry=${this.viewParams.ry}${this.mirrorY ? '(mirror)' : ''}`);
+        console.log(`   Offsets: ox=${this.viewParams.ox}, oy=${this.viewParams.oy}, oz=${this.viewParams.oz}`);
     }
 
-    async _init() {
-        // Écouter les messages broadcast
+    // ════════════════════════════════════════════════════════════
+    // INITIALISATION
+    // ════════════════════════════════════════════════════════════
+
+    _initBroadcast() {
         if (this.bc) {
             this.bc.addEventListener('message', (e) => this._onBroadcast(e.data));
         }
-        
-        // Écouter la table Grist (fallback Safari + état initial)
-        if (typeof grist !== 'undefined') {
-            grist.onRecords((records) => {
-                if (records?.[0]) this._onGristRecord(records[0]);
-            });
-        }
-        
-        // Charger l'état initial depuis Grist
-        await this._loadInitialState();
-        
-        console.log(`🔄 Sync initialisé [${this.id}] ${this.isMaster ? 'MASTER' : 'SLAVE'}`);
     }
 
     /**
-     * Charger l'état caméra initial depuis la table Grist
+     * Initialiser la connexion Grist et créer la table si nécessaire
      */
-    async _loadInitialState() {
-        if (typeof grist === 'undefined') return;
-        
+    async initGrist() {
+        if (typeof grist === 'undefined') {
+            console.log('⚠️ Grist non disponible');
+            return;
+        }
+
         try {
-            const t = await grist.docApi.fetchTable('Camera_Sync');
-            if (t?.id?.length) {
-                this.lastTs = t.Ts?.[0] || 0;
-                
-                // Appliquer après un délai (attendre init 3D)
-                setTimeout(() => {
-                    this._applyState({
-                        px: t.Px[0], py: t.Py[0], pz: t.Pz[0],
-                        tx: t.Tx[0], ty: t.Ty[0], tz: t.Tz[0],
-                        zm: t.Zm[0]
-                    }, true);
-                }, 200);
-            }
+            // Vérifier/créer la table de sync
+            await this._ensureSyncTable();
+
+            // Charger l'état initial
+            await this._loadInitialState();
+
+            this.gristReady = true;
+            console.log('✅ Grist sync prêt');
+
         } catch (e) {
-            // Table pas encore créée - normal au premier lancement
+            console.warn('⚠️ Erreur init Grist sync:', e.message);
         }
     }
+
+    /**
+     * Créer la table T3D_Sync si elle n'existe pas
+     */
+    async _ensureSyncTable() {
+        if (typeof grist === 'undefined') return;
+
+        try {
+            const tables = await grist.docApi.listTables();
+
+            if (!tables.includes(SYNC_TABLE)) {
+                console.log(`📋 Création table ${SYNC_TABLE}...`);
+
+                await grist.docApi.applyUserActions([
+                    ['AddTable', SYNC_TABLE, [
+                        { id: 'Channel', type: 'Text' },
+                        { id: 'CopcUrl', type: 'Text' },
+                        { id: 'Display', type: 'Text' },
+                        { id: 'Px', type: 'Numeric' },
+                        { id: 'Py', type: 'Numeric' },
+                        { id: 'Pz', type: 'Numeric' },
+                        { id: 'Tx', type: 'Numeric' },
+                        { id: 'Ty', type: 'Numeric' },
+                        { id: 'Tz', type: 'Numeric' },
+                        { id: 'Zoom', type: 'Numeric' },
+                        { id: 'MasterId', type: 'Text' },
+                        { id: 'UpdatedAt', type: 'Numeric' }
+                    ]]
+                ]);
+
+                console.log(`✅ Table ${SYNC_TABLE} créée`);
+            }
+        } catch (e) {
+            console.warn('Erreur création table sync:', e);
+        }
+    }
+
+    /**
+     * Charger l'état initial depuis Grist
+     */
+    async _loadInitialState() {
+        if (typeof grist === 'undefined') return null;
+
+        try {
+            const table = await grist.docApi.fetchTable(SYNC_TABLE);
+            if (!table?.id?.length) return null;
+
+            // Trouver la ligne pour notre channel
+            const idx = table.Channel?.findIndex(c => c === this.channel);
+            if (idx === -1 || idx === undefined) return null;
+
+            const state = {
+                url: table.CopcUrl?.[idx] || '',
+                display: table.Display?.[idx] || 'classification',
+                px: table.Px?.[idx] || 0,
+                py: table.Py?.[idx] || 0,
+                pz: table.Pz?.[idx] || 0,
+                tx: table.Tx?.[idx] || 0,
+                ty: table.Ty?.[idx] || 0,
+                tz: table.Tz?.[idx] || 0,
+                zoom: table.Zoom?.[idx] || 1,
+                masterId: table.MasterId?.[idx] || '',
+                ts: table.UpdatedAt?.[idx] || 0
+            };
+
+            this.lastTs = state.ts;
+            this.lastMasterState = state;
+
+            console.log('📥 État initial chargé depuis Grist');
+            return state;
+
+        } catch (e) {
+            // Table vide ou pas encore de données
+            return null;
+        }
+    }
+
+    /**
+     * Obtenir l'état initial (pour les slaves au démarrage)
+     */
+    async getInitialState() {
+        return this.lastMasterState;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // CONNEXION 3D
+    // ════════════════════════════════════════════════════════════
 
     /**
      * Connecter le module aux contrôles Giro3D
@@ -92,197 +220,330 @@ export class MultiViewSync {
         this.inst = instance;
         this.ctrl = controls;
         this.cam = instance.view.camera;
-        
-        // Écouter les mouvements caméra (broadcast en temps réel)
-        controls.addEventListener('change', () => {
-            if (!this.receiving && this.isMaster && this.enabled) {
-                this._broadcastState();
-            }
-        });
-        
-        // Sauvegarder dans Grist à la fin du mouvement
-        controls.addEventListener('end', () => {
-            if (this.isMaster && this.enabled) {
-                this._saveToGrist();
-            }
-        });
-        
+
+        if (this.isMaster) {
+            // Master: écouter les mouvements et broadcaster
+            controls.addEventListener('change', () => {
+                if (!this.receiving && this.enabled) {
+                    this._broadcastState();
+                }
+            });
+
+            controls.addEventListener('end', () => {
+                if (this.enabled) {
+                    this._saveToGrist();
+                }
+            });
+        }
+
         this._notifyStatus();
         return this;
     }
+
+    // ════════════════════════════════════════════════════════════
+    // BROADCAST (temps réel)
+    // ════════════════════════════════════════════════════════════
 
     /**
      * Diffuser l'état caméra via BroadcastChannel
      */
     _broadcastState() {
-        if (!this.bc || !this.cam) return;
-        
-        // Throttle pour limiter à ~30fps
+        if (!this.bc || !this.cam || !this.isMaster) return;
+
+        // Throttle
         const now = performance.now();
-        if (now - this.lastBc < this.throttleMs) return;
-        this.lastBc = now;
-        
-        const state = this._getCurrentState();
-        
-        // Éviter les broadcasts si rien n'a changé
-        if (this._isSameState(state)) return;
-        this.lastState = state;
-        
+        if (now - this.lastBcTime < THROTTLE_MS) return;
+        this.lastBcTime = now;
+
+        const state = this._getMasterState();
+
         this.bc.postMessage({
+            type: 'camera',
             id: this.id,
+            channel: this.channel,
             ts: Date.now(),
             ...state
         });
     }
 
     /**
-     * Recevoir un message broadcast d'un autre widget
+     * Recevoir un message broadcast
      */
     _onBroadcast(data) {
-        // Ignorer ses propres messages
+        // Ignorer ses propres messages et autres channels
         if (data.id === this.id) return;
-        
-        this._applyState(data);
-    }
+        if (data.channel !== this.channel) return;
 
-    /**
-     * Sauvegarder l'état dans la table Grist
-     */
-    async _saveToGrist() {
-        if (!this.cam || typeof grist === 'undefined') return;
-        
-        const state = this._getCurrentState();
-        const ts = Date.now();
-        
-        try {
-            const tables = await grist.docApi.listTables();
-            
-            if (!tables.includes('Camera_Sync')) {
-                // Créer la table si elle n'existe pas
-                await grist.docApi.applyUserActions([
-                    ['AddTable', 'Camera_Sync', [
-                        { id: 'Px', type: 'Numeric' },
-                        { id: 'Py', type: 'Numeric' },
-                        { id: 'Pz', type: 'Numeric' },
-                        { id: 'Tx', type: 'Numeric' },
-                        { id: 'Ty', type: 'Numeric' },
-                        { id: 'Tz', type: 'Numeric' },
-                        { id: 'Zm', type: 'Numeric' },
-                        { id: 'Wr', type: 'Text' },
-                        { id: 'Ts', type: 'Numeric' }
-                    ]],
-                    ['AddRecord', 'Camera_Sync', null, {
-                        ...this._stateToRecord(state),
-                        Wr: this.id,
-                        Ts: ts
-                    }]
-                ]);
-            } else {
-                // Mettre à jour la ligne existante
-                await grist.docApi.applyUserActions([
-                    ['UpdateRecord', 'Camera_Sync', 1, {
-                        ...this._stateToRecord(state),
-                        Wr: this.id,
-                        Ts: ts
-                    }]
-                ]);
-            }
-            
-            this.lastTs = ts;
-        } catch (e) {
-            console.warn('Sync save error:', e);
+        switch (data.type) {
+            case 'camera':
+                this._applyMasterState(data);
+                break;
+            case 'url':
+                if (this.onUrlChange && data.url) {
+                    this.onUrlChange(data.url);
+                }
+                break;
+            case 'display':
+                if (this.onDisplayChange && data.display) {
+                    this.onDisplayChange(data.display);
+                }
+                break;
         }
     }
 
     /**
-     * Recevoir une mise à jour depuis la table Grist (fallback)
+     * Notifier un changement d'URL (master only)
      */
-    _onGristRecord(record) {
-        // Ignorer si c'est notre propre écriture ou si plus ancien
-        if (record.Wr === this.id) return;
-        if (record.Ts <= this.lastTs) return;
-        
-        // Utiliser Grist uniquement si pas de BroadcastChannel (Safari)
-        if (!this.bc) {
-            this._applyState({
-                px: record.Px, py: record.Py, pz: record.Pz,
-                tx: record.Tx, ty: record.Ty, tz: record.Tz,
-                zm: record.Zm
-            });
-        }
-        
-        this.lastTs = record.Ts;
+    notifyUrlLoaded(url) {
+        if (!this.isMaster || !this.bc) return;
+
+        this.bc.postMessage({
+            type: 'url',
+            id: this.id,
+            channel: this.channel,
+            url: url
+        });
+
+        // Aussi sauvegarder dans Grist
+        this._saveToGrist();
     }
 
     /**
-     * Appliquer un état caméra reçu
+     * Notifier un changement de mode d'affichage (master only)
      */
-    _applyState(state, force = false) {
+    notifyDisplayChange(display) {
+        if (!this.isMaster || !this.bc) return;
+
+        this.bc.postMessage({
+            type: 'display',
+            id: this.id,
+            channel: this.channel,
+            display: display
+        });
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // TRANSFORMATION DE VUE
+    // ════════════════════════════════════════════════════════════
+
+    /**
+     * Obtenir l'état actuel de la caméra master
+     */
+    _getMasterState() {
+        const p = this.cam.position;
+        const t = this.ctrl.target;
+        return {
+            px: p.x, py: p.y, pz: p.z,
+            tx: t.x, ty: t.y, tz: t.z,
+            zoom: this.cam.zoom || 1
+        };
+    }
+
+    /**
+     * Appliquer l'état du master avec transformations
+     */
+    _applyMasterState(masterState) {
         if (!this.cam || !this.ctrl) return;
-        
-        // Le master n'applique pas les états externes (sauf force)
-        if (!force && this.isMaster) return;
-        
-        // Flag pour éviter les boucles
+        if (this.isMaster) return; // Master n'applique pas
+
         this.receiving = true;
-        
-        // Appliquer position caméra
-        this.cam.position.set(state.px, state.py, state.pz);
-        
-        // Appliquer target
-        this.ctrl.target.set(state.tx, state.ty, state.tz);
-        
-        // Appliquer zoom (caméra orthographique)
-        if (state.zm && this.cam.isOrthographicCamera) {
-            this.cam.zoom = state.zm;
+        this.lastMasterState = masterState;
+
+        // Position et target du master
+        const masterPos = new Vector3(masterState.px, masterState.py, masterState.pz);
+        const masterTarget = new Vector3(masterState.tx, masterState.ty, masterState.tz);
+
+        // Calculer la nouvelle position/target pour ce slave
+        const { position, target } = this._computeSlaveView(masterPos, masterTarget);
+
+        // Appliquer
+        this.cam.position.copy(position);
+        this.ctrl.target.copy(target);
+
+        // Zoom (avec coefficient distance)
+        if (this.cam.isOrthographicCamera && masterState.zoom) {
+            this.cam.zoom = masterState.zoom / this.viewParams.d;
             this.cam.updateProjectionMatrix();
         }
-        
-        // Mettre à jour les contrôles
+
         this.ctrl.update();
-        
-        // Notifier Giro3D
         this.inst.notifyChange();
-        
-        // Débloquer après un frame
+
         requestAnimationFrame(() => {
             this.receiving = false;
         });
     }
 
     /**
-     * Obtenir l'état actuel de la caméra
+     * Calculer la position/target du slave selon les paramètres de vue
      */
-    _getCurrentState() {
-        const p = this.cam.position;
-        const t = this.ctrl.target;
+    _computeSlaveView(masterPos, masterTarget) {
+        const { d, rx, ry, ox, oy, oz } = this.viewParams;
+
+        // === ÉTAPE 1: Translation (offset du target) ===
+        // Calculer la direction de visée du master (pour orienter les offsets)
+        const viewDir = this._tempVec.subVectors(masterTarget, masterPos).normalize();
+
+        // Vecteur "droite" (perpendiculaire à viewDir et up)
+        const up = new Vector3(0, 0, 1);
+        const right = new Vector3().crossVectors(viewDir, up).normalize();
+
+        // Vecteur "avant" (dans le plan horizontal)
+        const forward = new Vector3().crossVectors(up, right).normalize();
+
+        // Appliquer les offsets dans le référentiel de la vue
+        const targetOffset = new Vector3();
+        targetOffset.addScaledVector(right, ox);    // Latéral
+        targetOffset.addScaledVector(forward, oy);  // Profondeur
+        targetOffset.addScaledVector(up, oz);       // Vertical
+
+        const slaveTarget = masterTarget.clone().add(targetOffset);
+
+        // === ÉTAPE 2: Rotation (position sur la sphère) ===
+        // Vecteur master vers target
+        const toTarget = new Vector3().subVectors(masterTarget, masterPos);
+        const distance = toTarget.length() * d; // Appliquer coefficient distance
+
+        // Convertir en coordonnées sphériques
+        this._tempSpherical.setFromVector3(toTarget);
+
+        // Appliquer les rotations (en radians)
+        const rxRad = MathUtils.degToRad(rx);
+        const ryRad = MathUtils.degToRad(ry);
+
+        // Azimut (ry) - rotation horizontale
+        let azimuthDelta = ryRad;
+        if (this.mirrorY) {
+            // Mode miroir: inverser les mouvements futurs (géré dans _applyMirror)
+            azimuthDelta = -ryRad;
+        }
+        this._tempSpherical.theta += azimuthDelta;
+
+        // Élévation (rx) - rotation verticale
+        let elevationDelta = rxRad;
+        if (this.mirrorX) {
+            elevationDelta = -rxRad;
+        }
+        this._tempSpherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1,
+            this._tempSpherical.phi - elevationDelta));
+
+        // Appliquer la nouvelle distance
+        this._tempSpherical.radius = distance;
+
+        // Reconvertir en cartésien
+        const newToTarget = new Vector3().setFromSpherical(this._tempSpherical);
+
+        // Position du slave = target - direction
+        const slavePos = slaveTarget.clone().sub(newToTarget);
+
+        // === ÉTAPE 3: Miroir (si activé) ===
+        // Le miroir affecte le suivi dynamique, pas la position initiale
+        // Cela sera géré en inversant les deltas lors des updates
+
         return {
-            px: p.x, py: p.y, pz: p.z,
-            tx: t.x, ty: t.y, tz: t.z,
-            zm: this.cam.zoom || 1
+            position: slavePos,
+            target: slaveTarget
         };
     }
 
+    // ════════════════════════════════════════════════════════════
+    // PERSISTANCE GRIST
+    // ════════════════════════════════════════════════════════════
+
     /**
-     * Convertir état vers format record Grist
+     * Sauvegarder l'état dans Grist (debounced)
      */
-    _stateToRecord(s) {
-        return {
-            Px: s.px, Py: s.py, Pz: s.pz,
-            Tx: s.tx, Ty: s.ty, Tz: s.tz,
-            Zm: s.zm
-        };
+    _saveToGrist() {
+        if (!this.gristReady || !this.isMaster) return;
+
+        // Debounce
+        if (this.gristSaveTimeout) {
+            clearTimeout(this.gristSaveTimeout);
+        }
+
+        this.gristSaveTimeout = setTimeout(() => {
+            this._doSaveToGrist();
+        }, GRIST_SAVE_DEBOUNCE);
+    }
+
+    async _doSaveToGrist() {
+        if (typeof grist === 'undefined' || !this.cam) return;
+
+        const state = this._getMasterState();
+        const ts = Date.now();
+
+        try {
+            const table = await grist.docApi.fetchTable(SYNC_TABLE);
+            const idx = table?.Channel?.findIndex(c => c === this.channel);
+
+            const record = {
+                Channel: this.channel,
+                CopcUrl: this.currentUrl || '',
+                Display: this.currentDisplay || 'classification',
+                Px: state.px,
+                Py: state.py,
+                Pz: state.pz,
+                Tx: state.tx,
+                Ty: state.ty,
+                Tz: state.tz,
+                Zoom: state.zoom,
+                MasterId: this.id,
+                UpdatedAt: ts
+            };
+
+            if (idx === -1 || idx === undefined) {
+                // Créer nouvelle ligne
+                await grist.docApi.applyUserActions([
+                    ['AddRecord', SYNC_TABLE, null, record]
+                ]);
+            } else {
+                // Mettre à jour
+                const rowId = table.id[idx];
+                await grist.docApi.applyUserActions([
+                    ['UpdateRecord', SYNC_TABLE, rowId, record]
+                ]);
+            }
+
+            this.lastTs = ts;
+
+        } catch (e) {
+            console.warn('Erreur sauvegarde Grist:', e);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // API PUBLIQUE
+    // ════════════════════════════════════════════════════════════
+
+    /**
+     * Mettre à jour l'URL courante (pour sauvegarde)
+     */
+    setCurrentUrl(url) {
+        this.currentUrl = url;
     }
 
     /**
-     * Vérifier si l'état a changé significativement
+     * Mettre à jour le mode d'affichage courant
      */
-    _isSameState(s) {
-        if (!this.lastState) return false;
-        const epsilon = 0.1;
-        return Math.abs(s.px - this.lastState.px) < epsilon &&
-               Math.abs(s.py - this.lastState.py) < epsilon &&
-               Math.abs(s.pz - this.lastState.pz) < epsilon;
+    setCurrentDisplay(display) {
+        this.currentDisplay = display;
+    }
+
+    /**
+     * Obtenir le status actuel
+     */
+    getStatus() {
+        return {
+            id: this.id,
+            channel: this.channel,
+            isMaster: this.isMaster,
+            enabled: this.enabled,
+            viewParams: this.viewParams,
+            mirrorX: this.mirrorX,
+            mirrorY: this.mirrorY,
+            hasBroadcast: !!this.bc,
+            gristReady: this.gristReady
+        };
     }
 
     /**
@@ -292,32 +553,6 @@ export class MultiViewSync {
         if (this.onStatusChange) {
             this.onStatusChange(this.getStatus());
         }
-    }
-
-    // ════════════════════════════════════════════════════════════
-    // API PUBLIQUE
-    // ════════════════════════════════════════════════════════════
-
-    /**
-     * Obtenir le status actuel du sync
-     */
-    getStatus() {
-        return {
-            id: this.id,
-            isMaster: this.isMaster,
-            group: this.group,
-            enabled: this.enabled,
-            hasBroadcast: !!this.bc
-        };
-    }
-
-    /**
-     * Définir le rôle master/slave
-     */
-    setMaster(isMaster) {
-        this.isMaster = isMaster;
-        this._notifyStatus();
-        console.log(`🔄 Widget ${this.id} → ${isMaster ? 'MASTER' : 'SLAVE'}`);
     }
 
     /**
@@ -345,6 +580,9 @@ export class MultiViewSync {
         if (this.bc) {
             this.bc.close();
             this.bc = null;
+        }
+        if (this.gristSaveTimeout) {
+            clearTimeout(this.gristSaveTimeout);
         }
     }
 }
