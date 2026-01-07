@@ -123,6 +123,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Territoire 3D Component',
+    description: 'Widget multi-vues synchronisé pour visualisation LiDAR HD IGN (COPC). 5 modes de colorisation (classification, élévation, intensité, orthophoto, RGB), synchronisation temps réel entre widgets via BroadcastChannel, architecture master/slave. Lambert 93 (EPSG:2154).',
+    path: 'territoire-3d-component',
+    widgetId: '@nic01asFr/territoire-3d-component',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 
