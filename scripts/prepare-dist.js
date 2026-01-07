@@ -16,7 +16,8 @@ const staticWidgets = [
   { name: 'reveal-minimal-example', source: 'public' },
   { name: 'reveal-builder', source: 'public' },
   { name: 'reveal-editor', source: 'public' },
-  { name: 'panoramax-explorer', source: 'public' }
+  { name: 'panoramax-explorer', source: 'public' },
+  { name: 'territoire-3d-component', source: '.' } 
 ];
 
 let successCount = 0;
