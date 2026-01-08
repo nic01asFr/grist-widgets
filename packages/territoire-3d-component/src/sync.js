@@ -376,69 +376,76 @@ export class MultiViewSync {
 
     /**
      * Calculer la position/target du slave selon les paramètres de vue
+     *
+     * Système de coordonnées: Z-up (Lambert 93)
+     * - ry: rotation azimutale (horizontale) autour de Z
+     * - rx: rotation d'élévation (verticale)
+     * - d: coefficient de distance
+     * - ox, oy, oz: offset du target dans le référentiel de la vue master
      */
     _computeSlaveView(masterPos, masterTarget) {
         const { d, rx, ry, ox, oy, oz } = this.viewParams;
 
-        // === ÉTAPE 1: Translation (offset du target) ===
-        // Calculer la direction de visée du master (pour orienter les offsets)
-        const viewDir = this._tempVec.subVectors(masterTarget, masterPos).normalize();
+        // === ÉTAPE 1: Calculer le référentiel de la vue master ===
+        // Vecteur du target vers la caméra master (direction de visée inversée)
+        const camDir = new Vector3().subVectors(masterPos, masterTarget);
+        const horizontalDist = Math.sqrt(camDir.x * camDir.x + camDir.y * camDir.y);
+        const distance = camDir.length();
 
-        // Vecteur "droite" (perpendiculaire à viewDir et up)
-        const up = new Vector3(0, 0, 1);
-        const right = new Vector3().crossVectors(viewDir, up).normalize();
+        // Azimut actuel du master (angle dans le plan XY, mesuré depuis +X)
+        const masterAzimuth = Math.atan2(camDir.y, camDir.x);
 
-        // Vecteur "avant" (dans le plan horizontal)
-        const forward = new Vector3().crossVectors(up, right).normalize();
+        // Élévation actuelle du master (angle depuis le plan horizontal)
+        const masterElevation = Math.atan2(camDir.z, horizontalDist);
+
+        // === ÉTAPE 2: Calculer les offsets du target ===
+        // Direction horizontale du master (projetée dans le plan XY)
+        const forwardX = -Math.cos(masterAzimuth); // Direction vers laquelle regarde le master
+        const forwardY = -Math.sin(masterAzimuth);
+
+        // Direction "droite" (perpendiculaire, dans le plan XY)
+        const rightX = -forwardY;
+        const rightY = forwardX;
 
         // Appliquer les offsets dans le référentiel de la vue
-        const targetOffset = new Vector3();
-        targetOffset.addScaledVector(right, ox);    // Latéral
-        targetOffset.addScaledVector(forward, oy);  // Profondeur
-        targetOffset.addScaledVector(up, oz);       // Vertical
+        const slaveTarget = new Vector3(
+            masterTarget.x + rightX * ox + forwardX * oy,
+            masterTarget.y + rightY * ox + forwardY * oy,
+            masterTarget.z + oz
+        );
 
-        const slaveTarget = masterTarget.clone().add(targetOffset);
-
-        // === ÉTAPE 2: Rotation (position sur la sphère) ===
-        // Vecteur master vers target
-        const toTarget = new Vector3().subVectors(masterTarget, masterPos);
-        const distance = toTarget.length() * d; // Appliquer coefficient distance
-
-        // Convertir en coordonnées sphériques
-        this._tempSpherical.setFromVector3(toTarget);
-
-        // Appliquer les rotations (en radians)
-        const rxRad = MathUtils.degToRad(rx);
+        // === ÉTAPE 3: Calculer la position du slave ===
+        // Convertir les rotations en radians
         const ryRad = MathUtils.degToRad(ry);
+        const rxRad = MathUtils.degToRad(rx);
 
-        // Azimut (ry) - rotation horizontale
-        let azimuthDelta = ryRad;
-        if (this.mirrorY) {
-            // Mode miroir: inverser les mouvements futurs (géré dans _applyMirror)
-            azimuthDelta = -ryRad;
-        }
-        this._tempSpherical.theta += azimuthDelta;
+        // Nouvel azimut du slave (master + décalage)
+        // - Normal (ry > 0): slaveAzimuth = masterAzimuth + ry (suit le master)
+        // - Miroir (ry < 0): slaveAzimuth = -masterAzimuth + ry (réflexion, mouvements inversés)
+        const slaveAzimuth = this.mirrorY
+            ? -masterAzimuth + ryRad  // Miroir: réflexion, quand master va à droite, slave va à gauche
+            : masterAzimuth + ryRad;  // Normal: décalage fixe, slave suit le master
 
-        // Élévation (rx) - rotation verticale
-        let elevationDelta = rxRad;
-        if (this.mirrorX) {
-            elevationDelta = -rxRad;
-        }
-        this._tempSpherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1,
-            this._tempSpherical.phi - elevationDelta));
+        // Nouvelle élévation du slave
+        // - Normal: suit l'élévation du master avec décalage
+        // - Miroir: réflexion verticale
+        const slaveElevation = this.mirrorX
+            ? -masterElevation + rxRad  // Miroir vertical
+            : masterElevation + rxRad;  // Normal
 
-        // Appliquer la nouvelle distance
-        this._tempSpherical.radius = distance;
+        // Limiter l'élévation pour éviter les singularités
+        const clampedElevation = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, slaveElevation));
 
-        // Reconvertir en cartésien
-        const newToTarget = new Vector3().setFromSpherical(this._tempSpherical);
+        // Nouvelle distance (avec coefficient)
+        const slaveDistance = distance * d;
 
-        // Position du slave = target - direction
-        const slavePos = slaveTarget.clone().sub(newToTarget);
-
-        // === ÉTAPE 3: Miroir (si activé) ===
-        // Le miroir affecte le suivi dynamique, pas la position initiale
-        // Cela sera géré en inversant les deltas lors des updates
+        // Reconstruire la position du slave en coordonnées cartésiennes (Z-up)
+        const cosElev = Math.cos(clampedElevation);
+        const slavePos = new Vector3(
+            slaveTarget.x + Math.cos(slaveAzimuth) * cosElev * slaveDistance,
+            slaveTarget.y + Math.sin(slaveAzimuth) * cosElev * slaveDistance,
+            slaveTarget.z + Math.sin(clampedElevation) * slaveDistance
+        );
 
         return {
             position: slavePos,
