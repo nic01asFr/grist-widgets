@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Map 3D</title>
+
+    <!-- Mapbox GL JS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+
+    <!-- SunCalc -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+
+    <!-- Grist Plugin API -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-title">
+                🗺️ Smart Map 3D
+            </div>
+            <div class="sync-badge" id="sync-badge">
+                <div class="sync-dot"></div>
+                <span id="sync-status">Non connecté</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <button class="toolbar-btn" data-module="lieu">
+                    📍
+                    <span>Lieu</span>
+                </button>
+                <button class="toolbar-btn" data-module="donnees">
+                    📂
+                    <span>Données</span>
+                </button>
+                <button class="toolbar-btn" data-module="fond">
+                    🌍
+                    <span>Fond</span>
+                </button>
+                <button class="toolbar-btn" data-module="ambiance">
+                    ☀️
+                    <span>Ambiance</span>
+                </button>
+                <button class="toolbar-btn" data-module="vue">
+                    🎯
+                    <span>Vue</span>
+                </button>
+
+                <div class="toolbar-spacer"></div>
+
+                <button class="toolbar-btn" data-module="sync">
+                    🔗
+                    <span>Sync</span>
+                </button>
+            </div>
+
+            <!-- Map -->
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="coord-tooltip" id="coord-tooltip"></div>
+
+                <!-- Time Slider -->
+                <div class="time-slider-container">
+                    <span>🌅</span>
+                    <input type="range" id="time-slider" min="0" max="1439" value="720">
+                    <span class="time-display" id="time-display">12:00</span>
+                    <span>🌙</span>
+                </div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="side-panel hidden" id="side-panel">
+                <div class="panel-header">
+                    <span class="panel-title" id="panel-title">Panel</span>
+                    <button class="panel-close" id="panel-close">×</button>
+                </div>
+                <div class="panel-content" id="panel-content">
+                    <!-- Content generated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay hidden" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loading-text">Chargement...</div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

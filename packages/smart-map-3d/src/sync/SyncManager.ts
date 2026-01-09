@@ -40,10 +40,10 @@ export interface SelectionState {
 }
 
 export interface AmbianceState {
-  timeOfDay: number;      // Minutes depuis minuit
-  date: string;           // ISO date
-  shadowsEnabled: boolean;
-  useRealisticSun: boolean;
+  timeOfDay: number;       // Minutes depuis minuit
+  date: string;            // ISO date
+  shadowsEnabled?: boolean;
+  useRealisticSun?: boolean;
 }
 
 export interface LayerVisibilityState {
@@ -86,7 +86,7 @@ export class SyncManager {
   private instanceId: string;
   private groupId: string;
   private config: SyncConfig;
-  private isActive: boolean = false;
+  private _isActive: boolean = false;
 
   // Callbacks
   private onCameraChange: CameraCallback | null = null;
@@ -125,12 +125,12 @@ export class SyncManager {
    * Démarrer la synchronisation
    */
   start(): void {
-    if (this.isActive) return;
+    if (this._isActive) return;
 
     try {
       this.channel = new BroadcastChannel(`smart-map-3d-${this.groupId}`);
       this.channel.onmessage = (event) => this.handleMessage(event.data);
-      this.isActive = true;
+      this._isActive = true;
 
       // Annoncer notre présence
       this.sendMessage('join', { role: this.config.role });
@@ -148,7 +148,7 @@ export class SyncManager {
    * Arrêter la synchronisation
    */
   stop(): void {
-    if (!this.isActive) return;
+    if (!this._isActive) return;
 
     this.sendMessage('leave', {});
     this.stopHeartbeat();
@@ -158,7 +158,8 @@ export class SyncManager {
       this.channel = null;
     }
 
-    this.isActive = false;
+    this._isActive = false;
+    this.peers.clear();
     console.log(`🔌 Sync arrêté: instance="${this.instanceId}"`);
   }
 
@@ -166,7 +167,7 @@ export class SyncManager {
    * Changer de groupe de synchronisation
    */
   changeGroup(newGroupId: string): void {
-    const wasActive = this.isActive;
+    const wasActive = this._isActive;
     if (wasActive) this.stop();
 
     this.groupId = newGroupId;
@@ -187,7 +188,7 @@ export class SyncManager {
   // ============================================
 
   private sendMessage(type: SyncMessageType, payload: any): void {
-    if (!this.channel || !this.isActive) return;
+    if (!this.channel || !this._isActive) return;
 
     const message: SyncMessage = {
       type,
@@ -439,14 +440,27 @@ export class SyncManager {
   }
 
   get active(): boolean {
-    return this.isActive;
+    return this._isActive;
   }
 
   get peerCount(): number {
     return this.peers.size;
   }
 
-  get role(): string {
+  get currentRole(): string {
+    return this.config.role;
+  }
+
+  // Method accessors for compatibility
+  isActive(): boolean {
+    return this._isActive;
+  }
+
+  getPeerCount(): number {
+    return this.peers.size;
+  }
+
+  getRole(): 'master' | 'slave' | 'peer' {
     return this.config.role;
   }
 
@@ -464,6 +478,17 @@ export const SyncPresets = {
    */
   master: (): Partial<SyncConfig> => ({
     role: 'master',
+    syncCamera: true,
+    syncSelection: true,
+    syncLayers: true,
+    syncAmbiance: true
+  }),
+
+  /**
+   * Vue peer - synchronisation bidirectionnelle
+   */
+  peer: (): Partial<SyncConfig> => ({
+    role: 'peer',
     syncCamera: true,
     syncSelection: true,
     syncLayers: true,
