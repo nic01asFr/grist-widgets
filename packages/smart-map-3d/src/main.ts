@@ -60,11 +60,41 @@ async function init(): Promise<void> {
 
   // Initialiser et démarrer la synchronisation automatiquement
   syncManager = new SyncManager(STATE.sync.groupId, SyncPresets.peer());
+  setupSyncCallbacks(); // Brancher les callbacks APRÈS création du syncManager
   syncManager.start();
   updateSyncUI();
 
   // Setup event listeners
   setupEventListeners();
+}
+
+// Configuration des callbacks de synchronisation
+function setupSyncCallbacks(): void {
+  if (!syncManager || !map) return;
+
+  // Recevoir les updates de caméra
+  syncManager.setOnCameraChange((camera: CameraState) => {
+    console.log('📍 Sync camera reçue:', camera);
+    map.easeTo({
+      center: camera.center,
+      zoom: camera.zoom,
+      pitch: camera.pitch,
+      bearing: camera.bearing,
+      duration: 300
+    });
+  });
+
+  // Recevoir les updates d'ambiance
+  syncManager.setOnAmbianceChange((ambiance: AmbianceState) => {
+    console.log('☀️ Sync ambiance reçue:', ambiance);
+    STATE.settings.timeOfDay = ambiance.timeOfDay;
+    if (ambiance.date) STATE.settings.date = ambiance.date;
+
+    const slider = document.getElementById('time-slider') as HTMLInputElement;
+    if (slider) slider.value = String(ambiance.timeOfDay);
+    updateTimeDisplay(ambiance.timeOfDay);
+    updateLighting();
+  });
 }
 
 async function loadMapboxToken(): Promise<void> {
@@ -137,11 +167,9 @@ function initMap(): void {
     tooltip?.classList.remove('visible');
   });
 
-  // Sync camera
-  let ignoreNextCamera = false;
-
+  // Sync camera - envoi seulement, réception configurée dans setupSyncCallbacks
   map.on('move', () => {
-    if (syncManager && !ignoreNextCamera) {
+    if (syncManager && !syncManager.shouldIgnoreCamera()) {
       syncManager.sendCamera({
         center: [map.getCenter().lng, map.getCenter().lat],
         zoom: map.getZoom(),
@@ -149,18 +177,6 @@ function initMap(): void {
         bearing: map.getBearing()
       });
     }
-  });
-
-  // Recevoir les updates de caméra
-  syncManager?.setOnCameraChange((camera: CameraState) => {
-    ignoreNextCamera = true;
-    map.easeTo({
-      center: camera.center,
-      zoom: camera.zoom,
-      pitch: camera.pitch,
-      bearing: camera.bearing
-    });
-    setTimeout(() => ignoreNextCamera = false, 100);
   });
 
   // Update lighting on move
@@ -463,6 +479,14 @@ function setupPanelEventListeners(moduleName: string): void {
       setSyncRole((card as HTMLElement).dataset.role as 'master' | 'peer' | 'slave');
     });
   });
+
+  // Sync option toggles
+  document.querySelectorAll('[data-sync-option]').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+      const option = (toggle as HTMLElement).dataset.syncOption as keyof typeof STATE.sync;
+      toggleSyncOption(option);
+    });
+  });
 }
 
 // ============================================
@@ -660,6 +684,26 @@ function generateSyncPanel(): string {
     </div>
 
     <div class="panel-section">
+      <div class="section-title">Paramètres synchronisés</div>
+      <div class="toggle-group">
+        <span class="toggle-label">📍 Position caméra</span>
+        <div class="toggle ${STATE.sync.syncCamera ? 'active' : ''}" data-sync-option="syncCamera"></div>
+      </div>
+      <div class="toggle-group">
+        <span class="toggle-label">☀️ Heure / Ambiance</span>
+        <div class="toggle ${STATE.sync.syncAmbiance ? 'active' : ''}" data-sync-option="syncAmbiance"></div>
+      </div>
+      <div class="toggle-group">
+        <span class="toggle-label">🎯 Sélection</span>
+        <div class="toggle ${STATE.sync.syncSelection ? 'active' : ''}" data-sync-option="syncSelection"></div>
+      </div>
+      <div class="toggle-group">
+        <span class="toggle-label">📂 Visibilité couches</span>
+        <div class="toggle ${STATE.sync.syncLayers ? 'active' : ''}" data-sync-option="syncLayers"></div>
+      </div>
+    </div>
+
+    <div class="panel-section">
       <div class="section-title">Peers connectés</div>
       <div class="peer-count">
         <div class="peer-count-number">${peerCount}</div>
@@ -750,16 +794,17 @@ function toggleSync(): void {
 function changeSyncGroup(): void {
   const input = document.getElementById('sync-group-input') as HTMLInputElement;
   if (syncManager && input?.value) {
-    const wasActive = syncManager.isActive();
-    if (wasActive) syncManager.stop();
+    const config = STATE.sync.role === 'master' ? SyncPresets.master() :
+                   STATE.sync.role === 'slave' ? SyncPresets.slave() :
+                   SyncPresets.peer();
 
-    syncManager = new SyncManager(input.value, {
-      ...SyncPresets.peer(),
-      role: STATE.sync.role
-    });
+    syncManager.stop();
+    syncManager = new SyncManager(input.value, config);
     STATE.sync.groupId = input.value;
+    setupSyncCallbacks(); // Rebrancher les callbacks
+    syncManager.start();
+    updateSyncUI();
 
-    if (wasActive) syncManager.start();
     showToast(`Groupe changé: ${input.value}`, 'success');
   }
 }
@@ -771,16 +816,43 @@ function setSyncRole(role: 'master' | 'peer' | 'slave'): void {
                    role === 'slave' ? SyncPresets.slave() :
                    SyncPresets.peer();
 
-    const wasActive = syncManager.isActive();
+    // Appliquer les options granulaires
+    config.syncCamera = STATE.sync.syncCamera;
+    config.syncAmbiance = STATE.sync.syncAmbiance;
+    config.syncSelection = STATE.sync.syncSelection;
+    config.syncLayers = STATE.sync.syncLayers;
+
     syncManager.stop();
-
     syncManager = new SyncManager(STATE.sync.groupId, config);
-
-    // Toujours redémarrer après changement de rôle
+    setupSyncCallbacks(); // Rebrancher les callbacks
     syncManager.start();
     updateSyncUI();
+
+    showToast(`Rôle changé: ${role}`, 'success');
   }
   openModule('sync');
+}
+
+function toggleSyncOption(option: string): void {
+  // Toggle l'option dans STATE
+  if (option === 'syncCamera') STATE.sync.syncCamera = !STATE.sync.syncCamera;
+  else if (option === 'syncAmbiance') STATE.sync.syncAmbiance = !STATE.sync.syncAmbiance;
+  else if (option === 'syncSelection') STATE.sync.syncSelection = !STATE.sync.syncSelection;
+  else if (option === 'syncLayers') STATE.sync.syncLayers = !STATE.sync.syncLayers;
+
+  // Mettre à jour la config du syncManager
+  if (syncManager) {
+    syncManager.updateConfig({
+      syncCamera: STATE.sync.syncCamera,
+      syncAmbiance: STATE.sync.syncAmbiance,
+      syncSelection: STATE.sync.syncSelection,
+      syncLayers: STATE.sync.syncLayers
+    });
+  }
+
+  // Rafraîchir le panneau
+  openModule('sync');
+  console.log(`⚙️ Sync option ${option}: ${(STATE.sync as any)[option]}`);
 }
 
 function updateSyncUI(): void {

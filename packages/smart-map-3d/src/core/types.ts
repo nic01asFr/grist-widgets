@@ -28,6 +28,11 @@ export interface SyncState {
   groupId: string;
   role: 'master' | 'slave' | 'peer';
   peerCount: number;
+  // Options granulaires
+  syncCamera: boolean;
+  syncAmbiance: boolean;
+  syncSelection: boolean;
+  syncLayers: boolean;
 }
 
 export type ModuleName = 'lieu' | 'donnees' | 'fond' | 'ambiance' | 'vue' | 'sync';
@@ -445,6 +450,10 @@ export const DEFAULT_STATE: AppState = {
     enabled: false,
     groupId: 'maquette-3d',
     role: 'peer',
-    peerCount: 0
+    peerCount: 0,
+    syncCamera: true,
+    syncAmbiance: true,
+    syncSelection: true,
+    syncLayers: true
   }
 };
