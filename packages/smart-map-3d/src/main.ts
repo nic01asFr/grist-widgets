@@ -58,8 +58,10 @@ async function init(): Promise<void> {
   // Initialiser la carte
   initMap();
 
-  // Initialiser la synchronisation
+  // Initialiser et démarrer la synchronisation automatiquement
   syncManager = new SyncManager(STATE.sync.groupId, SyncPresets.peer());
+  syncManager.start();
+  updateSyncUI();
 
   // Setup event listeners
   setupEventListeners();
@@ -770,11 +772,13 @@ function setSyncRole(role: 'master' | 'peer' | 'slave'): void {
                    SyncPresets.peer();
 
     const wasActive = syncManager.isActive();
-    if (wasActive) syncManager.stop();
+    syncManager.stop();
 
     syncManager = new SyncManager(STATE.sync.groupId, config);
 
-    if (wasActive) syncManager.start();
+    // Toujours redémarrer après changement de rôle
+    syncManager.start();
+    updateSyncUI();
   }
   openModule('sync');
 }
@@ -797,6 +801,13 @@ function updateSyncUI(): void {
 
   STATE.sync.enabled = isActive;
 }
+
+// Rafraîchir le compteur de peers périodiquement
+setInterval(() => {
+  if (syncManager?.isActive()) {
+    updateSyncUI();
+  }
+}, 2000);
 
 // ============================================
 // UI HELPERS
