@@ -66,14 +66,27 @@ async function init(): Promise<void> {
 }
 
 async function loadMapboxToken(): Promise<void> {
-  // Essayer depuis Grist options
+  // Essayer depuis Grist options (avec timeout)
   if (typeof grist !== 'undefined') {
     try {
-      const options = await grist.widgetApi.getOptions();
-      if (options?.mapboxToken) {
-        CONFIG.mapbox.token = options.mapboxToken;
-        return;
-      }
+      // Attendre que Grist soit prêt avec timeout
+      const gristReady = new Promise<void>((resolve) => {
+        grist.ready({ requiredAccess: 'read table' });
+        grist.onOptions((options: any) => {
+          if (options?.mapboxToken) {
+            CONFIG.mapbox.token = options.mapboxToken;
+          }
+          resolve();
+        });
+      });
+
+      const timeout = new Promise<void>((resolve) => {
+        setTimeout(resolve, 2000); // 2 secondes max
+      });
+
+      await Promise.race([gristReady, timeout]);
+
+      if (CONFIG.mapbox.token) return;
     } catch (e) {
       console.log('Grist options non disponibles');
     }
