@@ -16,7 +16,9 @@ const staticWidgets = [
   { name: 'reveal-minimal-example', source: 'public' },
   { name: 'reveal-builder', source: 'public' },
   { name: 'reveal-editor', source: 'public' },
-  { name: 'panoramax-explorer', source: 'public' }
+  { name: 'panoramax-explorer', source: 'public' },
+  { name: 'smart-map-3d', source: 'public' },
+  { name: 'Maquette_3d', source: '.' }
 ];
 
 let successCount = 0;

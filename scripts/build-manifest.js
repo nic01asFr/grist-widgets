@@ -135,6 +135,30 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Smart Map 3D',
+    description: 'Widget cartographique 3D synchronisable avec Mapbox GL JS. Multi-vues avec synchronisation caméra/sélection/couches, terrain 3D, éclairage réaliste SunCalc, modèles GLTF, symbolisation avancée (catégorisée/graduée), intégration Grist. Architecture modulaire TypeScript.',
+    path: 'smart-map-3d',
+    widgetId: '@nic01asFr/smart-map-3d',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
+  },
+  {
+    name: 'Maquette 3D',
+    description: 'Widget complet de maquette territoriale 3D avec Mapbox. Style Standard, bâtiments/arbres/monuments 3D, terrain, éclairage solaire réaliste avec SunCalc, import multi-format (GeoJSON, KML, GPX, OSM), modèles GLTF, multi-styles par couche, symbolisation catégorisée/graduée, sélection avancée.',
+    path: 'Maquette_3d',
+    widgetId: '@nic01asFr/maquette-3d',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 
