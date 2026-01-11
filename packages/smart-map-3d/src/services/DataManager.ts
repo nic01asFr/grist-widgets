@@ -581,6 +581,8 @@ export class DataManager {
     const style = layer.style;
 
     // Créer les couches Mapbox selon le type de géométrie
+    // Note: $type in Mapbox only returns Point, LineString, Polygon (not Multi* variants)
+    // Multi* geometries are represented as their base type
     if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
       // Fill layer
       const fillId = `${layer.id}-fill`;
@@ -592,7 +594,7 @@ export class DataManager {
           'fill-color': this.getColorExpression(style, 'fillColor'),
           'fill-opacity': layer.opacity * 0.6
         },
-        filter: ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']]
+        filter: ['==', '$type', 'Polygon']
       });
       layer.mapboxLayerIds.push(fillId);
 
@@ -607,7 +609,7 @@ export class DataManager {
           'line-width': style.strokeWidth || 2,
           'line-opacity': layer.opacity
         },
-        filter: ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']]
+        filter: ['==', '$type', 'Polygon']
       });
       layer.mapboxLayerIds.push(strokeId);
 
@@ -626,7 +628,7 @@ export class DataManager {
             'fill-extrusion-base': style.extrusionBase || 0,
             'fill-extrusion-opacity': layer.opacity * 0.8
           },
-          filter: ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']]
+          filter: ['==', '$type', 'Polygon']
         });
         layer.mapboxLayerIds.push(extrusionId);
       }
@@ -643,7 +645,7 @@ export class DataManager {
           'line-width': style.strokeWidth || 3,
           'line-opacity': layer.opacity
         },
-        filter: ['any', ['==', '$type', 'LineString'], ['==', '$type', 'MultiLineString']]
+        filter: ['==', '$type', 'LineString']
       });
       layer.mapboxLayerIds.push(lineId);
     }
@@ -661,7 +663,7 @@ export class DataManager {
           'circle-stroke-width': style.strokeWidth || 2,
           'circle-opacity': layer.opacity
         },
-        filter: ['any', ['==', '$type', 'Point'], ['==', '$type', 'MultiPoint']]
+        filter: ['==', '$type', 'Point']
       });
       layer.mapboxLayerIds.push(pointId);
     }
