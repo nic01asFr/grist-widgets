@@ -655,13 +655,20 @@ function setupPanelEventListeners(moduleName: string): void {
         showLoading('Import en cours...');
         const source = await dataManager.importFile(file);
         dataManager.createLayer(source.id);
+
+        // Pause sync during zoom to avoid flooding sync messages
+        syncManager?.pauseCameraSend();
         dataManager.zoomToLayer(dataManager.getLayers()[dataManager.getLayers().length - 1].id);
+        // Resume after animation (fitBounds default ~300ms)
+        setTimeout(() => syncManager?.resumeCameraSend(), 500);
+
         hideLoading();
         showToast(`${source.metadata.featureCount} features importées`, 'success');
         openModule('donnees');
       } catch (err) {
         hideLoading();
         showToast(`Erreur: ${(err as Error).message}`, 'error');
+        syncManager?.resumeCameraSend(); // Resume on error too
       }
       input.value = ''; // Reset
     }
@@ -689,7 +696,10 @@ function setupPanelEventListeners(moduleName: string): void {
     btn.addEventListener('click', () => {
       const layerId = (btn as HTMLElement).dataset.zoomLayer;
       if (layerId && dataManager) {
+        // Pause sync during zoom animation
+        syncManager?.pauseCameraSend();
         dataManager.zoomToLayer(layerId);
+        setTimeout(() => syncManager?.resumeCameraSend(), 500);
       }
     });
   });
@@ -1240,7 +1250,11 @@ async function importFromGrist(): Promise<void> {
     if (dataManager) {
       const source = dataManager.importFromGrist(data, geomColumn, `Table ${tableId}`);
       dataManager.createLayer(source.id);
+
+      // Pause sync during zoom animation
+      syncManager?.pauseCameraSend();
       dataManager.zoomToLayer(dataManager.getLayers()[dataManager.getLayers().length - 1].id);
+      setTimeout(() => syncManager?.resumeCameraSend(), 500);
 
       hideLoading();
       showToast(`${source.metadata.featureCount} features importées depuis Grist`, 'success');
@@ -1249,6 +1263,7 @@ async function importFromGrist(): Promise<void> {
   } catch (err) {
     hideLoading();
     showToast(`Erreur: ${(err as Error).message}`, 'error');
+    syncManager?.resumeCameraSend(); // Resume on error
   }
 }
 
