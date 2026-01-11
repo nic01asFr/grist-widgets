@@ -47,6 +47,40 @@ const STATE: AppState = {
   settings: { ...DEFAULT_SETTINGS }
 };
 
+// Helper pour exécuter un zoom sans déclencher de sync
+function zoomWithoutSync(zoomFn: () => void): void {
+  if (!syncManager || !map) {
+    zoomFn();
+    return;
+  }
+
+  // Pause all camera sync
+  syncManager.pauseAllCameraSync();
+
+  // Execute the zoom
+  zoomFn();
+
+  // Resume after moveend (animation complete)
+  const resumeOnce = () => {
+    map.off('moveend', resumeOnce);
+    // Small delay to ensure all move events are done
+    setTimeout(() => {
+      syncManager?.resumeAllCameraSync();
+      console.log('🔓 Camera sync resumed after zoom');
+    }, 100);
+  };
+
+  map.once('moveend', resumeOnce);
+
+  // Fallback timeout in case moveend doesn't fire
+  setTimeout(() => {
+    if (syncManager?.isCameraSyncPaused()) {
+      syncManager.resumeAllCameraSync();
+      console.log('🔓 Camera sync resumed (timeout fallback)');
+    }
+  }, 3000);
+}
+
 // ============================================
 // INITIALISATION
 // ============================================
@@ -656,11 +690,9 @@ function setupPanelEventListeners(moduleName: string): void {
         const source = await dataManager.importFile(file);
         dataManager.createLayer(source.id);
 
-        // Pause sync during zoom to avoid flooding sync messages
-        syncManager?.pauseCameraSend();
-        dataManager.zoomToLayer(dataManager.getLayers()[dataManager.getLayers().length - 1].id);
-        // Resume after animation (fitBounds default ~300ms)
-        setTimeout(() => syncManager?.resumeCameraSend(), 500);
+        // Zoom to layer bounds without triggering sync
+        const layerId = dataManager.getLayers()[dataManager.getLayers().length - 1].id;
+        zoomWithoutSync(() => dataManager!.zoomToLayer(layerId));
 
         hideLoading();
         showToast(`${source.metadata.featureCount} features importées`, 'success');
@@ -668,7 +700,6 @@ function setupPanelEventListeners(moduleName: string): void {
       } catch (err) {
         hideLoading();
         showToast(`Erreur: ${(err as Error).message}`, 'error');
-        syncManager?.resumeCameraSend(); // Resume on error too
       }
       input.value = ''; // Reset
     }
@@ -696,10 +727,7 @@ function setupPanelEventListeners(moduleName: string): void {
     btn.addEventListener('click', () => {
       const layerId = (btn as HTMLElement).dataset.zoomLayer;
       if (layerId && dataManager) {
-        // Pause sync during zoom animation
-        syncManager?.pauseCameraSend();
-        dataManager.zoomToLayer(layerId);
-        setTimeout(() => syncManager?.resumeCameraSend(), 500);
+        zoomWithoutSync(() => dataManager!.zoomToLayer(layerId));
       }
     });
   });
@@ -1251,10 +1279,9 @@ async function importFromGrist(): Promise<void> {
       const source = dataManager.importFromGrist(data, geomColumn, `Table ${tableId}`);
       dataManager.createLayer(source.id);
 
-      // Pause sync during zoom animation
-      syncManager?.pauseCameraSend();
-      dataManager.zoomToLayer(dataManager.getLayers()[dataManager.getLayers().length - 1].id);
-      setTimeout(() => syncManager?.resumeCameraSend(), 500);
+      // Zoom to layer bounds without triggering sync
+      const layerId = dataManager.getLayers()[dataManager.getLayers().length - 1].id;
+      zoomWithoutSync(() => dataManager!.zoomToLayer(layerId));
 
       hideLoading();
       showToast(`${source.metadata.featureCount} features importées depuis Grist`, 'success');
@@ -1263,7 +1290,6 @@ async function importFromGrist(): Promise<void> {
   } catch (err) {
     hideLoading();
     showToast(`Erreur: ${(err as Error).message}`, 'error');
-    syncManager?.resumeCameraSend(); // Resume on error
   }
 }
 
