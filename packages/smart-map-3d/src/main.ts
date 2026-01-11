@@ -10,6 +10,7 @@ import { SyncManager, SyncPresets, CameraState, AmbianceState } from './sync/Syn
 import type { AppState, MapSettings } from './core/types';
 import { DEFAULT_SETTINGS, DEFAULT_STATE } from './core/types';
 import { SmartMapController } from './services/SmartMapController';
+import { DataManager, MapLayer, DataSource } from './services/DataManager';
 import { EditorUI } from './ui/EditorUI';
 import { ControlsRenderer } from './ui/ControlsRenderer';
 
@@ -37,6 +38,7 @@ const CONFIG = {
 let map: any = null;
 let syncManager: SyncManager | null = null;
 let smartController: SmartMapController | null = null;
+let dataManager: DataManager | null = null;
 let editorUI: EditorUI | null = null;
 let controlsRenderer: ControlsRenderer | null = null;
 
@@ -212,11 +214,69 @@ function onMapReady(): void {
   updateMapSettings();
   updateLighting();
 
+  // Initialize DataManager
+  initDataManager();
+
   // Initialize SmartMapController
   initSmartController();
 
   hideLoading();
   showToast('Carte initialisée', 'success');
+}
+
+// ============================================
+// DATA MANAGER INITIALIZATION
+// ============================================
+function initDataManager(): void {
+  if (!map) return;
+
+  dataManager = new DataManager();
+  dataManager.init(map);
+
+  // Callbacks pour mise à jour de l'UI
+  dataManager.setOnLayerChange((layers) => {
+    console.log('📂 Layers updated:', layers.length);
+    // Mettre à jour le panneau si ouvert
+    if (currentModule === 'donnees') {
+      openModule('donnees');
+    }
+  });
+
+  dataManager.setOnFeatureClick((feature, layer) => {
+    console.log('🎯 Feature clicked:', feature.properties, 'Layer:', layer.name);
+    showFeaturePopup(feature);
+  });
+
+  dataManager.setOnFeatureHover((feature, layer) => {
+    if (feature) {
+      updateCoordTooltip(feature);
+    }
+  });
+
+  console.log('✅ DataManager initialisé');
+}
+
+function showFeaturePopup(feature: any): void {
+  if (!feature.properties) return;
+
+  const props = Object.entries(feature.properties)
+    .filter(([k, v]) => v !== null && v !== undefined && !k.startsWith('_'))
+    .slice(0, 10)
+    .map(([k, v]) => `<b>${k}:</b> ${v}`)
+    .join('<br>');
+
+  showToast(props || 'Aucune propriété', 'success');
+}
+
+function updateCoordTooltip(feature: any): void {
+  const tooltip = document.getElementById('coord-tooltip');
+  if (tooltip && feature.properties) {
+    const name = feature.properties.name || feature.properties.nom || feature.properties.label || '';
+    if (name) {
+      tooltip.textContent = name;
+      tooltip.classList.add('visible');
+    }
+  }
 }
 
 // ============================================
@@ -289,29 +349,19 @@ function initSmartController(): void {
     controlsRenderer.init();
   }
 
-  // Add editor button to toolbar
-  addEditorButton();
+  // Setup editor button event
+  setupEditorButton();
 
   console.log('✅ SmartMapController initialisé');
 }
 
-function addEditorButton(): void {
-  const toolbar = document.querySelector('.toolbar-right');
-  if (!toolbar) return;
+function setupEditorButton(): void {
+  const btn = document.getElementById('editor-btn');
+  if (!btn) return;
 
-  // Check if button already exists
-  if (document.getElementById('editor-btn')) return;
-
-  const btn = document.createElement('button');
-  btn.id = 'editor-btn';
-  btn.className = 'toolbar-btn';
-  btn.title = 'Éditeur SmartMap';
-  btn.innerHTML = '📊';
   btn.addEventListener('click', () => {
     editorUI?.toggle();
   });
-
-  toolbar.appendChild(btn);
 }
 
 // ============================================
@@ -591,6 +641,90 @@ function setupPanelEventListeners(moduleName: string): void {
       toggleSyncOption(option);
     });
   });
+
+  // Data import - File
+  document.getElementById('import-file-btn')?.addEventListener('click', () => {
+    document.getElementById('file-input')?.click();
+  });
+
+  document.getElementById('file-input')?.addEventListener('change', async (e) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file && dataManager) {
+      try {
+        showLoading('Import en cours...');
+        const source = await dataManager.importFile(file);
+        dataManager.createLayer(source.id);
+        dataManager.zoomToLayer(dataManager.getLayers()[dataManager.getLayers().length - 1].id);
+        hideLoading();
+        showToast(`${source.metadata.featureCount} features importées`, 'success');
+        openModule('donnees');
+      } catch (err) {
+        hideLoading();
+        showToast(`Erreur: ${(err as Error).message}`, 'error');
+      }
+      input.value = ''; // Reset
+    }
+  });
+
+  // Data import - Grist
+  document.getElementById('import-grist-btn')?.addEventListener('click', importFromGrist);
+
+  // Layer toggles
+  document.querySelectorAll('[data-layer-toggle]').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+      const layerId = (toggle as HTMLElement).dataset.layerToggle;
+      if (layerId && dataManager) {
+        const layer = dataManager.getLayer(layerId);
+        if (layer) {
+          dataManager.setLayerVisibility(layerId, !layer.visible);
+          toggle.classList.toggle('active');
+        }
+      }
+    });
+  });
+
+  // Layer zoom
+  document.querySelectorAll('[data-zoom-layer]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layerId = (btn as HTMLElement).dataset.zoomLayer;
+      if (layerId && dataManager) {
+        dataManager.zoomToLayer(layerId);
+      }
+    });
+  });
+
+  // Layer delete
+  document.querySelectorAll('[data-delete-layer]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layerId = (btn as HTMLElement).dataset.deleteLayer;
+      if (layerId && dataManager) {
+        dataManager.removeLayer(layerId);
+        openModule('donnees');
+      }
+    });
+  });
+
+  // Layer opacity
+  document.querySelectorAll('[data-opacity-layer]').forEach(slider => {
+    slider.addEventListener('input', () => {
+      const layerId = (slider as HTMLElement).dataset.opacityLayer;
+      const value = parseInt((slider as HTMLInputElement).value) / 100;
+      if (layerId && dataManager) {
+        dataManager.setLayerOpacity(layerId, value);
+      }
+    });
+  });
+
+  // Layer style
+  document.querySelectorAll('[data-style-layer]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layerId = (btn as HTMLElement).dataset.styleLayer;
+      if (layerId) {
+        showStyleDialog(layerId);
+      }
+    });
+  });
 }
 
 // ============================================
@@ -623,12 +757,66 @@ function generateLieuPanel(): string {
 }
 
 function generateDonneesPanel(): string {
+  const layers = dataManager?.getLayers() || [];
+  const sources = dataManager?.getSources() || [];
+
+  const layersHtml = layers.length === 0
+    ? `<p class="empty-message">Aucune couche. Importez des données.</p>`
+    : layers.map(layer => {
+        const source = dataManager?.getSource(layer.sourceId);
+        return `
+          <div class="layer-item" data-layer-id="${layer.id}">
+            <div class="layer-header">
+              <div class="layer-visibility">
+                <div class="toggle ${layer.visible ? 'active' : ''}" data-layer-toggle="${layer.id}"></div>
+              </div>
+              <span class="layer-name">${layer.name}</span>
+              <span class="layer-count">${source?.metadata.featureCount || 0}</span>
+            </div>
+            <div class="layer-actions">
+              <button class="layer-action-btn" data-zoom-layer="${layer.id}" title="Zoomer">🔍</button>
+              <button class="layer-action-btn" data-style-layer="${layer.id}" title="Style">🎨</button>
+              <button class="layer-action-btn" data-delete-layer="${layer.id}" title="Supprimer">🗑️</button>
+            </div>
+            <div class="layer-opacity">
+              <input type="range" min="0" max="100" value="${layer.opacity * 100}"
+                     data-opacity-layer="${layer.id}" class="opacity-slider">
+            </div>
+          </div>
+        `;
+      }).join('');
+
   return `
     <div class="panel-section">
-      <p style="color: var(--text-muted); text-align: center; padding: 20px;">
-        📂 Aucune couche<br>
-        <span style="font-size: 12px;">Importez des données GeoJSON ou OSM</span>
+      <div class="section-title">Import</div>
+      <div class="import-buttons">
+        <button class="btn btn-primary btn-full" id="import-file-btn">
+          📁 Importer un fichier
+        </button>
+        <input type="file" id="file-input" accept=".geojson,.json,.csv,.kml,.gpx" style="display:none">
+      </div>
+      <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+        Formats: GeoJSON, CSV (avec WKT/lat-lng), KML, GPX
       </p>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Import depuis Grist</div>
+      <div class="input-group">
+        <select class="input-field" id="grist-geom-column">
+          <option value="">Colonne géométrie...</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-full" id="import-grist-btn" style="margin-top: 8px;">
+        📊 Importer la table actuelle
+      </button>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Couches (${layers.length})</div>
+      <div class="layers-list">
+        ${layersHtml}
+      </div>
     </div>
   `;
 }
@@ -1008,6 +1196,191 @@ function showToast(message: string, type: 'success' | 'error' | 'warning' = 'suc
   container.appendChild(toast);
 
   setTimeout(() => toast.remove(), 3000);
+}
+
+// ============================================
+// DATA IMPORT FUNCTIONS
+// ============================================
+async function importFromGrist(): Promise<void> {
+  if (typeof grist === 'undefined') {
+    showToast('Grist non disponible', 'error');
+    return;
+  }
+
+  const geomSelect = document.getElementById('grist-geom-column') as HTMLSelectElement;
+  const geomColumn = geomSelect?.value;
+
+  if (!geomColumn) {
+    showToast('Sélectionnez une colonne géométrie', 'warning');
+    return;
+  }
+
+  try {
+    showLoading('Import depuis Grist...');
+
+    // Récupérer les données de la table
+    const tableId = await grist.selectedTable.getTableId();
+    const records = await grist.docApi.fetchTable(tableId);
+
+    // Convertir en array d'objets
+    const columns = Object.keys(records);
+    const rowCount = records[columns[0]]?.length || 0;
+    const data: Record<string, any>[] = [];
+
+    for (let i = 0; i < rowCount; i++) {
+      const row: Record<string, any> = { id: records.id?.[i] || i };
+      for (const col of columns) {
+        if (col !== 'id') {
+          row[col] = records[col][i];
+        }
+      }
+      data.push(row);
+    }
+
+    if (dataManager) {
+      const source = dataManager.importFromGrist(data, geomColumn, `Table ${tableId}`);
+      dataManager.createLayer(source.id);
+      dataManager.zoomToLayer(dataManager.getLayers()[dataManager.getLayers().length - 1].id);
+
+      hideLoading();
+      showToast(`${source.metadata.featureCount} features importées depuis Grist`, 'success');
+      openModule('donnees');
+    }
+  } catch (err) {
+    hideLoading();
+    showToast(`Erreur: ${(err as Error).message}`, 'error');
+  }
+}
+
+function showStyleDialog(layerId: string): void {
+  if (!dataManager) return;
+
+  const layer = dataManager.getLayer(layerId);
+  const source = layer ? dataManager.getSource(layer.sourceId) : null;
+  if (!layer || !source) return;
+
+  const fields = source.metadata.fields.filter(f => f.type !== 'geometry');
+  const numericFields = fields.filter(f => f.type === 'number');
+  const textFields = fields.filter(f => f.type === 'string');
+
+  const dialog = document.createElement('div');
+  dialog.className = 'style-dialog-overlay';
+  dialog.innerHTML = `
+    <div class="style-dialog">
+      <div class="style-dialog-header">
+        <h3>🎨 Style: ${layer.name}</h3>
+        <button class="style-dialog-close">×</button>
+      </div>
+      <div class="style-dialog-content">
+        <div class="style-section">
+          <label>Type de style</label>
+          <select id="style-type">
+            <option value="simple" ${layer.style.type === 'simple' ? 'selected' : ''}>Simple</option>
+            <option value="categorized" ${layer.style.type === 'categorized' ? 'selected' : ''}>Catégorisé</option>
+            <option value="graduated" ${layer.style.type === 'graduated' ? 'selected' : ''}>Gradué</option>
+          </select>
+        </div>
+
+        <div class="style-section" id="style-field-section" style="display:${layer.style.type !== 'simple' ? 'block' : 'none'}">
+          <label>Champ</label>
+          <select id="style-field">
+            <option value="">Sélectionner...</option>
+            ${fields.map(f => `<option value="${f.name}">${f.name} (${f.type})</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="style-section">
+          <label>Couleur principale</label>
+          <input type="color" id="style-color" value="${layer.style.fillColor || layer.style.pointColor || '#4a9eff'}">
+        </div>
+
+        <div class="style-section">
+          <label>Extrusion 3D</label>
+          <div class="toggle ${layer.style.extrusion ? 'active' : ''}" id="style-extrusion-toggle"></div>
+        </div>
+
+        <div class="style-section" id="style-extrusion-field" style="display:${layer.style.extrusion ? 'block' : 'none'}">
+          <label>Champ hauteur</label>
+          <select id="extrusion-field">
+            <option value="">Hauteur fixe</option>
+            ${numericFields.map(f => `<option value="${f.name}" ${layer.style.extrusionField === f.name ? 'selected' : ''}>${f.name}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="style-dialog-footer">
+        <button class="btn btn-secondary" id="style-cancel">Annuler</button>
+        <button class="btn btn-primary" id="style-apply">Appliquer</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  // Events
+  dialog.querySelector('.style-dialog-close')?.addEventListener('click', () => dialog.remove());
+  dialog.querySelector('#style-cancel')?.addEventListener('click', () => dialog.remove());
+  dialog.querySelector('.style-dialog-overlay')?.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.remove();
+  });
+
+  dialog.querySelector('#style-type')?.addEventListener('change', (e) => {
+    const type = (e.target as HTMLSelectElement).value;
+    const fieldSection = dialog.querySelector('#style-field-section') as HTMLElement;
+    fieldSection.style.display = type !== 'simple' ? 'block' : 'none';
+  });
+
+  dialog.querySelector('#style-extrusion-toggle')?.addEventListener('click', (e) => {
+    const toggle = e.target as HTMLElement;
+    toggle.classList.toggle('active');
+    const extrusionField = dialog.querySelector('#style-extrusion-field') as HTMLElement;
+    extrusionField.style.display = toggle.classList.contains('active') ? 'block' : 'none';
+  });
+
+  dialog.querySelector('#style-apply')?.addEventListener('click', () => {
+    const styleType = (dialog.querySelector('#style-type') as HTMLSelectElement).value;
+    const styleField = (dialog.querySelector('#style-field') as HTMLSelectElement).value;
+    const styleColor = (dialog.querySelector('#style-color') as HTMLInputElement).value;
+    const extrusionEnabled = dialog.querySelector('#style-extrusion-toggle')?.classList.contains('active');
+    const extrusionField = (dialog.querySelector('#extrusion-field') as HTMLSelectElement).value;
+
+    if (styleType === 'categorized' && styleField) {
+      dataManager!.createCategorizedStyle(layerId, styleField);
+    } else if (styleType === 'graduated' && styleField) {
+      dataManager!.createGraduatedStyle(layerId, styleField);
+    } else {
+      dataManager!.updateLayerStyle(layerId, {
+        type: 'simple',
+        fillColor: styleColor,
+        pointColor: styleColor,
+        strokeColor: styleColor,
+        extrusion: extrusionEnabled,
+        extrusionField: extrusionField || undefined,
+        extrusionHeight: extrusionField ? undefined : 20
+      });
+    }
+
+    dialog.remove();
+    showToast('Style appliqué', 'success');
+  });
+}
+
+// Charger les colonnes Grist pour le sélecteur
+async function loadGristColumns(): Promise<void> {
+  if (typeof grist === 'undefined') return;
+
+  try {
+    const tableId = await grist.selectedTable.getTableId();
+    const columns = await grist.docApi.fetchTable(tableId);
+    const columnNames = Object.keys(columns).filter(c => c !== 'id');
+
+    const select = document.getElementById('grist-geom-column') as HTMLSelectElement;
+    if (select) {
+      select.innerHTML = '<option value="">Colonne géométrie...</option>' +
+        columnNames.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+  } catch (e) {
+    console.log('Impossible de charger les colonnes Grist');
+  }
 }
 
 // ============================================
