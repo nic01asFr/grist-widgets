@@ -9,6 +9,9 @@ import './styles.css';
 import { SyncManager, SyncPresets, CameraState, AmbianceState } from './sync/SyncManager';
 import type { AppState, MapSettings } from './core/types';
 import { DEFAULT_SETTINGS, DEFAULT_STATE } from './core/types';
+import { SmartMapController } from './services/SmartMapController';
+import { EditorUI } from './ui/EditorUI';
+import { ControlsRenderer } from './ui/ControlsRenderer';
 
 // Déclarations pour Mapbox et SunCalc (chargés via CDN)
 declare const mapboxgl: any;
@@ -33,6 +36,9 @@ const CONFIG = {
 // ============================================
 let map: any = null;
 let syncManager: SyncManager | null = null;
+let smartController: SmartMapController | null = null;
+let editorUI: EditorUI | null = null;
+let controlsRenderer: ControlsRenderer | null = null;
 
 const STATE: AppState = {
   ...DEFAULT_STATE,
@@ -206,8 +212,106 @@ function onMapReady(): void {
   updateMapSettings();
   updateLighting();
 
+  // Initialize SmartMapController
+  initSmartController();
+
   hideLoading();
   showToast('Carte initialisée', 'success');
+}
+
+// ============================================
+// SMART CONTROLLER INITIALIZATION
+// ============================================
+function initSmartController(): void {
+  if (!map) return;
+
+  // Create the controller
+  smartController = new SmartMapController({
+    autoAnalyze: true,
+    autoSave: true
+  });
+
+  // Initialize with callbacks
+  smartController.init(map, STATE, {
+    onAmbianceChange: (ambiance: AmbianceState) => {
+      STATE.settings.timeOfDay = ambiance.timeOfDay;
+      if (ambiance.date) STATE.settings.date = ambiance.date;
+
+      const slider = document.getElementById('time-slider') as HTMLInputElement;
+      if (slider) slider.value = String(ambiance.timeOfDay);
+      updateTimeDisplay(ambiance.timeOfDay);
+      updateLighting();
+    },
+    onLayerVisibilityChange: (layerId: string, visible: boolean) => {
+      console.log(`Layer ${layerId} visibility: ${visible}`);
+      // TODO: Implement layer visibility change
+    },
+    onLayerOpacityChange: (layerId: string, opacity: number) => {
+      console.log(`Layer ${layerId} opacity: ${opacity}`);
+      // TODO: Implement layer opacity change
+    },
+    onFilterChange: (fieldName: string, value: any) => {
+      console.log(`Filter ${fieldName}: ${value}`);
+      // TODO: Implement filter change
+    },
+    onStyleChange: (property: string, value: any) => {
+      console.log(`Style ${property}: ${value}`);
+      // TODO: Implement style change
+    },
+    onCameraChange: (camera: { zoom?: number; pitch?: number; bearing?: number }) => {
+      if (map) {
+        map.easeTo({ ...camera, duration: 300 });
+      }
+    }
+  });
+
+  // Create editor UI
+  const container = document.getElementById('map')?.parentElement;
+  if (container) {
+    editorUI = new EditorUI({
+      container,
+      controller: smartController,
+      onBookmarkSelect: (bookmarkId: string) => {
+        console.log('Bookmark selected:', bookmarkId);
+      }
+    });
+    editorUI.init();
+  }
+
+  // Create controls renderer
+  if (container) {
+    controlsRenderer = new ControlsRenderer({
+      container,
+      controlManager: smartController.getControlManager(),
+      position: 'left',
+      collapsed: false
+    });
+    controlsRenderer.init();
+  }
+
+  // Add editor button to toolbar
+  addEditorButton();
+
+  console.log('✅ SmartMapController initialisé');
+}
+
+function addEditorButton(): void {
+  const toolbar = document.querySelector('.toolbar-right');
+  if (!toolbar) return;
+
+  // Check if button already exists
+  if (document.getElementById('editor-btn')) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'editor-btn';
+  btn.className = 'toolbar-btn';
+  btn.title = 'Éditeur SmartMap';
+  btn.innerHTML = '📊';
+  btn.addEventListener('click', () => {
+    editorUI?.toggle();
+  });
+
+  toolbar.appendChild(btn);
 }
 
 // ============================================
