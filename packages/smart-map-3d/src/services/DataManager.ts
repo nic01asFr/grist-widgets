@@ -903,65 +903,408 @@ export class DataManager {
 
     // Already a geometry object
     if (typeof value === 'object' && value.type && value.coordinates) {
-      return value as GeoJSON.Geometry;
+      return this.validateAndCleanGeometry(value as GeoJSON.Geometry);
+    }
+
+    // JSON string (GeoJSON)
+    if (typeof value === 'string' && value.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed.type && parsed.coordinates) {
+          return this.validateAndCleanGeometry(parsed as GeoJSON.Geometry);
+        }
+        // Handle Feature wrapper
+        if (parsed.type === 'Feature' && parsed.geometry) {
+          return this.validateAndCleanGeometry(parsed.geometry as GeoJSON.Geometry);
+        }
+      } catch (e) {
+        // Not JSON, try WKT
+      }
     }
 
     // WKT string
     if (typeof value === 'string') {
-      return this.parseWKT(value);
-    }
-
-    // JSON string
-    if (typeof value === 'string' && value.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(value);
-        if (parsed.type && parsed.coordinates) {
-          return parsed as GeoJSON.Geometry;
-        }
-      } catch (e) {}
+      const geom = this.parseWKT(value);
+      if (geom) return this.validateAndCleanGeometry(geom);
     }
 
     return null;
   }
 
-  private parseWKT(wkt: string): GeoJSON.Geometry | null {
-    const cleaned = wkt.trim().toUpperCase();
+  /**
+   * Validates and cleans a geometry (removes NaN, ensures proper structure)
+   */
+  private validateAndCleanGeometry(geom: GeoJSON.Geometry): GeoJSON.Geometry | null {
+    if (!geom || !geom.type || !geom.coordinates) return null;
 
-    // Point
-    const pointMatch = cleaned.match(/^POINT\s*\(\s*([^\)]+)\s*\)$/i);
-    if (pointMatch) {
-      const coords = pointMatch[1].split(/\s+/).map(Number);
-      return { type: 'Point', coordinates: coords };
-    }
-
-    // LineString
-    const lineMatch = cleaned.match(/^LINESTRING\s*\(\s*([^\)]+)\s*\)$/i);
-    if (lineMatch) {
-      const coords = lineMatch[1].split(',').map(pair => pair.trim().split(/\s+/).map(Number));
-      return { type: 'LineString', coordinates: coords };
-    }
-
-    // Polygon
-    const polyMatch = cleaned.match(/^POLYGON\s*\(\s*\(([^\)]+)\)\s*\)$/i);
-    if (polyMatch) {
-      const coords = polyMatch[1].split(',').map(pair => pair.trim().split(/\s+/).map(Number));
-      return { type: 'Polygon', coordinates: [coords] };
-    }
-
-    // MultiPolygon (simplified)
-    if (cleaned.startsWith('MULTIPOLYGON')) {
-      // Basic support - extract all coordinate sets
-      const coordSets = cleaned.match(/\(\([^\)]+\)\)/g);
-      if (coordSets) {
-        const polygons = coordSets.map(set => {
-          const inner = set.replace(/^\(\(|\)\)$/g, '');
-          return [inner.split(',').map(pair => pair.trim().split(/\s+/).map(Number))];
-        });
-        return { type: 'MultiPolygon', coordinates: polygons };
+    const cleanCoords = (coords: any): any => {
+      if (typeof coords === 'number') {
+        return isNaN(coords) ? 0 : coords;
       }
+      if (Array.isArray(coords)) {
+        return coords.map(cleanCoords);
+      }
+      return coords;
+    };
+
+    const cleaned = {
+      type: geom.type,
+      coordinates: cleanCoords(geom.coordinates)
+    } as GeoJSON.Geometry;
+
+    // Validate coordinate structure
+    if (!this.isValidGeometry(cleaned)) return null;
+
+    return cleaned;
+  }
+
+  /**
+   * Check if geometry has valid structure
+   */
+  private isValidGeometry(geom: GeoJSON.Geometry): boolean {
+    const coords = geom.coordinates as any;
+
+    switch (geom.type) {
+      case 'Point':
+        return Array.isArray(coords) && coords.length >= 2 &&
+               typeof coords[0] === 'number' && typeof coords[1] === 'number';
+
+      case 'MultiPoint':
+        return Array.isArray(coords) && coords.every((p: any) =>
+          Array.isArray(p) && p.length >= 2);
+
+      case 'LineString':
+        return Array.isArray(coords) && coords.length >= 2 &&
+               coords.every((p: any) => Array.isArray(p) && p.length >= 2);
+
+      case 'MultiLineString':
+        return Array.isArray(coords) && coords.every((line: any) =>
+          Array.isArray(line) && line.length >= 2);
+
+      case 'Polygon':
+        return Array.isArray(coords) && coords.length >= 1 &&
+               coords.every((ring: any) => Array.isArray(ring) && ring.length >= 4);
+
+      case 'MultiPolygon':
+        return Array.isArray(coords) && coords.every((poly: any) =>
+          Array.isArray(poly) && poly.length >= 1);
+
+      case 'GeometryCollection':
+        return Array.isArray((geom as any).geometries);
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Complete WKT parser supporting all geometry types
+   */
+  private parseWKT(wkt: string): GeoJSON.Geometry | null {
+    if (!wkt || typeof wkt !== 'string') return null;
+
+    const cleaned = wkt.trim();
+    const upper = cleaned.toUpperCase();
+
+    // Remove SRID prefix if present (e.g., "SRID=4326;POINT(...)")
+    const sridMatch = cleaned.match(/^SRID=\d+;(.+)$/i);
+    const wktBody = sridMatch ? sridMatch[1].trim() : cleaned;
+    const upperBody = wktBody.toUpperCase();
+
+    try {
+      // POINT
+      if (upperBody.startsWith('POINT')) {
+        return this.parseWKTPoint(wktBody);
+      }
+
+      // MULTIPOINT
+      if (upperBody.startsWith('MULTIPOINT')) {
+        return this.parseWKTMultiPoint(wktBody);
+      }
+
+      // LINESTRING
+      if (upperBody.startsWith('LINESTRING')) {
+        return this.parseWKTLineString(wktBody);
+      }
+
+      // MULTILINESTRING
+      if (upperBody.startsWith('MULTILINESTRING')) {
+        return this.parseWKTMultiLineString(wktBody);
+      }
+
+      // POLYGON
+      if (upperBody.startsWith('POLYGON')) {
+        return this.parseWKTPolygon(wktBody);
+      }
+
+      // MULTIPOLYGON
+      if (upperBody.startsWith('MULTIPOLYGON')) {
+        return this.parseWKTMultiPolygon(wktBody);
+      }
+
+      // GEOMETRYCOLLECTION
+      if (upperBody.startsWith('GEOMETRYCOLLECTION')) {
+        return this.parseWKTGeometryCollection(wktBody);
+      }
+
+    } catch (e) {
+      console.warn('WKT parse error:', e, wkt.substring(0, 100));
     }
 
     return null;
+  }
+
+  private parseWKTPoint(wkt: string): GeoJSON.Geometry | null {
+    // POINT (x y) or POINT(x y) or POINT EMPTY
+    if (wkt.toUpperCase().includes('EMPTY')) {
+      return null;
+    }
+
+    const match = wkt.match(/POINT\s*\(\s*([^)]+)\s*\)/i);
+    if (!match) return null;
+
+    const coords = this.parseCoordinate(match[1]);
+    if (!coords) return null;
+
+    return { type: 'Point', coordinates: coords };
+  }
+
+  private parseWKTMultiPoint(wkt: string): GeoJSON.Geometry | null {
+    if (wkt.toUpperCase().includes('EMPTY')) {
+      return { type: 'MultiPoint', coordinates: [] };
+    }
+
+    // MULTIPOINT ((x y), (x y)) or MULTIPOINT (x y, x y)
+    const match = wkt.match(/MULTIPOINT\s*\(\s*(.+)\s*\)/i);
+    if (!match) return null;
+
+    const content = match[1];
+    const coordinates: number[][] = [];
+
+    // Try format with parentheses: ((x y), (x y))
+    const parenMatches = content.match(/\(\s*[^)]+\s*\)/g);
+    if (parenMatches) {
+      for (const pm of parenMatches) {
+        const coord = this.parseCoordinate(pm.replace(/[()]/g, ''));
+        if (coord) coordinates.push(coord);
+      }
+    } else {
+      // Format without parentheses: x y, x y
+      const parts = content.split(',');
+      for (const part of parts) {
+        const coord = this.parseCoordinate(part);
+        if (coord) coordinates.push(coord);
+      }
+    }
+
+    return { type: 'MultiPoint', coordinates };
+  }
+
+  private parseWKTLineString(wkt: string): GeoJSON.Geometry | null {
+    if (wkt.toUpperCase().includes('EMPTY')) {
+      return { type: 'LineString', coordinates: [] };
+    }
+
+    const match = wkt.match(/LINESTRING\s*\(\s*(.+)\s*\)/i);
+    if (!match) return null;
+
+    const coordinates = this.parseCoordinateSequence(match[1]);
+    return { type: 'LineString', coordinates };
+  }
+
+  private parseWKTMultiLineString(wkt: string): GeoJSON.Geometry | null {
+    if (wkt.toUpperCase().includes('EMPTY')) {
+      return { type: 'MultiLineString', coordinates: [] };
+    }
+
+    const match = wkt.match(/MULTILINESTRING\s*\(\s*(.+)\s*\)/i);
+    if (!match) return null;
+
+    const coordinates: number[][][] = [];
+    const rings = this.extractRings(match[1]);
+
+    for (const ring of rings) {
+      coordinates.push(this.parseCoordinateSequence(ring));
+    }
+
+    return { type: 'MultiLineString', coordinates };
+  }
+
+  private parseWKTPolygon(wkt: string): GeoJSON.Geometry | null {
+    if (wkt.toUpperCase().includes('EMPTY')) {
+      return { type: 'Polygon', coordinates: [] };
+    }
+
+    const match = wkt.match(/POLYGON\s*\(\s*(.+)\s*\)/i);
+    if (!match) return null;
+
+    const coordinates: number[][][] = [];
+    const rings = this.extractRings(match[1]);
+
+    for (const ring of rings) {
+      const coords = this.parseCoordinateSequence(ring);
+      // Ensure ring is closed
+      if (coords.length > 0) {
+        const first = coords[0];
+        const last = coords[coords.length - 1];
+        if (first[0] !== last[0] || first[1] !== last[1]) {
+          coords.push([...first]);
+        }
+      }
+      coordinates.push(coords);
+    }
+
+    return { type: 'Polygon', coordinates };
+  }
+
+  private parseWKTMultiPolygon(wkt: string): GeoJSON.Geometry | null {
+    if (wkt.toUpperCase().includes('EMPTY')) {
+      return { type: 'MultiPolygon', coordinates: [] };
+    }
+
+    const match = wkt.match(/MULTIPOLYGON\s*\(\s*(.+)\s*\)/i);
+    if (!match) return null;
+
+    const content = match[1];
+    const coordinates: number[][][][] = [];
+
+    // Extract each polygon: ((...), (...))
+    const polygons = this.extractPolygons(content);
+
+    for (const polyContent of polygons) {
+      const rings = this.extractRings(polyContent);
+      const polyCoords: number[][][] = [];
+
+      for (const ring of rings) {
+        const coords = this.parseCoordinateSequence(ring);
+        // Ensure ring is closed
+        if (coords.length > 0) {
+          const first = coords[0];
+          const last = coords[coords.length - 1];
+          if (first[0] !== last[0] || first[1] !== last[1]) {
+            coords.push([...first]);
+          }
+        }
+        polyCoords.push(coords);
+      }
+
+      coordinates.push(polyCoords);
+    }
+
+    return { type: 'MultiPolygon', coordinates };
+  }
+
+  private parseWKTGeometryCollection(wkt: string): GeoJSON.Geometry | null {
+    if (wkt.toUpperCase().includes('EMPTY')) {
+      return { type: 'GeometryCollection', geometries: [] } as any;
+    }
+
+    const match = wkt.match(/GEOMETRYCOLLECTION\s*\(\s*(.+)\s*\)/i);
+    if (!match) return null;
+
+    const geometries: GeoJSON.Geometry[] = [];
+    const content = match[1];
+
+    // Split by geometry type keywords
+    const geomTypes = ['POINT', 'MULTIPOINT', 'LINESTRING', 'MULTILINESTRING', 'POLYGON', 'MULTIPOLYGON'];
+    let remaining = content;
+
+    while (remaining.length > 0) {
+      let foundGeom = false;
+
+      for (const gType of geomTypes) {
+        const typeIndex = remaining.toUpperCase().indexOf(gType);
+        if (typeIndex === 0) {
+          // Find the end of this geometry
+          let depth = 0;
+          let endIndex = -1;
+
+          for (let i = remaining.indexOf('('); i < remaining.length; i++) {
+            if (remaining[i] === '(') depth++;
+            if (remaining[i] === ')') depth--;
+            if (depth === 0) {
+              endIndex = i;
+              break;
+            }
+          }
+
+          if (endIndex > 0) {
+            const geomWkt = remaining.substring(0, endIndex + 1);
+            const parsed = this.parseWKT(geomWkt);
+            if (parsed) geometries.push(parsed);
+
+            remaining = remaining.substring(endIndex + 1).replace(/^\s*,\s*/, '');
+            foundGeom = true;
+            break;
+          }
+        }
+      }
+
+      if (!foundGeom) break;
+    }
+
+    return { type: 'GeometryCollection', geometries } as any;
+  }
+
+  private parseCoordinate(str: string): number[] | null {
+    const parts = str.trim().split(/\s+/).map(s => parseFloat(s));
+    if (parts.length < 2 || parts.some(isNaN)) return null;
+    return parts.slice(0, 3); // x, y, z (optional)
+  }
+
+  private parseCoordinateSequence(str: string): number[][] {
+    const coords: number[][] = [];
+    const parts = str.split(',');
+
+    for (const part of parts) {
+      const coord = this.parseCoordinate(part);
+      if (coord) coords.push(coord);
+    }
+
+    return coords;
+  }
+
+  private extractRings(content: string): string[] {
+    const rings: string[] = [];
+    let depth = 0;
+    let start = -1;
+
+    for (let i = 0; i < content.length; i++) {
+      if (content[i] === '(') {
+        if (depth === 0) start = i + 1;
+        depth++;
+      } else if (content[i] === ')') {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          rings.push(content.substring(start, i));
+          start = -1;
+        }
+      }
+    }
+
+    return rings;
+  }
+
+  private extractPolygons(content: string): string[] {
+    const polygons: string[] = [];
+    let depth = 0;
+    let start = -1;
+
+    for (let i = 0; i < content.length; i++) {
+      if (content[i] === '(') {
+        if (depth === 0) start = i;
+        depth++;
+      } else if (content[i] === ')') {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          // Include the outer parentheses content
+          polygons.push(content.substring(start + 1, i));
+          start = -1;
+        }
+      }
+    }
+
+    return polygons;
   }
 
   private parseKMLPlacemark(pm: Element, index: number): GeoFeature | null {

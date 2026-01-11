@@ -23,3 +23,10 @@ export type {
   GeoFeatureCollection,
   ImportOptions
 } from './DataManager';
+
+export { GristSystemManager } from './GristSystemManager';
+export type {
+  WidgetConfig,
+  LayerConfig,
+  BookmarkConfig
+} from './GristSystemManager';
