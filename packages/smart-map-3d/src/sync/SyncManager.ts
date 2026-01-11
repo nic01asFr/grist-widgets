@@ -99,6 +99,7 @@ export class SyncManager {
   private cameraDebounceMs: number = 50;
   private ignoreNextCamera: boolean = false;
   private cameraSendPaused: boolean = false;
+  private cameraReceivePaused: boolean = false;
 
   // Peers tracking
   private peers: Map<string, { lastSeen: number }> = new Map();
@@ -232,10 +233,40 @@ export class SyncManager {
   }
 
   /**
-   * Check if camera send is paused
+   * Pause la réception des sync camera
    */
-  isCameraSendPaused(): boolean {
-    return this.cameraSendPaused;
+  pauseCameraReceive(): void {
+    this.cameraReceivePaused = true;
+  }
+
+  /**
+   * Resume la réception des sync camera
+   */
+  resumeCameraReceive(): void {
+    this.cameraReceivePaused = false;
+  }
+
+  /**
+   * Pause envoi ET réception camera (pour mouvements programmatiques)
+   */
+  pauseAllCameraSync(): void {
+    this.cameraSendPaused = true;
+    this.cameraReceivePaused = true;
+  }
+
+  /**
+   * Resume envoi ET réception camera
+   */
+  resumeAllCameraSync(): void {
+    this.cameraSendPaused = false;
+    this.cameraReceivePaused = false;
+  }
+
+  /**
+   * Check if camera sync is paused
+   */
+  isCameraSyncPaused(): boolean {
+    return this.cameraSendPaused || this.cameraReceivePaused;
   }
 
   /**
@@ -316,6 +347,7 @@ export class SyncManager {
   private handleCameraMessage(message: SyncMessage): void {
     if (!this.config.syncCamera) return;
     if (this.config.role === 'master') return; // Masters n'écoutent pas
+    if (this.cameraReceivePaused) return; // Paused during programmatic camera changes
 
     let camera: CameraState = message.payload;
 
