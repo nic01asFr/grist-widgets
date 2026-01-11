@@ -98,6 +98,7 @@ export class SyncManager {
   private lastCameraSent: number = 0;
   private cameraDebounceMs: number = 50;
   private ignoreNextCamera: boolean = false;
+  private cameraSendPaused: boolean = false;
 
   // Peers tracking
   private peers: Map<string, { lastSeen: number }> = new Map();
@@ -207,12 +208,34 @@ export class SyncManager {
   sendCamera(camera: CameraState): void {
     if (!this.config.syncCamera) return;
     if (this.config.role === 'slave') return; // Slaves ne transmettent pas
+    if (this.cameraSendPaused) return; // Paused during programmatic camera changes
 
     const now = Date.now();
     if (now - this.lastCameraSent < this.cameraDebounceMs) return;
 
     this.lastCameraSent = now;
     this.sendMessage('camera', camera);
+  }
+
+  /**
+   * Pause l'envoi des sync camera (pour fitBounds, etc.)
+   */
+  pauseCameraSend(): void {
+    this.cameraSendPaused = true;
+  }
+
+  /**
+   * Resume l'envoi des sync camera
+   */
+  resumeCameraSend(): void {
+    this.cameraSendPaused = false;
+  }
+
+  /**
+   * Check if camera send is paused
+   */
+  isCameraSendPaused(): boolean {
+    return this.cameraSendPaused;
   }
 
   /**
