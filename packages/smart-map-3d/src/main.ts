@@ -11,6 +11,7 @@ import type { AppState, MapSettings } from './core/types';
 import { DEFAULT_SETTINGS, DEFAULT_STATE } from './core/types';
 import { SmartMapController } from './services/SmartMapController';
 import { DataManager, MapLayer, DataSource } from './services/DataManager';
+import { GristSystemManager } from './services/GristSystemManager';
 import { EditorUI } from './ui/EditorUI';
 import { ControlsRenderer } from './ui/ControlsRenderer';
 
@@ -39,6 +40,7 @@ let map: any = null;
 let syncManager: SyncManager | null = null;
 let smartController: SmartMapController | null = null;
 let dataManager: DataManager | null = null;
+let gristSystem: GristSystemManager | null = null;
 let editorUI: EditorUI | null = null;
 let controlsRenderer: ControlsRenderer | null = null;
 
@@ -85,6 +87,10 @@ function zoomWithoutSync(zoomFn: () => void): void {
 async function init(): Promise<void> {
   showLoading('Initialisation...');
 
+  // Initialiser le gestionnaire système Grist (tables de config, etc.)
+  gristSystem = new GristSystemManager();
+  await gristSystem.initialize();
+
   // Récupérer le token Mapbox
   await loadMapboxToken();
 
@@ -104,8 +110,41 @@ async function init(): Promise<void> {
   syncManager.start();
   updateSyncUI();
 
+  // Charger les couches sauvegardées (si disponibles)
+  await loadSavedLayers();
+
   // Setup event listeners
   setupEventListeners();
+}
+
+// Charger les couches sauvegardées depuis Grist
+async function loadSavedLayers(): Promise<void> {
+  if (!gristSystem || !dataManager) return;
+
+  try {
+    const savedLayers = await gristSystem.getLayers();
+    console.log(`📂 ${savedLayers.length} couches sauvegardées trouvées`);
+
+    for (const layerConfig of savedLayers) {
+      if (layerConfig.sourceType === 'grist' && layerConfig.sourceRef) {
+        // Recharger depuis table Grist
+        const geomColumns = await gristSystem.detectGeometryColumns(layerConfig.sourceRef);
+        if (geomColumns.length > 0) {
+          const data = await gristSystem.fetchTableData(layerConfig.sourceRef);
+          const source = dataManager.importFromGrist(data, geomColumns[0], layerConfig.name);
+          const layer = dataManager.createLayer(source.id, {
+            name: layerConfig.name,
+            visible: layerConfig.visible,
+            opacity: layerConfig.opacity,
+            style: JSON.parse(layerConfig.styleJson || '{}')
+          });
+          console.log(`✓ Couche "${layerConfig.name}" restaurée`);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Erreur chargement couches sauvegardées:', e);
+  }
 }
 
 // Configuration des callbacks de synchronisation
@@ -761,6 +800,40 @@ function setupPanelEventListeners(moduleName: string): void {
       }
     });
   });
+
+  // Layer export (GeoJSON)
+  document.querySelectorAll('[data-export-layer]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layerId = (btn as HTMLElement).dataset.exportLayer;
+      if (layerId) {
+        exportLayerToGeoJSON(layerId);
+      }
+    });
+  });
+
+  // Layer save config
+  document.querySelectorAll('[data-save-layer]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layerId = (btn as HTMLElement).dataset.saveLayer;
+      if (layerId) {
+        saveLayerConfig(layerId);
+      }
+    });
+  });
+
+  // Refresh tables list
+  document.getElementById('refresh-tables-btn')?.addEventListener('click', refreshGristTables);
+
+  // Table select change
+  document.getElementById('grist-table-select')?.addEventListener('change', async (e) => {
+    const tableName = (e.target as HTMLSelectElement).value;
+    if (tableName) {
+      await loadTableColumns(tableName);
+    }
+  });
+
+  // Export all layers
+  document.getElementById('export-all-btn')?.addEventListener('click', exportAllLayers);
 }
 
 // ============================================
@@ -800,19 +873,24 @@ function generateDonneesPanel(): string {
     ? `<p class="empty-message">Aucune couche. Importez des données.</p>`
     : layers.map(layer => {
         const source = dataManager?.getSource(layer.sourceId);
+        const geomType = source?.metadata.geometryType || 'Unknown';
+        const geomIcon = geomType.includes('Polygon') ? '⬡' : geomType.includes('Line') ? '⟋' : '●';
         return `
           <div class="layer-item" data-layer-id="${layer.id}">
             <div class="layer-header">
               <div class="layer-visibility">
                 <div class="toggle ${layer.visible ? 'active' : ''}" data-layer-toggle="${layer.id}"></div>
               </div>
+              <span class="layer-geom-icon" title="${geomType}">${geomIcon}</span>
               <span class="layer-name">${layer.name}</span>
               <span class="layer-count">${source?.metadata.featureCount || 0}</span>
             </div>
             <div class="layer-actions">
-              <button class="layer-action-btn" data-zoom-layer="${layer.id}" title="Zoomer">🔍</button>
-              <button class="layer-action-btn" data-style-layer="${layer.id}" title="Style">🎨</button>
-              <button class="layer-action-btn" data-delete-layer="${layer.id}" title="Supprimer">🗑️</button>
+              <button class="layer-action-btn" data-zoom-layer="${layer.id}" title="Zoomer sur l'étendue">🔍</button>
+              <button class="layer-action-btn" data-style-layer="${layer.id}" title="Modifier le style">🎨</button>
+              <button class="layer-action-btn" data-export-layer="${layer.id}" title="Exporter GeoJSON">💾</button>
+              <button class="layer-action-btn" data-save-layer="${layer.id}" title="Sauvegarder config">📌</button>
+              <button class="layer-action-btn danger" data-delete-layer="${layer.id}" title="Supprimer">🗑️</button>
             </div>
             <div class="layer-opacity">
               <input type="range" min="0" max="100" value="${layer.opacity * 100}"
@@ -824,35 +902,50 @@ function generateDonneesPanel(): string {
 
   return `
     <div class="panel-section">
-      <div class="section-title">Import</div>
+      <div class="section-title">📥 Import fichier</div>
       <div class="import-buttons">
         <button class="btn btn-primary btn-full" id="import-file-btn">
-          📁 Importer un fichier
+          📁 Choisir un fichier
         </button>
-        <input type="file" id="file-input" accept=".geojson,.json,.csv,.kml,.gpx" style="display:none">
+        <input type="file" id="file-input" accept=".geojson,.json,.csv,.kml,.gpx,.shp" style="display:none">
       </div>
       <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
-        Formats: GeoJSON, CSV (avec WKT/lat-lng), KML, GPX
+        GeoJSON, CSV (WKT/lat-lng), KML, GPX
       </p>
     </div>
 
     <div class="panel-section">
-      <div class="section-title">Import depuis Grist</div>
+      <div class="section-title">📊 Import depuis Grist</div>
+      <div class="input-group" style="margin-bottom: 8px;">
+        <select class="input-field" id="grist-table-select">
+          <option value="">Sélectionner une table...</option>
+        </select>
+      </div>
       <div class="input-group">
         <select class="input-field" id="grist-geom-column">
           <option value="">Colonne géométrie...</option>
         </select>
       </div>
       <button class="btn btn-secondary btn-full" id="import-grist-btn" style="margin-top: 8px;">
-        📊 Importer la table actuelle
+        📊 Importer
+      </button>
+      <button class="btn btn-full" id="refresh-tables-btn" style="margin-top: 4px; background: var(--bg-secondary);">
+        🔄 Rafraîchir les tables
       </button>
     </div>
 
     <div class="panel-section">
-      <div class="section-title">Couches (${layers.length})</div>
+      <div class="section-title">📂 Couches (${layers.length})</div>
       <div class="layers-list">
         ${layersHtml}
       </div>
+      ${layers.length > 0 ? `
+        <div style="margin-top: 12px; display: flex; gap: 8px;">
+          <button class="btn btn-full" id="export-all-btn" style="flex:1; background: var(--bg-secondary);">
+            💾 Tout exporter
+          </button>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -1235,8 +1328,140 @@ function showToast(message: string, type: 'success' | 'error' | 'warning' = 'suc
 }
 
 // ============================================
-// DATA IMPORT FUNCTIONS
+// DATA IMPORT/EXPORT FUNCTIONS
 // ============================================
+
+// Refresh available Grist tables
+async function refreshGristTables(): Promise<void> {
+  if (!gristSystem) return;
+
+  try {
+    const tables = await gristSystem.getDocumentTables();
+    const select = document.getElementById('grist-table-select') as HTMLSelectElement;
+    if (select) {
+      select.innerHTML = '<option value="">Sélectionner une table...</option>' +
+        tables.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+    showToast(`${tables.length} tables trouvées`, 'success');
+  } catch (e) {
+    showToast('Erreur chargement tables', 'error');
+  }
+}
+
+// Load columns for selected table
+async function loadTableColumns(tableName: string): Promise<void> {
+  if (!gristSystem) return;
+
+  try {
+    const geomColumns = await gristSystem.detectGeometryColumns(tableName);
+    const select = document.getElementById('grist-geom-column') as HTMLSelectElement;
+
+    if (select) {
+      if (geomColumns.length > 0) {
+        select.innerHTML = geomColumns.map(c =>
+          `<option value="${c}">${c}</option>`
+        ).join('');
+        showToast(`${geomColumns.length} colonnes géométrie détectées`, 'success');
+      } else {
+        select.innerHTML = '<option value="">Aucune colonne géométrie</option>';
+        showToast('Aucune colonne géométrie détectée', 'warning');
+      }
+    }
+  } catch (e) {
+    showToast('Erreur lecture colonnes', 'error');
+  }
+}
+
+// Export a layer to GeoJSON file
+function exportLayerToGeoJSON(layerId: string): void {
+  if (!dataManager || !gristSystem) return;
+
+  const layer = dataManager.getLayer(layerId);
+  const source = layer ? dataManager.getSource(layer.sourceId) : null;
+  if (!layer || !source) return;
+
+  const geojson = gristSystem.exportToGeoJSON(source.data.features);
+  const blob = new Blob([geojson], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${layer.name.replace(/[^a-z0-9]/gi, '_')}.geojson`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast(`Couche "${layer.name}" exportée`, 'success');
+}
+
+// Export all layers to a single GeoJSON file
+function exportAllLayers(): void {
+  if (!dataManager || !gristSystem) return;
+
+  const layers = dataManager.getLayers();
+  const allFeatures: any[] = [];
+
+  for (const layer of layers) {
+    const source = dataManager.getSource(layer.sourceId);
+    if (source) {
+      // Add layer info to properties
+      for (const feature of source.data.features) {
+        allFeatures.push({
+          ...feature,
+          properties: {
+            ...feature.properties,
+            _layerName: layer.name,
+            _layerId: layer.id
+          }
+        });
+      }
+    }
+  }
+
+  const geojson = gristSystem.exportToGeoJSON(allFeatures);
+  const blob = new Blob([geojson], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `smart-map-3d_export_${new Date().toISOString().split('T')[0]}.geojson`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast(`${layers.length} couches exportées (${allFeatures.length} features)`, 'success');
+}
+
+// Save layer configuration to Grist system table
+async function saveLayerConfig(layerId: string): Promise<void> {
+  if (!dataManager || !gristSystem) {
+    showToast('Sauvegarde non disponible (Grist requis)', 'warning');
+    return;
+  }
+
+  const layer = dataManager.getLayer(layerId);
+  const source = layer ? dataManager.getSource(layer.sourceId) : null;
+  if (!layer || !source) return;
+
+  try {
+    await gristSystem.saveLayer({
+      name: layer.name,
+      sourceType: source.type as 'file' | 'grist' | 'url',
+      sourceRef: source.type === 'grist' ? source.name : '',
+      visible: layer.visible,
+      opacity: layer.opacity,
+      styleJson: JSON.stringify(layer.style),
+      zIndex: dataManager.getLayers().indexOf(layer)
+    });
+
+    showToast(`Configuration "${layer.name}" sauvegardée`, 'success');
+  } catch (e) {
+    showToast('Erreur sauvegarde configuration', 'error');
+  }
+}
+
 async function importFromGrist(): Promise<void> {
   if (typeof grist === 'undefined') {
     showToast('Grist non disponible', 'error');
