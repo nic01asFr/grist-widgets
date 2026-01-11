@@ -13,3 +13,13 @@ export type { ControlManagerConfig, PropertyChangeCallback } from './ControlMana
 
 export { SmartMapController } from './SmartMapController';
 export type { SmartMapControllerConfig, SmartMapCallbacks } from './SmartMapController';
+
+export { DataManager } from './DataManager';
+export type {
+  DataSource,
+  MapLayer,
+  LayerStyleConfig,
+  GeoFeature,
+  GeoFeatureCollection,
+  ImportOptions
+} from './DataManager';
