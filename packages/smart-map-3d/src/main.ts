@@ -47,15 +47,15 @@ const STATE: AppState = {
   settings: { ...DEFAULT_SETTINGS }
 };
 
-// Helper pour exécuter un zoom sans déclencher de sync
+// Helper pour exécuter un zoom sans déclencher de sync sur AUCUN widget
 function zoomWithoutSync(zoomFn: () => void): void {
   if (!syncManager || !map) {
     zoomFn();
     return;
   }
 
-  // Pause all camera sync
-  syncManager.pauseAllCameraSync();
+  // Broadcast pause to ALL widgets in the sync group
+  syncManager.broadcastPauseCameraSync();
 
   // Execute the zoom
   zoomFn();
@@ -65,8 +65,7 @@ function zoomWithoutSync(zoomFn: () => void): void {
     map.off('moveend', resumeOnce);
     // Small delay to ensure all move events are done
     setTimeout(() => {
-      syncManager?.resumeAllCameraSync();
-      console.log('🔓 Camera sync resumed after zoom');
+      syncManager?.broadcastResumeCameraSync();
     }, 100);
   };
 
@@ -75,8 +74,7 @@ function zoomWithoutSync(zoomFn: () => void): void {
   // Fallback timeout in case moveend doesn't fire
   setTimeout(() => {
     if (syncManager?.isCameraSyncPaused()) {
-      syncManager.resumeAllCameraSync();
-      console.log('🔓 Camera sync resumed (timeout fallback)');
+      syncManager.broadcastResumeCameraSync();
     }
   }, 3000);
 }

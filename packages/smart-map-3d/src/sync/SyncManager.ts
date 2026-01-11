@@ -17,7 +17,9 @@ export type SyncMessageType =
   | 'join'        // Rejoindre un groupe
   | 'leave'       // Quitter un groupe
   | 'ping'        // Heartbeat
-  | 'pong';       // Réponse heartbeat
+  | 'pong'        // Réponse heartbeat
+  | 'pauseCamera' // Demande de pause camera sync
+  | 'resumeCamera'; // Demande de resume camera sync
 
 export interface SyncMessage {
   type: SyncMessageType;
@@ -263,6 +265,28 @@ export class SyncManager {
   }
 
   /**
+   * Broadcast pause camera sync to ALL peers in the group
+   * Use this before programmatic camera movements (fitBounds, etc.)
+   */
+  broadcastPauseCameraSync(): void {
+    this.cameraSendPaused = true;
+    this.cameraReceivePaused = true;
+    this.sendMessage('pauseCamera', {});
+    console.log('🔒 Broadcasting camera sync pause');
+  }
+
+  /**
+   * Broadcast resume camera sync to ALL peers in the group
+   * Use this after programmatic camera movements complete
+   */
+  broadcastResumeCameraSync(): void {
+    this.cameraSendPaused = false;
+    this.cameraReceivePaused = false;
+    this.sendMessage('resumeCamera', {});
+    console.log('🔓 Broadcasting camera sync resume');
+  }
+
+  /**
    * Check if camera sync is paused
    */
   isCameraSyncPaused(): boolean {
@@ -340,6 +364,18 @@ export class SyncManager {
         break;
       case 'pong':
         // Peer est vivant, déjà mis à jour dans le tracking
+        break;
+      case 'pauseCamera':
+        // Un peer demande à tous de pauser le camera sync
+        console.log('🔒 Camera sync paused by peer:', message.instanceId);
+        this.cameraSendPaused = true;
+        this.cameraReceivePaused = true;
+        break;
+      case 'resumeCamera':
+        // Un peer demande à tous de reprendre le camera sync
+        console.log('🔓 Camera sync resumed by peer:', message.instanceId);
+        this.cameraSendPaused = false;
+        this.cameraReceivePaused = false;
         break;
     }
   }
