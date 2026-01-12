@@ -87,13 +87,16 @@ function zoomWithoutSync(zoomFn: () => void): void {
 async function init(): Promise<void> {
   showLoading('Initialisation...');
 
-  // Initialiser le gestionnaire système Grist (tables de config, etc.)
+  // IMPORTANT: Appeler grist.ready() EN PREMIER pour activer le plugin API
+  if (typeof grist !== 'undefined') {
+    await initGristApi();
+  }
+
+  // Maintenant on peut initialiser le gestionnaire système Grist
   gristSystem = new GristSystemManager();
   await gristSystem.initialize();
 
-  // Récupérer le token Mapbox
-  await loadMapboxToken();
-
+  // Si pas de token, en demander un
   if (!CONFIG.mapbox.token) {
     hideLoading();
     showToast('Token Mapbox manquant - configurez-le dans les options du widget', 'error');
@@ -113,8 +116,46 @@ async function init(): Promise<void> {
   // Charger les couches sauvegardées (si disponibles)
   await loadSavedLayers();
 
-  // Setup event listeners
+  // Setup event listeners (sans grist.ready qui est déjà fait)
   setupEventListeners();
+}
+
+// Initialiser l'API Grist et récupérer les options
+async function initGristApi(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    grist.ready({ requiredAccess: 'read table' });
+
+    // Écouter les options pour le token Mapbox
+    grist.onOptions((options: any) => {
+      if (options?.mapboxToken) {
+        CONFIG.mapbox.token = options.mapboxToken;
+        console.log('✓ Token Mapbox configuré depuis Grist');
+      }
+      // Fallback localStorage si pas de token dans options
+      if (!CONFIG.mapbox.token) {
+        const saved = localStorage.getItem('smartmap3d_mapbox_token');
+        if (saved) {
+          CONFIG.mapbox.token = saved;
+          console.log('✓ Token Mapbox depuis localStorage');
+        }
+      }
+      resolve();
+    });
+
+    // Timeout au cas où onOptions ne fire pas
+    setTimeout(() => {
+      console.log('⚠️ Timeout attente options Grist');
+      // Fallback localStorage
+      if (!CONFIG.mapbox.token) {
+        const saved = localStorage.getItem('smartmap3d_mapbox_token');
+        if (saved) {
+          CONFIG.mapbox.token = saved;
+          console.log('✓ Token Mapbox depuis localStorage (timeout)');
+        }
+      }
+      resolve();
+    }, 2000);
+  });
 }
 
 // Charger les couches sauvegardées depuis Grist
@@ -174,40 +215,6 @@ function setupSyncCallbacks(): void {
     updateTimeDisplay(ambiance.timeOfDay);
     updateLighting();
   });
-}
-
-async function loadMapboxToken(): Promise<void> {
-  // Essayer depuis Grist options (avec timeout)
-  if (typeof grist !== 'undefined') {
-    try {
-      // Attendre que Grist soit prêt avec timeout
-      const gristReady = new Promise<void>((resolve) => {
-        grist.ready({ requiredAccess: 'read table' });
-        grist.onOptions((options: any) => {
-          if (options?.mapboxToken) {
-            CONFIG.mapbox.token = options.mapboxToken;
-          }
-          resolve();
-        });
-      });
-
-      const timeout = new Promise<void>((resolve) => {
-        setTimeout(resolve, 2000); // 2 secondes max
-      });
-
-      await Promise.race([gristReady, timeout]);
-
-      if (CONFIG.mapbox.token) return;
-    } catch (e) {
-      console.log('Grist options non disponibles');
-    }
-  }
-
-  // Fallback localStorage
-  const saved = localStorage.getItem('smartmap3d_mapbox_token');
-  if (saved) {
-    CONFIG.mapbox.token = saved;
-  }
 }
 
 function initMap(): void {
