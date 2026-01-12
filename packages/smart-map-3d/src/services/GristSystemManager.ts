@@ -94,6 +94,7 @@ const SYSTEM_TABLES = {
 export class GristSystemManager {
   private initialized: boolean = false;
   private tables: Map<string, boolean> = new Map();
+  private canCreateTables: boolean = false;
 
   /**
    * Check if Grist API is available
@@ -103,39 +104,90 @@ export class GristSystemManager {
   }
 
   /**
-   * Initialize system tables if they don't exist
+   * Check if a specific system table is available
+   */
+  isTableAvailable(tableKey: 'config' | 'layers' | 'bookmarks'): boolean {
+    return this.tables.get(tableKey) === true;
+  }
+
+  /**
+   * Initialize system tables - check existing, don't block if can't create
+   * Widgets typically don't have permission to create tables, so we gracefully
+   * handle this and continue without system table features if needed.
    */
   async initialize(): Promise<boolean> {
     if (!this.isGristAvailable()) {
       console.log('⚠️ Grist non disponible - mode standalone');
+      this.initialized = true;
       return false;
     }
 
     if (this.initialized) return true;
 
     try {
-      console.log('🔧 Initialisation des tables système...');
+      console.log('🔧 Vérification des tables système...');
 
-      // Check/create each system table
+      // Check each system table - just check existence, don't try to create
       for (const [key, tableDef] of Object.entries(SYSTEM_TABLES)) {
+        try {
+          const exists = await this.tableExists(tableDef.name);
+          if (exists) {
+            console.log(`✓ Table ${tableDef.name} disponible`);
+            this.tables.set(key, true);
+          } else {
+            console.log(`⚠️ Table ${tableDef.name} non trouvée (fonctionnalités limitées)`);
+            this.tables.set(key, false);
+          }
+        } catch (e) {
+          console.warn(`⚠️ Erreur vérification table ${tableDef.name}:`, e);
+          this.tables.set(key, false);
+        }
+      }
+
+      this.initialized = true;
+
+      const availableCount = Array.from(this.tables.values()).filter(v => v).length;
+      if (availableCount > 0) {
+        console.log(`✅ ${availableCount}/${this.tables.size} tables système disponibles`);
+      } else {
+        console.log('ℹ️ Aucune table système - mode sans persistance');
+      }
+
+      return availableCount > 0;
+
+    } catch (error) {
+      console.warn('⚠️ Erreur vérification tables système:', error);
+      this.initialized = true; // Mark as initialized anyway to not block
+      return false;
+    }
+  }
+
+  /**
+   * Try to create system tables (requires document permissions)
+   * Call this explicitly if you know you have permission
+   */
+  async createSystemTables(): Promise<boolean> {
+    if (!this.isGristAvailable()) return false;
+
+    let created = 0;
+    for (const [key, tableDef] of Object.entries(SYSTEM_TABLES)) {
+      if (this.tables.get(key)) continue; // Already exists
+
+      try {
         const exists = await this.tableExists(tableDef.name);
         if (!exists) {
           await this.createSystemTable(tableDef.name, tableDef.columns);
           console.log(`✅ Table ${tableDef.name} créée`);
-        } else {
-          console.log(`✓ Table ${tableDef.name} existe`);
         }
         this.tables.set(key, true);
+        created++;
+      } catch (e) {
+        console.warn(`❌ Impossible de créer ${tableDef.name}:`, e);
       }
-
-      this.initialized = true;
-      console.log('✅ Tables système initialisées');
-      return true;
-
-    } catch (error) {
-      console.error('❌ Erreur initialisation tables système:', error);
-      return false;
     }
+
+    this.canCreateTables = created > 0;
+    return created > 0;
   }
 
   /**
@@ -176,7 +228,7 @@ export class GristSystemManager {
    * Get a config value
    */
   async getConfig(key: string, defaultValue?: string): Promise<string | undefined> {
-    if (!this.isGristAvailable()) return defaultValue;
+    if (!this.isGristAvailable() || !this.isTableAvailable('config')) return defaultValue;
 
     try {
       const records = await grist.docApi.fetchTable(SYSTEM_TABLES.config.name);
@@ -195,7 +247,7 @@ export class GristSystemManager {
    * Set a config value
    */
   async setConfig(key: string, value: string): Promise<void> {
-    if (!this.isGristAvailable()) return;
+    if (!this.isGristAvailable() || !this.isTableAvailable('config')) return;
 
     try {
       const records = await grist.docApi.fetchTable(SYSTEM_TABLES.config.name);
@@ -228,7 +280,7 @@ export class GristSystemManager {
    * Get all config values
    */
   async getAllConfig(): Promise<Record<string, string>> {
-    if (!this.isGristAvailable()) return {};
+    if (!this.isGristAvailable() || !this.isTableAvailable('config')) return {};
 
     try {
       const records = await grist.docApi.fetchTable(SYSTEM_TABLES.config.name);
@@ -254,7 +306,7 @@ export class GristSystemManager {
    * Save a layer configuration
    */
   async saveLayer(layer: Omit<LayerConfig, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> {
-    if (!this.isGristAvailable()) return null;
+    if (!this.isGristAvailable() || !this.isTableAvailable('layers')) return null;
 
     try {
       const now = new Date().toISOString();
@@ -277,7 +329,7 @@ export class GristSystemManager {
    * Update a layer configuration
    */
   async updateLayer(id: number, updates: Partial<LayerConfig>): Promise<void> {
-    if (!this.isGristAvailable()) return;
+    if (!this.isGristAvailable() || !this.isTableAvailable('layers')) return;
 
     try {
       await grist.docApi.applyUserActions([
@@ -295,7 +347,7 @@ export class GristSystemManager {
    * Delete a layer configuration
    */
   async deleteLayer(id: number): Promise<void> {
-    if (!this.isGristAvailable()) return;
+    if (!this.isGristAvailable() || !this.isTableAvailable('layers')) return;
 
     try {
       await grist.docApi.applyUserActions([
@@ -310,7 +362,7 @@ export class GristSystemManager {
    * Get all saved layers
    */
   async getLayers(): Promise<LayerConfig[]> {
-    if (!this.isGristAvailable()) return [];
+    if (!this.isGristAvailable() || !this.isTableAvailable('layers')) return [];
 
     try {
       const records = await grist.docApi.fetchTable(SYSTEM_TABLES.layers.name);
@@ -347,7 +399,7 @@ export class GristSystemManager {
    * Save a bookmark
    */
   async saveBookmark(bookmark: Omit<BookmarkConfig, 'id' | 'createdAt'>): Promise<string | null> {
-    if (!this.isGristAvailable()) return null;
+    if (!this.isGristAvailable() || !this.isTableAvailable('bookmarks')) return null;
 
     try {
       const result = await grist.docApi.applyUserActions([
@@ -368,7 +420,7 @@ export class GristSystemManager {
    * Delete a bookmark
    */
   async deleteBookmark(id: number): Promise<void> {
-    if (!this.isGristAvailable()) return;
+    if (!this.isGristAvailable() || !this.isTableAvailable('bookmarks')) return;
 
     try {
       await grist.docApi.applyUserActions([
@@ -383,7 +435,7 @@ export class GristSystemManager {
    * Get all bookmarks
    */
   async getBookmarks(): Promise<BookmarkConfig[]> {
-    if (!this.isGristAvailable()) return [];
+    if (!this.isGristAvailable() || !this.isTableAvailable('bookmarks')) return [];
 
     try {
       const records = await grist.docApi.fetchTable(SYSTEM_TABLES.bookmarks.name);
