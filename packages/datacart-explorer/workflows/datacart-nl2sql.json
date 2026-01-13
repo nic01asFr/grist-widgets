@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\n\nconst question = body.question || '';\nconst database = body.database || 'r_datacart';\nconst context = body.context || {};\nconst history = body.history || [];\n\nif (!question.trim()) {\n    throw new Error('Question requise');\n}\n\n// Construire le contexte enrichi\nconst enrichedContext = {\n    database: database,\n    databaseDescription: getDatabaseDescription(database),\n    selectedTable: context.selectedTable || null,\n    availableSchemas: context.availableSchemas || [],\n    conversationHistory: history.slice(-6) // Derniers 3 échanges\n};\n\nfunction getDatabaseDescription(db) {\n    const descriptions = {\n        'r_datacart': 'Base de données des référentiels géographiques IGN incluant BDTOPO (bâtiments, routes, hydrographie, végétation, transport), AdminExpress (limites administratives), Parcellaire Express (cadastre), GPU (documents urbanisme), RPG (parcelles agricoles)',\n        'e_datacart': 'Base de données externes incluant BDNB (données bâtiments), mesures compensatoires environnementales, données partenaires',\n        'm_datacart': 'Base de données métiers CEREMA incluant études, projets internes, données terrain'\n    };\n    return descriptions[db] || 'Base de données DataCart';\n}\n\nreturn [{\n    json: {\n        question: question,\n        database: database,\n        context: enrichedContext\n    }\n}];"
+        "jsCode": "const body = $input.first().json.body;\n\nconst question = body.question || '';\nconst database = body.database || 'r_datacart';\nconst context = body.context || {};\nconst history = body.history || [];\n\nif (!question.trim()) {\n    throw new Error('Question requise');\n}\n\nconst enrichedContext = {\n    database: database,\n    databaseDescription: getDatabaseDescription(database),\n    selectedTable: context.selectedTable || null,\n    availableSchemas: context.availableSchemas || [],\n    conversationHistory: history.slice(-6)\n};\n\nfunction getDatabaseDescription(db) {\n    const descriptions = {\n        'r_datacart': 'Base de données des référentiels géographiques IGN incluant BDTOPO (bâtiments, routes, hydrographie, végétation, transport), AdminExpress (limites administratives), Parcellaire Express (cadastre), GPU (documents urbanisme), RPG (parcelles agricoles)',\n        'e_datacart': 'Base de données externes incluant BDNB (données bâtiments), mesures compensatoires environnementales, données partenaires',\n        'm_datacart': 'Base de données métiers CEREMA incluant études, projets internes, données terrain'\n    };\n    return descriptions[db] || 'Base de données DataCart';\n}\n\nreturn [{\n    json: {\n        question: question,\n        database: database,\n        context: enrichedContext\n    }\n}];"
       },
       "id": "code-prepare-context",
       "name": "Préparer contexte",
@@ -29,7 +29,7 @@
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-20250514",
+        "model": "mistral-large-latest",
         "options": {
           "temperature": 0.3,
           "maxTokens": 2000
@@ -37,13 +37,13 @@
       },
       "id": "agent-router",
       "name": "Agent Router",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.2,
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
       "position": [680, 300],
       "credentials": {
-        "anthropicApi": {
-          "id": "anthropic-api",
-          "name": "Anthropic API"
+        "mistralCloudApi": {
+          "id": "mistral-api",
+          "name": "Mistral API"
         }
       }
     },
@@ -61,7 +61,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst routerResponse = input.response || input.text || '';\n\n// Parser la réponse JSON du router\nlet analysis;\ntry {\n    // Extraire le JSON de la réponse\n    const jsonMatch = routerResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        analysis = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    // Fallback si parsing échoue\n    analysis = {\n        query_type: 'simple',\n        is_spatial: false,\n        probable_tables: [],\n        spatial_operations: [],\n        filters_needed: [],\n        columns_needed: ['*'],\n        reasoning: 'Analyse par défaut'\n    };\n}\n\n// Récupérer les données d'entrée originales\nconst originalData = $('Préparer contexte').first().json;\n\nreturn [{\n    json: {\n        question: originalData.question,\n        database: originalData.database,\n        context: originalData.context,\n        analysis: analysis\n    }\n}];"
+        "jsCode": "const input = $input.first().json;\nconst routerResponse = input.response || input.text || '';\n\nlet analysis;\ntry {\n    const jsonMatch = routerResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        analysis = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    analysis = {\n        query_type: 'simple',\n        is_spatial: false,\n        probable_tables: [],\n        spatial_operations: [],\n        filters_needed: [],\n        columns_needed: ['*'],\n        reasoning: 'Analyse par défaut'\n    };\n}\n\nconst originalData = $('Préparer contexte').first().json;\n\nreturn [{\n    json: {\n        question: originalData.question,\n        database: originalData.database,\n        context: originalData.context,\n        analysis: analysis\n    }\n}];"
       },
       "id": "code-parse-router",
       "name": "Parser Router Response",
@@ -71,7 +71,7 @@
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-20250514",
+        "model": "mistral-large-latest",
         "options": {
           "temperature": 0.2,
           "maxTokens": 3000
@@ -79,13 +79,13 @@
       },
       "id": "agent-sql-builder",
       "name": "Agent SQL Builder",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.2,
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
       "position": [1120, 300],
       "credentials": {
-        "anthropicApi": {
-          "id": "anthropic-api",
-          "name": "Anthropic API"
+        "mistralCloudApi": {
+          "id": "mistral-api",
+          "name": "Mistral API"
         }
       }
     },
@@ -103,7 +103,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst builderResponse = input.response || input.text || '';\n\n// Parser la réponse JSON\nlet sqlResult;\ntry {\n    const jsonMatch = builderResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        sqlResult = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    // Fallback\n    sqlResult = {\n        sql: '',\n        explanation: 'Erreur lors de la génération SQL',\n        tables_used: [],\n        warnings: ['Impossible de générer la requête'],\n        assumptions: []\n    };\n}\n\nconst originalData = $('Parser Router Response').first().json;\n\nreturn [{\n    json: {\n        question: originalData.question,\n        database: originalData.database,\n        sql: sqlResult.sql,\n        explanation: sqlResult.explanation,\n        tables_used: sqlResult.tables_used,\n        warnings: sqlResult.warnings || [],\n        assumptions: sqlResult.assumptions || [],\n        analysis: originalData.analysis\n    }\n}];"
+        "jsCode": "const input = $input.first().json;\nconst builderResponse = input.response || input.text || '';\n\nlet sqlResult;\ntry {\n    const jsonMatch = builderResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        sqlResult = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    sqlResult = {\n        sql: '',\n        explanation: 'Erreur lors de la génération SQL',\n        tables_used: [],\n        warnings: ['Impossible de générer la requête'],\n        assumptions: []\n    };\n}\n\nconst originalData = $('Parser Router Response').first().json;\n\nreturn [{\n    json: {\n        question: originalData.question,\n        database: originalData.database,\n        sql: sqlResult.sql,\n        explanation: sqlResult.explanation,\n        tables_used: sqlResult.tables_used,\n        warnings: sqlResult.warnings || [],\n        assumptions: sqlResult.assumptions || [],\n        analysis: originalData.analysis\n    }\n}];"
       },
       "id": "code-parse-sql",
       "name": "Parser SQL Response",
@@ -113,7 +113,7 @@
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-20250514",
+        "model": "mistral-large-latest",
         "options": {
           "temperature": 0.1,
           "maxTokens": 1500
@@ -121,20 +121,20 @@
       },
       "id": "agent-validator",
       "name": "Agent Validator",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.2,
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
       "position": [1560, 300],
       "credentials": {
-        "anthropicApi": {
-          "id": "anthropic-api",
-          "name": "Anthropic API"
+        "mistralCloudApi": {
+          "id": "mistral-api",
+          "name": "Mistral API"
         }
       }
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "Tu es un expert en validation et sécurité SQL. Vérifie la requête SQL suivante.\n\n## REQUÊTE À VALIDER:\n```sql\n{{ $json.sql }}\n```\n\n## VÉRIFICATIONS OBLIGATOIRES:\n1. ✅ La requête est bien un SELECT (pas INSERT, UPDATE, DELETE, DROP, etc.)\n2. ✅ Pas d'injection SQL potentielle\n3. ✅ Présence d'un LIMIT\n4. ✅ Syntaxe SQL correcte\n5. ✅ Les fonctions PostGIS sont correctement utilisées\n6. ✅ Les noms de tables/colonnes semblent valides\n\n## OPTIMISATIONS SUGGÉRÉES:\n- Indices potentiellement utilisés\n- Requête trop large (sans filtres géographiques ou attributaires)\n- Performance estimée\n\nRéponds en JSON:\n{\n  \"is_valid\": true/false,\n  \"is_safe\": true/false,\n  \"sql_corrected\": \"requête corrigée si nécessaire, sinon la même\",\n  \"issues\": [\"liste des problèmes trouvés\"],\n  \"suggestions\": [\"suggestions d'amélioration\"],\n  \"performance_warning\": \"avertissement performance si applicable\"\n}",
+        "text": "Tu es un expert en validation et sécurité SQL. Vérifie la requête SQL suivante.\n\n## REQUÊTE À VALIDER:\n```sql\n{{ $json.sql }}\n```\n\n## VÉRIFICATIONS OBLIGATOIRES:\n1. La requête est bien un SELECT (pas INSERT, UPDATE, DELETE, DROP, etc.)\n2. Pas d'injection SQL potentielle\n3. Présence d'un LIMIT\n4. Syntaxe SQL correcte\n5. Les fonctions PostGIS sont correctement utilisées\n6. Les noms de tables/colonnes semblent valides\n\n## OPTIMISATIONS SUGGÉRÉES:\n- Indices potentiellement utilisés\n- Requête trop large (sans filtres géographiques ou attributaires)\n- Performance estimée\n\nRéponds en JSON:\n{\n  \"is_valid\": true/false,\n  \"is_safe\": true/false,\n  \"sql_corrected\": \"requête corrigée si nécessaire, sinon la même\",\n  \"issues\": [\"liste des problèmes trouvés\"],\n  \"suggestions\": [\"suggestions d'amélioration\"],\n  \"performance_warning\": \"avertissement performance si applicable\"\n}",
         "options": {}
       },
       "id": "prompt-validator",
@@ -145,7 +145,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst validatorResponse = input.response || input.text || '';\n\n// Parser la réponse\nlet validation;\ntry {\n    const jsonMatch = validatorResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        validation = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    validation = {\n        is_valid: true,\n        is_safe: true,\n        sql_corrected: '',\n        issues: [],\n        suggestions: [],\n        performance_warning: null\n    };\n}\n\nconst originalData = $('Parser SQL Response').first().json;\n\n// Construire la réponse finale\nconst finalSQL = validation.sql_corrected || originalData.sql;\nconst warnings = [...(originalData.warnings || []), ...(validation.issues || [])];\n\nif (validation.performance_warning) {\n    warnings.push(validation.performance_warning);\n}\n\nreturn [{\n    json: {\n        success: validation.is_valid && validation.is_safe,\n        sql: finalSQL,\n        explanation: originalData.explanation,\n        tables_used: originalData.tables_used,\n        warnings: warnings,\n        suggestions: validation.suggestions || [],\n        is_spatial: originalData.analysis?.is_spatial || false,\n        query_type: originalData.analysis?.query_type || 'simple'\n    }\n}];"
+        "jsCode": "const input = $input.first().json;\nconst validatorResponse = input.response || input.text || '';\n\nlet validation;\ntry {\n    const jsonMatch = validatorResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        validation = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    validation = {\n        is_valid: true,\n        is_safe: true,\n        sql_corrected: '',\n        issues: [],\n        suggestions: [],\n        performance_warning: null\n    };\n}\n\nconst originalData = $('Parser SQL Response').first().json;\n\nconst finalSQL = validation.sql_corrected || originalData.sql;\nconst warnings = [...(originalData.warnings || []), ...(validation.issues || [])];\n\nif (validation.performance_warning) {\n    warnings.push(validation.performance_warning);\n}\n\nreturn [{\n    json: {\n        success: validation.is_valid && validation.is_safe,\n        sql: finalSQL,\n        explanation: originalData.explanation,\n        tables_used: originalData.tables_used,\n        warnings: warnings,\n        suggestions: validation.suggestions || [],\n        is_spatial: originalData.analysis?.is_spatial || false,\n        query_type: originalData.analysis?.query_type || 'simple'\n    }\n}];"
       },
       "id": "code-final-response",
       "name": "Construire réponse finale",

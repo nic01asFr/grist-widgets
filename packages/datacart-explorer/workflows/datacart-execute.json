@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst sql = body.sql || '';\nconst database = body.database || 'r_datacart';\nconst limit = Math.min(body.limit || 1000, 10000);\n\n// Liste des mots-clés interdits\nconst forbiddenKeywords = [\n    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',\n    'TRUNCATE', 'GRANT', 'REVOKE', 'EXECUTE', 'EXEC',\n    'COPY', 'pg_read_file', 'pg_write_file', 'lo_import', 'lo_export'\n];\n\n// Vérification de sécurité\nconst normalizedSQL = sql.toUpperCase().replace(/\\s+/g, ' ').trim();\n\n// Vérifier que c'est un SELECT ou WITH\nif (!normalizedSQL.startsWith('SELECT') && !normalizedSQL.startsWith('WITH')) {\n    throw new Error('Seules les requêtes SELECT sont autorisées');\n}\n\n// Vérifier les mots-clés interdits\nfor (const keyword of forbiddenKeywords) {\n    const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n    if (regex.test(sql)) {\n        throw new Error(`Mot-clé interdit détecté: ${keyword}`);\n    }\n}\n\n// Vérifier l'absence de commentaires malicieux\nif (sql.includes('--') || sql.includes('/*')) {\n    // Autoriser les commentaires mais vérifier qu'ils ne cachent pas de code dangereux\n    const withoutComments = sql\n        .replace(/--.*$/gm, '')\n        .replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');\n    \n    for (const keyword of forbiddenKeywords) {\n        const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n        if (regex.test(withoutComments)) {\n            throw new Error(`Mot-clé interdit détecté: ${keyword}`);\n        }\n    }\n}\n\n// Vérifier qu'il n'y a pas de ; suivi d'une autre requête (injection)\nconst statements = sql.split(';').filter(s => s.trim().length > 0);\nif (statements.length > 1) {\n    throw new Error('Une seule requête à la fois est autorisée');\n}\n\n// Ajouter LIMIT si absent\nlet finalSQL = sql.trim();\nif (finalSQL.endsWith(';')) {\n    finalSQL = finalSQL.slice(0, -1);\n}\n\nif (!normalizedSQL.includes('LIMIT')) {\n    finalSQL = `${finalSQL} LIMIT ${limit}`;\n}\n\nreturn [{\n    json: {\n        sql: finalSQL,\n        database: database,\n        limit: limit,\n        validated: true\n    }\n}];"
+        "jsCode": "const body = $input.first().json.body;\nconst sql = body.sql || '';\nconst database = body.database || 'r_datacart';\nconst limit = Math.min(body.limit || 1000, 10000);\n\n// Liste des mots-clés interdits\nconst forbiddenKeywords = [\n    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',\n    'TRUNCATE', 'GRANT', 'REVOKE', 'EXECUTE', 'EXEC',\n    'COPY', 'pg_read_file', 'pg_write_file', 'lo_import', 'lo_export'\n];\n\n// Vérification de sécurité\nconst normalizedSQL = sql.toUpperCase().replace(/\\s+/g, ' ').trim();\n\n// Vérifier que c'est un SELECT ou WITH\nif (!normalizedSQL.startsWith('SELECT') && !normalizedSQL.startsWith('WITH')) {\n    throw new Error('Seules les requêtes SELECT sont autorisées');\n}\n\n// Vérifier les mots-clés interdits\nfor (const keyword of forbiddenKeywords) {\n    const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n    if (regex.test(sql)) {\n        throw new Error(`Mot-clé interdit détecté: ${keyword}`);\n    }\n}\n\n// Vérifier l'absence de commentaires malicieux\nif (sql.includes('--') || sql.includes('/*')) {\n    const withoutComments = sql\n        .replace(/--.*$/gm, '')\n        .replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');\n    \n    for (const keyword of forbiddenKeywords) {\n        const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n        if (regex.test(withoutComments)) {\n            throw new Error(`Mot-clé interdit détecté: ${keyword}`);\n        }\n    }\n}\n\n// Vérifier qu'il n'y a pas de ; suivi d'une autre requête (injection)\nconst statements = sql.split(';').filter(s => s.trim().length > 0);\nif (statements.length > 1) {\n    throw new Error('Une seule requête à la fois est autorisée');\n}\n\n// Ajouter LIMIT si absent\nlet finalSQL = sql.trim();\nif (finalSQL.endsWith(';')) {\n    finalSQL = finalSQL.slice(0, -1);\n}\n\nif (!normalizedSQL.includes('LIMIT')) {\n    finalSQL = `${finalSQL} LIMIT ${limit}`;\n}\n\nreturn [{\n    json: {\n        sql: finalSQL,\n        database: database,\n        limit: limit,\n        validated: true\n    }\n}];"
       },
       "id": "code-validate-sql",
       "name": "Valider SQL",
@@ -55,6 +55,65 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "outputKey": "r_datacart",
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.database }}",
+                    "rightValue": "r_datacart",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "e_datacart",
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.database }}",
+                    "rightValue": "e_datacart",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "m_datacart",
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.database }}",
+                    "rightValue": "m_datacart",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-database",
+      "name": "Router Database",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [860, 300]
     },
     {
       "parameters": {
@@ -118,87 +177,7 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "db-r",
-              "leftValue": "={{ $json.database }}",
-              "rightValue": "r_datacart",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "switch-database",
-      "name": "Router Database",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
-      "position": [860, 300],
-      "parameters": {
-        "rules": {
-          "rules": [
-            {
-              "outputKey": "r_datacart",
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.database }}",
-                    "rightValue": "r_datacart",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "outputKey": "e_datacart",
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.database }}",
-                    "rightValue": "e_datacart",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "outputKey": "m_datacart",
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.database }}",
-                    "rightValue": "m_datacart",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const startTime = Date.now();\nconst rows = $input.all().map(item => item.json);\nconst executionTime = Date.now() - startTime;\n\n// Extraire les infos de colonnes depuis le premier résultat\nlet columns = [];\nif (rows.length > 0) {\n    columns = Object.keys(rows[0]).map(key => {\n        const value = rows[0][key];\n        let type = 'text';\n        \n        if (typeof value === 'number') {\n            type = Number.isInteger(value) ? 'integer' : 'numeric';\n        } else if (typeof value === 'boolean') {\n            type = 'boolean';\n        } else if (value instanceof Date) {\n            type = 'timestamp';\n        } else if (typeof value === 'object' && value !== null) {\n            // Vérifier si c'est du GeoJSON\n            if (value.type && value.coordinates) {\n                type = 'geometry';\n            } else {\n                type = 'json';\n            }\n        } else if (typeof value === 'string') {\n            // Essayer de détecter le GeoJSON sous forme de string\n            try {\n                const parsed = JSON.parse(value);\n                if (parsed.type && parsed.coordinates) {\n                    type = 'geometry';\n                }\n            } catch (e) {\n                // Ce n'est pas du JSON\n            }\n        }\n        \n        return { name: key, type: type };\n    });\n}\n\nreturn [{\n    json: {\n        success: true,\n        rows: rows,\n        columns: columns,\n        row_count: rows.length,\n        execution_time: executionTime\n    }\n}];"
+        "jsCode": "const startTime = Date.now();\nconst rows = $input.all().map(item => item.json);\nconst executionTime = Date.now() - startTime;\n\nlet columns = [];\nif (rows.length > 0) {\n    columns = Object.keys(rows[0]).map(key => {\n        const value = rows[0][key];\n        let type = 'text';\n        \n        if (typeof value === 'number') {\n            type = Number.isInteger(value) ? 'integer' : 'numeric';\n        } else if (typeof value === 'boolean') {\n            type = 'boolean';\n        } else if (value instanceof Date) {\n            type = 'timestamp';\n        } else if (typeof value === 'object' && value !== null) {\n            if (value.type && value.coordinates) {\n                type = 'geometry';\n            } else {\n                type = 'json';\n            }\n        } else if (typeof value === 'string') {\n            try {\n                const parsed = JSON.parse(value);\n                if (parsed.type && parsed.coordinates) {\n                    type = 'geometry';\n                }\n            } catch (e) {}\n        }\n        \n        return { name: key, type: type };\n    });\n}\n\nreturn [{\n    json: {\n        success: true,\n        rows: rows,\n        columns: columns,\n        row_count: rows.length,\n        execution_time: executionTime\n    }\n}];"
       },
       "id": "code-format-results",
       "name": "Formater résultats",
@@ -256,16 +235,6 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [900, 500]
-    },
-    {
-      "parameters": {
-        "errorMessage": "={{ $json.message }}"
-      },
-      "id": "error-handler",
-      "name": "Error Handler",
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [680, 500]
     }
   ],
   "connections": {
@@ -380,8 +349,7 @@
     }
   },
   "settings": {
-    "executionOrder": "v1",
-    "errorWorkflow": "error-handler"
+    "executionOrder": "v1"
   },
   "staticData": null,
   "tags": [
