@@ -1,0 +1,243 @@
+{
+  "name": "DataCart - Schema API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dc/schema",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-schema",
+      "name": "Webhook Schema",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "dc-schema"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-table",
+              "leftValue": "={{ $json.query.table }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-table-specified",
+      "name": "Table spécifiée ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    c.table_schema,\n    c.table_name,\n    c.column_name,\n    c.data_type,\n    c.is_nullable,\n    c.column_default,\n    CASE \n        WHEN pk.column_name IS NOT NULL THEN true \n        ELSE false \n    END as is_primary_key,\n    CASE \n        WHEN fk.column_name IS NOT NULL THEN true \n        ELSE false \n    END as is_foreign_key,\n    fk.foreign_table_schema,\n    fk.foreign_table_name,\n    pgd.description as column_comment,\n    CASE \n        WHEN c.data_type IN ('geometry', 'geography') THEN \n            (SELECT type FROM geometry_columns WHERE f_table_schema = c.table_schema AND f_table_name = c.table_name AND f_geometry_column = c.column_name LIMIT 1)\n        ELSE NULL\n    END as geometry_type,\n    CASE \n        WHEN c.data_type IN ('geometry', 'geography') THEN \n            (SELECT srid FROM geometry_columns WHERE f_table_schema = c.table_schema AND f_table_name = c.table_name AND f_geometry_column = c.column_name LIMIT 1)\n        ELSE NULL\n    END as geometry_srid\nFROM information_schema.columns c\nLEFT JOIN (\n    SELECT ku.table_schema, ku.table_name, ku.column_name\n    FROM information_schema.table_constraints tc\n    JOIN information_schema.key_column_usage ku \n        ON tc.constraint_name = ku.constraint_name \n        AND tc.table_schema = ku.table_schema\n    WHERE tc.constraint_type = 'PRIMARY KEY'\n) pk ON c.table_schema = pk.table_schema \n    AND c.table_name = pk.table_name \n    AND c.column_name = pk.column_name\nLEFT JOIN (\n    SELECT \n        kcu.table_schema,\n        kcu.table_name,\n        kcu.column_name,\n        ccu.table_schema AS foreign_table_schema,\n        ccu.table_name AS foreign_table_name\n    FROM information_schema.table_constraints tc\n    JOIN information_schema.key_column_usage kcu \n        ON tc.constraint_name = kcu.constraint_name\n    JOIN information_schema.constraint_column_usage ccu \n        ON ccu.constraint_name = tc.constraint_name\n    WHERE tc.constraint_type = 'FOREIGN KEY'\n) fk ON c.table_schema = fk.table_schema \n    AND c.table_name = fk.table_name \n    AND c.column_name = fk.column_name\nLEFT JOIN pg_catalog.pg_statio_all_tables st \n    ON c.table_schema = st.schemaname \n    AND c.table_name = st.relname\nLEFT JOIN pg_catalog.pg_description pgd \n    ON pgd.objoid = st.relid \n    AND pgd.objsubid = c.ordinal_position\nWHERE c.table_schema = '{{ $json.query.schema }}'\n    AND c.table_name = '{{ $json.query.table }}'\nORDER BY c.ordinal_position;",
+        "options": {}
+      },
+      "id": "pg-table-columns",
+      "name": "PostgreSQL - Colonnes table",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [680, 200],
+      "credentials": {
+        "postgres": {
+          "id": "datacart-postgres",
+          "name": "DataCart PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH table_info AS (\n    SELECT \n        t.table_schema,\n        t.table_name,\n        obj_description((t.table_schema || '.' || t.table_name)::regclass) as table_comment,\n        COALESCE(s.n_live_tup, 0) as row_count,\n        CASE \n            WHEN EXISTS (\n                SELECT 1 FROM geometry_columns gc \n                WHERE gc.f_table_schema = t.table_schema \n                AND gc.f_table_name = t.table_name\n            ) THEN true \n            ELSE false \n        END as has_geometry\n    FROM information_schema.tables t\n    LEFT JOIN pg_stat_user_tables s \n        ON t.table_schema = s.schemaname \n        AND t.table_name = s.relname\n    WHERE t.table_type = 'BASE TABLE'\n        AND t.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology')\n        AND t.table_schema NOT LIKE 'pg_temp%'\n        AND t.table_schema NOT LIKE 'pg_toast%'\n),\ncolumn_info AS (\n    SELECT \n        c.table_schema,\n        c.table_name,\n        json_agg(\n            json_build_object(\n                'name', c.column_name,\n                'type', c.data_type,\n                'nullable', c.is_nullable = 'YES',\n                'default', c.column_default\n            ) ORDER BY c.ordinal_position\n        ) as columns\n    FROM information_schema.columns c\n    WHERE c.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology')\n    GROUP BY c.table_schema, c.table_name\n)\nSELECT \n    ti.table_schema as schema,\n    ti.table_name as table,\n    ti.table_comment as comment,\n    ti.row_count,\n    ti.has_geometry,\n    ci.columns\nFROM table_info ti\nLEFT JOIN column_info ci \n    ON ti.table_schema = ci.table_schema \n    AND ti.table_name = ci.table_name\nORDER BY ti.table_schema, ti.table_name;",
+        "options": {}
+      },
+      "id": "pg-all-schemas",
+      "name": "PostgreSQL - Tous les schémas",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [680, 400],
+      "credentials": {
+        "postgres": {
+          "id": "datacart-postgres",
+          "name": "DataCart PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transformer les colonnes en format structuré\nconst columns = $input.all().map(item => ({\n    name: item.json.column_name,\n    type: item.json.data_type,\n    nullable: item.json.is_nullable === 'YES',\n    default: item.json.column_default,\n    is_primary_key: item.json.is_primary_key,\n    is_foreign_key: item.json.is_foreign_key,\n    foreign_table: item.json.is_foreign_key ? \n        `${item.json.foreign_table_schema}.${item.json.foreign_table_name}` : null,\n    comment: item.json.column_comment,\n    geometry_type: item.json.geometry_type,\n    geometry_srid: item.json.geometry_srid\n}));\n\nconst schema = $input.first().json.table_schema;\nconst table = $input.first().json.table_name;\n\nreturn [{\n    json: {\n        schema: schema,\n        table: table,\n        columns: columns\n    }\n}];"
+      },
+      "id": "code-format-columns",
+      "name": "Formater colonnes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Restructurer les données par schéma\nconst items = $input.all();\nconst schemas = {};\n\nitems.forEach(item => {\n    const schemaName = item.json.schema;\n    const tableName = item.json.table;\n    \n    if (!schemas[schemaName]) {\n        schemas[schemaName] = { tables: {} };\n    }\n    \n    schemas[schemaName].tables[tableName] = {\n        name: tableName,\n        schema: schemaName,\n        comment: item.json.comment,\n        rowCount: item.json.row_count,\n        hasGeometry: item.json.has_geometry,\n        columns: item.json.columns || []\n    };\n});\n\n// Retourner sous forme de liste pour compatibilité\nconst result = items.map(item => ({\n    schema: item.json.schema,\n    table: item.json.table,\n    comment: item.json.comment,\n    row_count: item.json.row_count,\n    has_geometry: item.json.has_geometry,\n    columns: item.json.columns || []\n}));\n\nreturn [{ json: result }];"
+      },
+      "id": "code-format-schemas",
+      "name": "Formater schémas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-columns",
+      "name": "Respond Colonnes",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-schemas",
+      "name": "Respond Schémas",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Schema": {
+      "main": [
+        [
+          {
+            "node": "Table spécifiée ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Table spécifiée ?": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL - Colonnes table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PostgreSQL - Tous les schémas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL - Colonnes table": {
+      "main": [
+        [
+          {
+            "node": "Formater colonnes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL - Tous les schémas": {
+      "main": [
+        [
+          {
+            "node": "Formater schémas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formater colonnes": {
+      "main": [
+        [
+          {
+            "node": "Respond Colonnes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formater schémas": {
+      "main": [
+        [
+          {
+            "node": "Respond Schémas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "DataCart",
+      "id": "datacart"
+    }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

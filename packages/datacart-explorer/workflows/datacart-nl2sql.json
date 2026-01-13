@@ -1,0 +1,347 @@
+{
+  "name": "DataCart - NL2SQL AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dc/nl2sql",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-nl2sql",
+      "name": "Webhook NL2SQL",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "dc-nl2sql"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nconst question = body.question || '';\nconst database = body.database || 'r_datacart';\nconst context = body.context || {};\nconst history = body.history || [];\n\nif (!question.trim()) {\n    throw new Error('Question requise');\n}\n\n// Construire le contexte enrichi\nconst enrichedContext = {\n    database: database,\n    databaseDescription: getDatabaseDescription(database),\n    selectedTable: context.selectedTable || null,\n    availableSchemas: context.availableSchemas || [],\n    conversationHistory: history.slice(-6) // Derniers 3 échanges\n};\n\nfunction getDatabaseDescription(db) {\n    const descriptions = {\n        'r_datacart': 'Base de données des référentiels géographiques IGN incluant BDTOPO (bâtiments, routes, hydrographie, végétation, transport), AdminExpress (limites administratives), Parcellaire Express (cadastre), GPU (documents urbanisme), RPG (parcelles agricoles)',\n        'e_datacart': 'Base de données externes incluant BDNB (données bâtiments), mesures compensatoires environnementales, données partenaires',\n        'm_datacart': 'Base de données métiers CEREMA incluant études, projets internes, données terrain'\n    };\n    return descriptions[db] || 'Base de données DataCart';\n}\n\nreturn [{\n    json: {\n        question: question,\n        database: database,\n        context: enrichedContext\n    }\n}];"
+      },
+      "id": "code-prepare-context",
+      "name": "Préparer contexte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-20250514",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 2000
+        }
+      },
+      "id": "agent-router",
+      "name": "Agent Router",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [680, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-api",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Tu es un expert en routage de requêtes SQL pour une base de données géographiques PostgreSQL/PostGIS.\n\nAnalyse la question utilisateur et détermine :\n1. Si la question nécessite une requête spatiale (distance, intersection, buffer, etc.)\n2. Les schémas et tables probablement concernés\n3. Le type de requête (SELECT simple, agrégation, jointure, spatial)\n\n## Base de données: {{ $json.database }}\n{{ $json.context.databaseDescription }}\n\n## Table sélectionnée (si applicable):\n{{ $json.context.selectedTable ? JSON.stringify($json.context.selectedTable, null, 2) : 'Aucune' }}\n\n## Schémas disponibles:\n{{ JSON.stringify($json.context.availableSchemas, null, 2) }}\n\n## Question utilisateur:\n{{ $json.question }}\n\nRéponds en JSON avec cette structure:\n{\n  \"query_type\": \"simple|aggregation|join|spatial\",\n  \"is_spatial\": true/false,\n  \"probable_tables\": [\"schema.table1\", \"schema.table2\"],\n  \"spatial_operations\": [\"ST_DWithin\", \"ST_Intersects\", etc.] ou [],\n  \"filters_needed\": [\"description des filtres\"],\n  \"columns_needed\": [\"colonnes probables\"],\n  \"reasoning\": \"explication courte de l'analyse\"\n}",
+        "options": {}
+      },
+      "id": "prompt-router",
+      "name": "Prompt Router",
+      "type": "@n8n/n8n-nodes-langchain.prompt",
+      "typeVersion": 1,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst routerResponse = input.response || input.text || '';\n\n// Parser la réponse JSON du router\nlet analysis;\ntry {\n    // Extraire le JSON de la réponse\n    const jsonMatch = routerResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        analysis = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    // Fallback si parsing échoue\n    analysis = {\n        query_type: 'simple',\n        is_spatial: false,\n        probable_tables: [],\n        spatial_operations: [],\n        filters_needed: [],\n        columns_needed: ['*'],\n        reasoning: 'Analyse par défaut'\n    };\n}\n\n// Récupérer les données d'entrée originales\nconst originalData = $('Préparer contexte').first().json;\n\nreturn [{\n    json: {\n        question: originalData.question,\n        database: originalData.database,\n        context: originalData.context,\n        analysis: analysis\n    }\n}];"
+      },
+      "id": "code-parse-router",
+      "name": "Parser Router Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-20250514",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 3000
+        }
+      },
+      "id": "agent-sql-builder",
+      "name": "Agent SQL Builder",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [1120, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-api",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Tu es un expert SQL PostgreSQL/PostGIS spécialisé dans les données géographiques françaises.\n\n## RÈGLES STRICTES:\n1. Génère UNIQUEMENT des requêtes SELECT (jamais INSERT, UPDATE, DELETE, DROP, etc.)\n2. Utilise toujours ST_AsGeoJSON() pour retourner les géométries\n3. Ajoute toujours un LIMIT (max 1000 par défaut)\n4. Les géométries sont en Lambert-93 (SRID 2154) ou WGS84 (SRID 4326)\n5. Utilise des alias clairs pour les colonnes\n\n## BASE DE DONNÉES: {{ $json.database }}\n{{ $json.context.databaseDescription }}\n\n## ANALYSE PRÉLIMINAIRE:\n- Type de requête: {{ $json.analysis.query_type }}\n- Requête spatiale: {{ $json.analysis.is_spatial }}\n- Tables probables: {{ JSON.stringify($json.analysis.probable_tables) }}\n- Opérations spatiales: {{ JSON.stringify($json.analysis.spatial_operations) }}\n\n## TABLE SÉLECTIONNÉE:\n{{ $json.context.selectedTable ? JSON.stringify($json.context.selectedTable, null, 2) : 'Aucune - utiliser les tables probables' }}\n\n## SCHÉMAS DISPONIBLES:\n{{ JSON.stringify($json.context.availableSchemas.slice(0, 10), null, 2) }}\n\n## CONVENTIONS BDTOPO:\n- Schéma principal: bdtopo\n- Tables communes: batiment, troncon_de_route, commune, cours_d_eau, zone_de_vegetation\n- Colonne géométrie: geometrie (généralement)\n- Hauteur bâtiments: hauteur\n- Nom commune: nom\n\n## CONVENTIONS ADMIN EXPRESS:\n- Schéma: admin_express\n- Tables: commune, departement, region, epci\n- Code INSEE: code_insee\n\n## CONVENTIONS CADASTRE:\n- Schéma: parcellaire_express\n- Tables: parcelle, batiment\n- Identifiant parcelle: idu\n\n## QUESTION UTILISATEUR:\n{{ $json.question }}\n\n## INSTRUCTIONS:\nGénère une requête SQL PostgreSQL/PostGIS optimisée.\nSi la question mentionne une localisation (ville, département), utilise les tables administratives pour filtrer.\nPour les distances, utilise ST_DWithin avec la distance en mètres.\n\nRéponds en JSON:\n{\n  \"sql\": \"SELECT ... FROM ... WHERE ... LIMIT 100;\",\n  \"explanation\": \"Explication en français de ce que fait la requête\",\n  \"tables_used\": [\"schema.table\"],\n  \"warnings\": [\"avertissements éventuels sur les performances ou limites\"],\n  \"assumptions\": [\"hypothèses faites pour construire la requête\"]\n}",
+        "options": {}
+      },
+      "id": "prompt-sql-builder",
+      "name": "Prompt SQL Builder",
+      "type": "@n8n/n8n-nodes-langchain.prompt",
+      "typeVersion": 1,
+      "position": [1120, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst builderResponse = input.response || input.text || '';\n\n// Parser la réponse JSON\nlet sqlResult;\ntry {\n    const jsonMatch = builderResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        sqlResult = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    // Fallback\n    sqlResult = {\n        sql: '',\n        explanation: 'Erreur lors de la génération SQL',\n        tables_used: [],\n        warnings: ['Impossible de générer la requête'],\n        assumptions: []\n    };\n}\n\nconst originalData = $('Parser Router Response').first().json;\n\nreturn [{\n    json: {\n        question: originalData.question,\n        database: originalData.database,\n        sql: sqlResult.sql,\n        explanation: sqlResult.explanation,\n        tables_used: sqlResult.tables_used,\n        warnings: sqlResult.warnings || [],\n        assumptions: sqlResult.assumptions || [],\n        analysis: originalData.analysis\n    }\n}];"
+      },
+      "id": "code-parse-sql",
+      "name": "Parser SQL Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-20250514",
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 1500
+        }
+      },
+      "id": "agent-validator",
+      "name": "Agent Validator",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [1560, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-api",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Tu es un expert en validation et sécurité SQL. Vérifie la requête SQL suivante.\n\n## REQUÊTE À VALIDER:\n```sql\n{{ $json.sql }}\n```\n\n## VÉRIFICATIONS OBLIGATOIRES:\n1. ✅ La requête est bien un SELECT (pas INSERT, UPDATE, DELETE, DROP, etc.)\n2. ✅ Pas d'injection SQL potentielle\n3. ✅ Présence d'un LIMIT\n4. ✅ Syntaxe SQL correcte\n5. ✅ Les fonctions PostGIS sont correctement utilisées\n6. ✅ Les noms de tables/colonnes semblent valides\n\n## OPTIMISATIONS SUGGÉRÉES:\n- Indices potentiellement utilisés\n- Requête trop large (sans filtres géographiques ou attributaires)\n- Performance estimée\n\nRéponds en JSON:\n{\n  \"is_valid\": true/false,\n  \"is_safe\": true/false,\n  \"sql_corrected\": \"requête corrigée si nécessaire, sinon la même\",\n  \"issues\": [\"liste des problèmes trouvés\"],\n  \"suggestions\": [\"suggestions d'amélioration\"],\n  \"performance_warning\": \"avertissement performance si applicable\"\n}",
+        "options": {}
+      },
+      "id": "prompt-validator",
+      "name": "Prompt Validator",
+      "type": "@n8n/n8n-nodes-langchain.prompt",
+      "typeVersion": 1,
+      "position": [1560, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst validatorResponse = input.response || input.text || '';\n\n// Parser la réponse\nlet validation;\ntry {\n    const jsonMatch = validatorResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n        validation = JSON.parse(jsonMatch[0]);\n    } else {\n        throw new Error('Pas de JSON trouvé');\n    }\n} catch (e) {\n    validation = {\n        is_valid: true,\n        is_safe: true,\n        sql_corrected: '',\n        issues: [],\n        suggestions: [],\n        performance_warning: null\n    };\n}\n\nconst originalData = $('Parser SQL Response').first().json;\n\n// Construire la réponse finale\nconst finalSQL = validation.sql_corrected || originalData.sql;\nconst warnings = [...(originalData.warnings || []), ...(validation.issues || [])];\n\nif (validation.performance_warning) {\n    warnings.push(validation.performance_warning);\n}\n\nreturn [{\n    json: {\n        success: validation.is_valid && validation.is_safe,\n        sql: finalSQL,\n        explanation: originalData.explanation,\n        tables_used: originalData.tables_used,\n        warnings: warnings,\n        suggestions: validation.suggestions || [],\n        is_spatial: originalData.analysis?.is_spatial || false,\n        query_type: originalData.analysis?.query_type || 'simple'\n    }\n}];"
+      },
+      "id": "code-final-response",
+      "name": "Construire réponse finale",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-nl2sql",
+      "name": "Respond NL2SQL",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2000, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"Erreur lors de la génération SQL\",\n  \"message\": \"{{ $json.message || 'Une erreur est survenue' }}\"\n}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 600]
+    }
+  ],
+  "connections": {
+    "Webhook NL2SQL": {
+      "main": [
+        [
+          {
+            "node": "Préparer contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer contexte": {
+      "main": [
+        [
+          {
+            "node": "Agent Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Router": {
+      "main": [
+        [
+          {
+            "node": "Parser Router Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent Router",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser Router Response": {
+      "main": [
+        [
+          {
+            "node": "Agent SQL Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent SQL Builder": {
+      "main": [
+        [
+          {
+            "node": "Parser SQL Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt SQL Builder": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent SQL Builder",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser SQL Response": {
+      "main": [
+        [
+          {
+            "node": "Agent Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Validator": {
+      "main": [
+        [
+          {
+            "node": "Construire réponse finale",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Validator": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent Validator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construire réponse finale": {
+      "main": [
+        [
+          {
+            "node": "Respond NL2SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "DataCart",
+      "id": "datacart"
+    },
+    {
+      "name": "AI",
+      "id": "ai"
+    }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}
