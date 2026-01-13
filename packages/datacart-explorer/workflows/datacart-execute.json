@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst sql = body.sql || '';\nconst database = body.database || 'r_datacart';\nconst limit = Math.min(body.limit || 1000, 10000);\n\n// Liste des mots-clés interdits\nconst forbiddenKeywords = [\n    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',\n    'TRUNCATE', 'GRANT', 'REVOKE', 'EXECUTE', 'EXEC',\n    'COPY', 'pg_read_file', 'pg_write_file', 'lo_import', 'lo_export'\n];\n\n// Vérification de sécurité\nconst normalizedSQL = sql.toUpperCase().replace(/\\s+/g, ' ').trim();\n\n// Vérifier que c'est un SELECT ou WITH\nif (!normalizedSQL.startsWith('SELECT') && !normalizedSQL.startsWith('WITH')) {\n    throw new Error('Seules les requêtes SELECT sont autorisées');\n}\n\n// Vérifier les mots-clés interdits\nfor (const keyword of forbiddenKeywords) {\n    const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n    if (regex.test(sql)) {\n        throw new Error(`Mot-clé interdit détecté: ${keyword}`);\n    }\n}\n\n// Vérifier l'absence de commentaires malicieux\nif (sql.includes('--') || sql.includes('/*')) {\n    const withoutComments = sql\n        .replace(/--.*$/gm, '')\n        .replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');\n    \n    for (const keyword of forbiddenKeywords) {\n        const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n        if (regex.test(withoutComments)) {\n            throw new Error(`Mot-clé interdit détecté: ${keyword}`);\n        }\n    }\n}\n\n// Vérifier qu'il n'y a pas de ; suivi d'une autre requête (injection)\nconst statements = sql.split(';').filter(s => s.trim().length > 0);\nif (statements.length > 1) {\n    throw new Error('Une seule requête à la fois est autorisée');\n}\n\n// Ajouter LIMIT si absent\nlet finalSQL = sql.trim();\nif (finalSQL.endsWith(';')) {\n    finalSQL = finalSQL.slice(0, -1);\n}\n\nif (!normalizedSQL.includes('LIMIT')) {\n    finalSQL = `${finalSQL} LIMIT ${limit}`;\n}\n\nreturn [{\n    json: {\n        sql: finalSQL,\n        database: database,\n        limit: limit,\n        validated: true\n    }\n}];"
+        "jsCode": "const body = $input.first().json.body || {};\nconst sql = body.sql || '';\nconst database = body.database || 'r_datacart';\nconst limit = Math.min(body.limit || 1000, 10000);\n\n// Liste des mots-clés interdits\nconst forbiddenKeywords = [\n    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',\n    'TRUNCATE', 'GRANT', 'REVOKE', 'EXECUTE', 'EXEC',\n    'COPY', 'pg_read_file', 'pg_write_file', 'lo_import', 'lo_export'\n];\n\ntry {\n    // Vérification de sécurité\n    const normalizedSQL = sql.toUpperCase().replace(/\\s+/g, ' ').trim();\n\n    // Vérifier que c'est un SELECT ou WITH\n    if (!normalizedSQL.startsWith('SELECT') && !normalizedSQL.startsWith('WITH')) {\n        return [{ json: { validated: false, error: 'Seules les requêtes SELECT sont autorisées' } }];\n    }\n\n    // Vérifier les mots-clés interdits\n    for (const keyword of forbiddenKeywords) {\n        const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n        if (regex.test(sql)) {\n            return [{ json: { validated: false, error: `Mot-clé interdit détecté: ${keyword}` } }];\n        }\n    }\n\n    // Vérifier l'absence de commentaires malicieux\n    if (sql.includes('--') || sql.includes('/*')) {\n        const withoutComments = sql.replace(/--.*$/gm, '').replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');\n        for (const keyword of forbiddenKeywords) {\n            const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n            if (regex.test(withoutComments)) {\n                return [{ json: { validated: false, error: `Mot-clé interdit détecté: ${keyword}` } }];\n            }\n        }\n    }\n\n    // Vérifier qu'il n'y a pas de ; suivi d'une autre requête (injection)\n    const statements = sql.split(';').filter(s => s.trim().length > 0);\n    if (statements.length > 1) {\n        return [{ json: { validated: false, error: 'Une seule requête à la fois est autorisée' } }];\n    }\n\n    // Ajouter LIMIT si absent\n    let finalSQL = sql.trim();\n    if (finalSQL.endsWith(';')) {\n        finalSQL = finalSQL.slice(0, -1);\n    }\n    if (!normalizedSQL.includes('LIMIT')) {\n        finalSQL = `${finalSQL} LIMIT ${limit}`;\n    }\n\n    return [{ json: { sql: finalSQL, database: database, limit: limit, validated: true } }];\n\n} catch (e) {\n    return [{ json: { validated: false, error: e.message } }];\n}"
       },
       "id": "code-validate-sql",
       "name": "Valider SQL",
@@ -113,7 +113,7 @@
       "name": "Router Database",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [860, 300]
+      "position": [900, 300]
     },
     {
       "parameters": {
@@ -127,7 +127,7 @@
       "name": "Execute r_datacart",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1020, 160],
+      "position": [1120, 160],
       "credentials": {
         "postgres": {
           "id": "r-datacart-postgres",
@@ -147,7 +147,7 @@
       "name": "Execute e_datacart",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1020, 300],
+      "position": [1120, 300],
       "credentials": {
         "postgres": {
           "id": "e-datacart-postgres",
@@ -167,7 +167,7 @@
       "name": "Execute m_datacart",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1020, 440],
+      "position": [1120, 440],
       "credentials": {
         "postgres": {
           "id": "m-datacart-postgres",
@@ -183,7 +183,7 @@
       "name": "Formater résultats",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1240, 300]
+      "position": [1340, 300]
     },
     {
       "parameters": {
@@ -208,12 +208,12 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1460, 300]
+      "position": [1560, 300]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.message || 'Erreur de validation SQL' }}\",\n  \"message\": \"{{ $json.message || 'Requête non autorisée' }}\"\n}",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error || 'Erreur de validation SQL' }}\"\n}",
         "options": {
           "responseCode": 400,
           "responseHeaders": {
