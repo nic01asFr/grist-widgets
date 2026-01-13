@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataCart Explorer - CEREMA</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+    
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app" class="datacart-app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 6h16M4 12h16M4 18h16"/>
+                        <circle cx="19" cy="6" r="2" fill="currentColor"/>
+                        <circle cx="9" cy="12" r="2" fill="currentColor"/>
+                        <circle cx="15" cy="18" r="2" fill="currentColor"/>
+                    </svg>
+                    <span class="logo-text">DataCart Explorer</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="database-selector">
+                    <button class="db-btn active" data-db="r_datacart" title="Référentiels IGN">
+                        <span class="db-icon">📚</span>
+                        <span class="db-name">r_datacart</span>
+                    </button>
+                    <button class="db-btn" data-db="e_datacart" title="Données externes">
+                        <span class="db-icon">🌐</span>
+                        <span class="db-name">e_datacart</span>
+                    </button>
+                    <button class="db-btn" data-db="m_datacart" title="Données métiers">
+                        <span class="db-icon">🏢</span>
+                        <span class="db-name">m_datacart</span>
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="icon-btn" id="btn-settings" title="Paramètres">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    </svg>
+                </button>
+                <div class="connection-status" id="connection-status" title="État connexion">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connexion...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Left Panel: Explorer + Saved Queries -->
+            <aside class="panel panel-left" id="panel-left">
+                <div class="panel-section explorer-section">
+                    <div class="section-header">
+                        <h3><span class="section-icon">📂</span> Explorateur</h3>
+                    </div>
+                    <div class="section-content">
+                        <div class="search-box">
+                            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="M21 21l-4.35-4.35"/>
+                            </svg>
+                            <input type="text" id="explorer-search" placeholder="Filtrer tables...">
+                        </div>
+                        <div class="tree-container" id="schema-tree">
+                            <div class="tree-loading">
+                                <div class="spinner"></div>
+                                <span>Chargement des schémas...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Details Panel -->
+                <div class="panel-section details-section" id="table-details" style="display: none;">
+                    <div class="section-header">
+                        <h3><span class="section-icon">📊</span> <span id="details-table-name">Table</span></h3>
+                        <button class="icon-btn-sm" id="btn-close-details" title="Fermer">×</button>
+                    </div>
+                    <div class="section-content">
+                        <div class="table-meta" id="table-meta"></div>
+                        <div class="columns-list" id="columns-list"></div>
+                        <div class="quick-actions">
+                            <button class="action-btn" id="btn-select-all" title="SELECT * LIMIT 100">
+                                <span>📋</span> SELECT *
+                            </button>
+                            <button class="action-btn" id="btn-preview-map" title="Aperçu carte">
+                                <span>🗺️</span> Aperçu
+                            </button>
+                            <button class="action-btn" id="btn-stats" title="Statistiques">
+                                <span>📊</span> Stats
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Saved Queries -->
+                <div class="panel-section queries-section">
+                    <div class="section-header">
+                        <h3><span class="section-icon">📋</span> Requêtes</h3>
+                    </div>
+                    <div class="section-content">
+                        <div class="saved-queries" id="saved-queries">
+                            <div class="empty-state">
+                                <span>Aucune requête sauvegardée</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resize Handle -->
+                <div class="resize-handle resize-handle-right" id="resize-left"></div>
+            </aside>
+
+            <!-- Center Panel: Assistant + Editor + Results -->
+            <div class="panel panel-center" id="panel-center">
+                <!-- AI Assistant -->
+                <div class="center-section assistant-section" id="assistant-section">
+                    <div class="section-header">
+                        <h3><span class="section-icon">💬</span> Assistant IA</h3>
+                        <button class="icon-btn-sm" id="btn-assistant-help" title="Aide">?</button>
+                    </div>
+                    <div class="section-content">
+                        <div class="chat-container" id="chat-container">
+                            <div class="chat-welcome">
+                                <div class="welcome-icon">🤖</div>
+                                <p>Décrivez votre requête en français et je générerai le SQL correspondant.</p>
+                                <div class="welcome-examples">
+                                    <span class="example-chip" data-query="Les bâtiments de plus de 10 étages à Marseille">🏢 Bâtiments > 10 étages</span>
+                                    <span class="example-chip" data-query="Routes départementales dans les Bouches-du-Rhône">🛣️ Routes BDR</span>
+                                    <span class="example-chip" data-query="Parcelles cadastrales de plus de 5000m² à Lyon">📐 Grandes parcelles</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-container">
+                            <textarea id="chat-input" placeholder="Décrivez votre requête en français..." rows="2"></textarea>
+                            <div class="chat-actions">
+                                <button class="btn btn-primary" id="btn-generate-sql">
+                                    <span class="btn-icon">🪄</span>
+                                    <span>Générer SQL</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-chat-history" title="Historique">
+                                    <span class="btn-icon">📋</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SQL Editor -->
+                <div class="center-section editor-section" id="editor-section">
+                    <div class="section-header">
+                        <h3><span class="section-icon">📝</span> Éditeur SQL</h3>
+                        <div class="editor-actions">
+                            <button class="btn btn-success" id="btn-execute" title="Exécuter (Ctrl+Enter)">
+                                <span class="btn-icon">▶️</span>
+                                <span>Exécuter</span>
+                            </button>
+                            <button class="btn btn-secondary" id="btn-save-query" title="Sauvegarder">
+                                <span class="btn-icon">💾</span>
+                            </button>
+                            <button class="btn btn-secondary" id="btn-clear-editor" title="Effacer">
+                                <span class="btn-icon">🗑️</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="section-content">
+                        <div class="editor-container">
+                            <textarea id="sql-editor"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div class="center-section results-section" id="results-section">
+                    <div class="section-header">
+                        <h3>
+                            <span class="section-icon">📊</span> 
+                            Résultats
+                            <span class="results-count" id="results-count"></span>
+                        </h3>
+                        <div class="results-actions">
+                            <div class="view-toggle">
+                                <button class="view-btn active" data-view="table" title="Tableau">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+                                    </svg>
+                                </button>
+                                <button class="view-btn" data-view="map" title="Carte">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 6l7-3 8 3 7-3v15l-7 3-8-3-7 3z"/>
+                                        <path d="M8 3v15M16 6v15"/>
+                                    </svg>
+                                </button>
+                                <button class="view-btn" data-view="split" title="Split">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <path d="M12 3v18"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="export-buttons">
+                                <button class="btn btn-outline" id="btn-export-csv" title="Export CSV">
+                                    <span>📥 CSV</span>
+                                </button>
+                                <button class="btn btn-outline" id="btn-export-geojson" title="Export GeoJSON">
+                                    <span>📥 GeoJSON</span>
+                                </button>
+                                <button class="btn btn-primary" id="btn-export-grist" title="Exporter vers Grist">
+                                    <span>→ Grist</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section-content">
+                        <div class="results-container" id="results-container">
+                            <!-- Initial State -->
+                            <div class="results-empty" id="results-empty">
+                                <div class="empty-icon">🔍</div>
+                                <p>Exécutez une requête pour voir les résultats</p>
+                            </div>
+                            
+                            <!-- Loading State -->
+                            <div class="results-loading" id="results-loading" style="display: none;">
+                                <div class="spinner-large"></div>
+                                <p>Exécution en cours...</p>
+                                <span class="loading-timer" id="loading-timer">0.0s</span>
+                            </div>
+
+                            <!-- Error State -->
+                            <div class="results-error" id="results-error" style="display: none;">
+                                <div class="error-icon">❌</div>
+                                <p class="error-message" id="error-message"></p>
+                                <pre class="error-details" id="error-details"></pre>
+                            </div>
+
+                            <!-- Table View -->
+                            <div class="results-table-container" id="results-table-container" style="display: none;">
+                                <div class="table-wrapper">
+                                    <table class="results-table" id="results-table">
+                                        <thead id="results-thead"></thead>
+                                        <tbody id="results-tbody"></tbody>
+                                    </table>
+                                </div>
+                                <div class="table-pagination" id="table-pagination"></div>
+                            </div>
+
+                            <!-- Map View -->
+                            <div class="results-map-container" id="results-map-container" style="display: none;">
+                                <div id="results-map"></div>
+                            </div>
+
+                            <!-- Split View -->
+                            <div class="results-split-container" id="results-split-container" style="display: none;">
+                                <div class="split-table" id="split-table"></div>
+                                <div class="split-resize-handle" id="split-resize"></div>
+                                <div class="split-map" id="split-map"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Save Query Modal -->
+    <div class="modal" id="modal-save-query" style="display: none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💾 Sauvegarder la requête</h3>
+                <button class="modal-close" data-close>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="query-name">Nom *</label>
+                    <input type="text" id="query-name" placeholder="Ma requête">
+                </div>
+                <div class="form-group">
+                    <label for="query-description">Description</label>
+                    <textarea id="query-description" rows="2" placeholder="Description optionnelle"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="query-tags">Tags</label>
+                    <input type="text" id="query-tags" placeholder="bdtopo, spatial, analyse...">
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="query-favorite">
+                    <label for="query-favorite">⭐ Ajouter aux favoris</label>
+                </div>
+                <div class="form-group">
+                    <label>Aperçu SQL</label>
+                    <pre class="sql-preview" id="save-sql-preview"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btn-confirm-save">💾 Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export to Grist Modal -->
+    <div class="modal" id="modal-export-grist" style="display: none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>→ Exporter vers Grist</h3>
+                <button class="modal-close" data-close>&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="export-count"><span id="export-row-count">0</span> lignes à exporter</p>
+                
+                <div class="form-group">
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="export-mode" value="new" checked>
+                            <span>Créer une nouvelle table</span>
+                        </label>
+                        <input type="text" id="new-table-name" placeholder="DC_Results_2025" class="indent-input">
+                    </div>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="export-mode" value="existing">
+                            <span>Ajouter à une table existante</span>
+                        </label>
+                        <select id="existing-table" class="indent-input" disabled>
+                            <option value="">-- Sélectionner --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Colonnes à exporter</label>
+                    <div class="columns-checklist" id="export-columns"></div>
+                </div>
+
+                <div class="form-note">
+                    ⚠️ Les colonnes geometry seront converties en GeoJSON (texte)
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btn-confirm-export">→ Exporter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="modal-settings" style="display: none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Paramètres</h3>
+                <button class="modal-close" data-close>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="setting-n8n-url">URL n8n Webhooks</label>
+                    <input type="text" id="setting-n8n-url" placeholder="https://n8n.pocfactory.cerema.fr/webhook">
+                </div>
+                <div class="form-group">
+                    <label for="setting-max-results">Limite résultats par défaut</label>
+                    <input type="number" id="setting-max-results" value="1000" min="100" max="10000">
+                </div>
+                <div class="form-group">
+                    <label for="setting-map-center">Centre carte par défaut</label>
+                    <input type="text" id="setting-map-center" placeholder="43.2965, 5.3698">
+                </div>
+                <div class="form-group">
+                    <label for="setting-map-zoom">Zoom par défaut</label>
+                    <input type="number" id="setting-map-zoom" value="10" min="1" max="18">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btn-save-settings">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
+    
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    
+    <script src="modules/config.js"></script>
+    <script src="modules/utils.js"></script>
+    <script src="modules/grist-bridge.js"></script>
+    <script src="modules/explorer.js"></script>
+    <script src="modules/assistant.js"></script>
+    <script src="modules/editor.js"></script>
+    <script src="modules/results.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
