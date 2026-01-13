@@ -19,10 +19,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const query = $input.first().json.query || {};\nconst database = query.database || 'r_datacart';\nconst schema = query.schema || null;\nconst table = query.table || null;\n\nreturn [{\n    json: {\n        database: database,\n        schema: schema,\n        table: table,\n        hasTable: !!table\n    }\n}];"
+        "jsCode": "const query = $input.first().json.query || {};\nconst database = query.database || 'r_datacart';\nreturn [{ json: { database: database } }];"
       },
       "id": "code-parse-params",
-      "name": "Parser paramètres",
+      "name": "Parser params",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [460, 300]
@@ -89,7 +89,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH table_info AS (\n    SELECT \n        t.table_schema,\n        t.table_name,\n        obj_description((t.table_schema || '.' || t.table_name)::regclass) as table_comment,\n        COALESCE(s.n_live_tup, 0) as row_count,\n        CASE \n            WHEN EXISTS (\n                SELECT 1 FROM geometry_columns gc \n                WHERE gc.f_table_schema = t.table_schema \n                AND gc.f_table_name = t.table_name\n            ) THEN true \n            ELSE false \n        END as has_geometry\n    FROM information_schema.tables t\n    LEFT JOIN pg_stat_user_tables s \n        ON t.table_schema = s.schemaname \n        AND t.table_name = s.relname\n    WHERE t.table_type = 'BASE TABLE'\n        AND t.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology')\n        AND t.table_schema NOT LIKE 'pg_temp%'\n        AND t.table_schema NOT LIKE 'pg_toast%'\n)\nSELECT \n    ti.table_schema as schema,\n    ti.table_name as name,\n    ti.table_comment as comment,\n    ti.row_count,\n    ti.has_geometry\nFROM table_info ti\nORDER BY ti.table_schema, ti.table_name;",
+        "query": "SELECT t.table_schema as schema, t.table_name as name, COALESCE(s.n_live_tup, 0) as row_count, EXISTS(SELECT 1 FROM geometry_columns gc WHERE gc.f_table_schema = t.table_schema AND gc.f_table_name = t.table_name) as has_geometry FROM information_schema.tables t LEFT JOIN pg_stat_user_tables s ON t.table_schema = s.schemaname AND t.table_name = s.relname WHERE t.table_type = 'BASE TABLE' AND t.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology') ORDER BY t.table_schema, t.table_name",
         "options": {
           "queryTimeout": 60
         }
@@ -109,7 +109,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH table_info AS (\n    SELECT \n        t.table_schema,\n        t.table_name,\n        obj_description((t.table_schema || '.' || t.table_name)::regclass) as table_comment,\n        COALESCE(s.n_live_tup, 0) as row_count,\n        CASE \n            WHEN EXISTS (\n                SELECT 1 FROM geometry_columns gc \n                WHERE gc.f_table_schema = t.table_schema \n                AND gc.f_table_name = t.table_name\n            ) THEN true \n            ELSE false \n        END as has_geometry\n    FROM information_schema.tables t\n    LEFT JOIN pg_stat_user_tables s \n        ON t.table_schema = s.schemaname \n        AND t.table_name = s.relname\n    WHERE t.table_type = 'BASE TABLE'\n        AND t.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology')\n        AND t.table_schema NOT LIKE 'pg_temp%'\n        AND t.table_schema NOT LIKE 'pg_toast%'\n)\nSELECT \n    ti.table_schema as schema,\n    ti.table_name as name,\n    ti.table_comment as comment,\n    ti.row_count,\n    ti.has_geometry\nFROM table_info ti\nORDER BY ti.table_schema, ti.table_name;",
+        "query": "SELECT t.table_schema as schema, t.table_name as name, COALESCE(s.n_live_tup, 0) as row_count, EXISTS(SELECT 1 FROM geometry_columns gc WHERE gc.f_table_schema = t.table_schema AND gc.f_table_name = t.table_name) as has_geometry FROM information_schema.tables t LEFT JOIN pg_stat_user_tables s ON t.table_schema = s.schemaname AND t.table_name = s.relname WHERE t.table_type = 'BASE TABLE' AND t.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology') ORDER BY t.table_schema, t.table_name",
         "options": {
           "queryTimeout": 60
         }
@@ -129,7 +129,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH table_info AS (\n    SELECT \n        t.table_schema,\n        t.table_name,\n        obj_description((t.table_schema || '.' || t.table_name)::regclass) as table_comment,\n        COALESCE(s.n_live_tup, 0) as row_count,\n        CASE \n            WHEN EXISTS (\n                SELECT 1 FROM geometry_columns gc \n                WHERE gc.f_table_schema = t.table_schema \n                AND gc.f_table_name = t.table_name\n            ) THEN true \n            ELSE false \n        END as has_geometry\n    FROM information_schema.tables t\n    LEFT JOIN pg_stat_user_tables s \n        ON t.table_schema = s.schemaname \n        AND t.table_name = s.relname\n    WHERE t.table_type = 'BASE TABLE'\n        AND t.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology')\n        AND t.table_schema NOT LIKE 'pg_temp%'\n        AND t.table_schema NOT LIKE 'pg_toast%'\n)\nSELECT \n    ti.table_schema as schema,\n    ti.table_name as name,\n    ti.table_comment as comment,\n    ti.row_count,\n    ti.has_geometry\nFROM table_info ti\nORDER BY ti.table_schema, ti.table_name;",
+        "query": "SELECT t.table_schema as schema, t.table_name as name, COALESCE(s.n_live_tup, 0) as row_count, EXISTS(SELECT 1 FROM geometry_columns gc WHERE gc.f_table_schema = t.table_schema AND gc.f_table_name = t.table_name) as has_geometry FROM information_schema.tables t LEFT JOIN pg_stat_user_tables s ON t.table_schema = s.schemaname AND t.table_name = s.relname WHERE t.table_type = 'BASE TABLE' AND t.table_schema NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology') ORDER BY t.table_schema, t.table_name",
         "options": {
           "queryTimeout": 60
         }
@@ -148,10 +148,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst schemas = {};\n\nitems.forEach(item => {\n    const schemaName = item.json.schema;\n    const tableName = item.json.name;\n    \n    if (!schemas[schemaName]) {\n        schemas[schemaName] = {\n            name: schemaName,\n            tables: []\n        };\n    }\n    \n    schemas[schemaName].tables.push({\n        name: tableName,\n        schema: schemaName,\n        comment: item.json.comment,\n        rowCount: item.json.row_count,\n        hasGeometry: item.json.has_geometry\n    });\n});\n\nreturn [{\n    json: {\n        success: true,\n        schemas: Object.values(schemas),\n        total_tables: items.length\n    }\n}];"
+        "jsCode": "const items = $input.all();\nconst schemas = {};\nitems.forEach(item => {\n  const s = item.json.schema;\n  if (!schemas[s]) schemas[s] = { name: s, tables: [] };\n  schemas[s].tables.push({ name: item.json.name, schema: s, rowCount: item.json.row_count, hasGeometry: item.json.has_geometry });\n});\nreturn [{ json: { success: true, schemas: Object.values(schemas), total_tables: items.length } }];"
       },
       "id": "code-format-schemas",
-      "name": "Formater schémas",
+      "name": "Format schemas",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1120, 300]
@@ -180,32 +180,6 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [1340, 300]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.message || 'Erreur lors de la récupération des schémas' }}\"\n}",
-        "options": {
-          "responseCode": 500,
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
-        }
-      },
-      "id": "respond-error",
-      "name": "Respond Error",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [680, 500]
     }
   ],
   "connections": {
@@ -213,14 +187,14 @@
       "main": [
         [
           {
-            "node": "Parser paramètres",
+            "node": "Parser params",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parser paramètres": {
+    "Parser params": {
       "main": [
         [
           {
@@ -260,7 +234,7 @@
       "main": [
         [
           {
-            "node": "Formater schémas",
+            "node": "Format schemas",
             "type": "main",
             "index": 0
           }
@@ -271,7 +245,7 @@
       "main": [
         [
           {
-            "node": "Formater schémas",
+            "node": "Format schemas",
             "type": "main",
             "index": 0
           }
@@ -282,14 +256,14 @@
       "main": [
         [
           {
-            "node": "Formater schémas",
+            "node": "Format schemas",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Formater schémas": {
+    "Format schemas": {
       "main": [
         [
           {
@@ -305,12 +279,7 @@
     "executionOrder": "v1"
   },
   "staticData": null,
-  "tags": [
-    {
-      "name": "DataCart",
-      "id": "datacart"
-    }
-  ],
+  "tags": [],
   "triggerCount": 1,
   "pinData": {}
 }

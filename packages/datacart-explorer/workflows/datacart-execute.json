@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body || {};\nconst sql = body.sql || '';\nconst database = body.database || 'r_datacart';\nconst limit = Math.min(body.limit || 1000, 10000);\n\n// Liste des mots-clés interdits\nconst forbiddenKeywords = [\n    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',\n    'TRUNCATE', 'GRANT', 'REVOKE', 'EXECUTE', 'EXEC',\n    'COPY', 'pg_read_file', 'pg_write_file', 'lo_import', 'lo_export'\n];\n\ntry {\n    // Vérification de sécurité\n    const normalizedSQL = sql.toUpperCase().replace(/\\s+/g, ' ').trim();\n\n    // Vérifier que c'est un SELECT ou WITH\n    if (!normalizedSQL.startsWith('SELECT') && !normalizedSQL.startsWith('WITH')) {\n        return [{ json: { validated: false, error: 'Seules les requêtes SELECT sont autorisées' } }];\n    }\n\n    // Vérifier les mots-clés interdits\n    for (const keyword of forbiddenKeywords) {\n        const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n        if (regex.test(sql)) {\n            return [{ json: { validated: false, error: `Mot-clé interdit détecté: ${keyword}` } }];\n        }\n    }\n\n    // Vérifier l'absence de commentaires malicieux\n    if (sql.includes('--') || sql.includes('/*')) {\n        const withoutComments = sql.replace(/--.*$/gm, '').replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');\n        for (const keyword of forbiddenKeywords) {\n            const regex = new RegExp(`\\\\b${keyword}\\\\b`, 'i');\n            if (regex.test(withoutComments)) {\n                return [{ json: { validated: false, error: `Mot-clé interdit détecté: ${keyword}` } }];\n            }\n        }\n    }\n\n    // Vérifier qu'il n'y a pas de ; suivi d'une autre requête (injection)\n    const statements = sql.split(';').filter(s => s.trim().length > 0);\n    if (statements.length > 1) {\n        return [{ json: { validated: false, error: 'Une seule requête à la fois est autorisée' } }];\n    }\n\n    // Ajouter LIMIT si absent\n    let finalSQL = sql.trim();\n    if (finalSQL.endsWith(';')) {\n        finalSQL = finalSQL.slice(0, -1);\n    }\n    if (!normalizedSQL.includes('LIMIT')) {\n        finalSQL = `${finalSQL} LIMIT ${limit}`;\n    }\n\n    return [{ json: { sql: finalSQL, database: database, limit: limit, validated: true } }];\n\n} catch (e) {\n    return [{ json: { validated: false, error: e.message } }];\n}"
+        "jsCode": "const body = $input.first().json.body || {};\nconst sql = body.sql || '';\nconst database = body.database || 'r_datacart';\nconst limit = Math.min(body.limit || 1000, 10000);\n\nconst forbidden = ['INSERT ', 'UPDATE ', 'DELETE ', 'DROP ', 'CREATE ', 'ALTER ', 'TRUNCATE ', 'GRANT ', 'REVOKE '];\nconst upperSQL = sql.toUpperCase();\n\nif (!upperSQL.trim().startsWith('SELECT') && !upperSQL.trim().startsWith('WITH')) {\n  return [{ json: { validated: false, error: 'Seules les requêtes SELECT sont autorisées' } }];\n}\n\nfor (const kw of forbidden) {\n  if (upperSQL.includes(kw)) {\n    return [{ json: { validated: false, error: 'Mot-clé interdit: ' + kw.trim() } }];\n  }\n}\n\nlet finalSQL = sql.trim().replace(/;$/, '');\nif (!upperSQL.includes('LIMIT')) {\n  finalSQL = finalSQL + ' LIMIT ' + limit;\n}\n\nreturn [{ json: { sql: finalSQL, database: database, limit: limit, validated: true } }];"
       },
       "id": "code-validate-sql",
       "name": "Valider SQL",
@@ -51,7 +51,7 @@
         "options": {}
       },
       "id": "if-validated",
-      "name": "SQL Validé ?",
+      "name": "SQL Valide",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [680, 300]
@@ -177,10 +177,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const startTime = Date.now();\nconst rows = $input.all().map(item => item.json);\nconst executionTime = Date.now() - startTime;\n\nlet columns = [];\nif (rows.length > 0) {\n    columns = Object.keys(rows[0]).map(key => {\n        const value = rows[0][key];\n        let type = 'text';\n        \n        if (typeof value === 'number') {\n            type = Number.isInteger(value) ? 'integer' : 'numeric';\n        } else if (typeof value === 'boolean') {\n            type = 'boolean';\n        } else if (value instanceof Date) {\n            type = 'timestamp';\n        } else if (typeof value === 'object' && value !== null) {\n            if (value.type && value.coordinates) {\n                type = 'geometry';\n            } else {\n                type = 'json';\n            }\n        } else if (typeof value === 'string') {\n            try {\n                const parsed = JSON.parse(value);\n                if (parsed.type && parsed.coordinates) {\n                    type = 'geometry';\n                }\n            } catch (e) {}\n        }\n        \n        return { name: key, type: type };\n    });\n}\n\nreturn [{\n    json: {\n        success: true,\n        rows: rows,\n        columns: columns,\n        row_count: rows.length,\n        execution_time: executionTime\n    }\n}];"
+        "jsCode": "const rows = $input.all().map(item => item.json);\nconst columns = rows.length > 0 ? Object.keys(rows[0]).map(k => ({ name: k, type: 'text' })) : [];\nreturn [{ json: { success: true, rows: rows, columns: columns, row_count: rows.length } }];"
       },
       "id": "code-format-results",
-      "name": "Formater résultats",
+      "name": "Formater resultats",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1340, 300]
@@ -213,7 +213,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error || 'Erreur de validation SQL' }}\"\n}",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
         "options": {
           "responseCode": 400,
           "responseHeaders": {
@@ -231,7 +231,7 @@
         }
       },
       "id": "respond-validation-error",
-      "name": "Respond Validation Error",
+      "name": "Respond Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [900, 500]
@@ -253,14 +253,14 @@
       "main": [
         [
           {
-            "node": "SQL Validé ?",
+            "node": "SQL Valide",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "SQL Validé ?": {
+    "SQL Valide": {
       "main": [
         [
           {
@@ -271,7 +271,7 @@
         ],
         [
           {
-            "node": "Respond Validation Error",
+            "node": "Respond Error",
             "type": "main",
             "index": 0
           }
@@ -307,7 +307,7 @@
       "main": [
         [
           {
-            "node": "Formater résultats",
+            "node": "Formater resultats",
             "type": "main",
             "index": 0
           }
@@ -318,7 +318,7 @@
       "main": [
         [
           {
-            "node": "Formater résultats",
+            "node": "Formater resultats",
             "type": "main",
             "index": 0
           }
@@ -329,14 +329,14 @@
       "main": [
         [
           {
-            "node": "Formater résultats",
+            "node": "Formater resultats",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Formater résultats": {
+    "Formater resultats": {
       "main": [
         [
           {
@@ -352,12 +352,7 @@
     "executionOrder": "v1"
   },
   "staticData": null,
-  "tags": [
-    {
-      "name": "DataCart",
-      "id": "datacart"
-    }
-  ],
+  "tags": [],
   "triggerCount": 1,
   "pinData": {}
 }
