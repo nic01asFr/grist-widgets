@@ -159,6 +159,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'DataCart Explorer',
+    description: 'Explorateur SQL pour bases de données DataCart (CEREMA). Interface 3 panneaux avec explorateur de schémas, assistant IA NL2SQL, éditeur CodeMirror avec autocomplétion, et visualisation des résultats (tableau + carte Leaflet). Export CSV, GeoJSON et vers Grist. Intégration n8n pour exécution sécurisée.',
+    path: 'datacart-explorer',
+    widgetId: '@nic01asFr/datacart-explorer',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 
