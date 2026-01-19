@@ -4,8 +4,8 @@
  */
 
 const CONFIG = {
-    // n8n Webhook Base URL
-    n8nBaseUrl: 'https://n8n.colaig.fr/webhook',
+    // n8n Webhook Base URL (Instance interne CEREMA px50-037)
+    n8nBaseUrl: 'https://px50-037:5678/webhook',
     
     // Database configurations
     databases: {
