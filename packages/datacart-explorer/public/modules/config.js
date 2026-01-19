@@ -5,7 +5,7 @@
 
 const CONFIG = {
     // n8n Webhook Base URL
-    n8nBaseUrl: 'https://n8n.pocfactory.cerema.fr/webhook',
+    n8nBaseUrl: 'https://n8n.colaig.fr/webhook',
     
     // Database configurations
     databases: {
