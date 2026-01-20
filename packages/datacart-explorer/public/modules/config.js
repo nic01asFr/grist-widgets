@@ -4,8 +4,8 @@
  */
 
 const CONFIG = {
-    // n8n Webhook Base URL (via nginx reverse proxy sur px50-037)
-    n8nBaseUrl: 'https://px50-037/webhook',
+    // n8n Webhook Base URL (via nginx reverse proxy sur px50-037:8443)
+    n8nBaseUrl: 'https://px50-037:8443/webhook',
     
     // Database configurations
     databases: {
