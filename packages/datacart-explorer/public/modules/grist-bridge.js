@@ -96,21 +96,33 @@ const GristBridge = {
      */
     async setupSystemTables() {
         if (!this.docApi) return;
-        
+
         try {
             const tables = await this.docApi.listTables();
             const tableIds = tables.map(t => t.id);
-            
+
+            // Check if table exists (exact match or with numeric suffix like DC_Config20)
+            const configExists = tableIds.some(id =>
+                id === CONFIG.gristTables.config || id.startsWith(CONFIG.gristTables.config)
+            );
+            const queriesExists = tableIds.some(id =>
+                id === CONFIG.gristTables.queries || id.startsWith(CONFIG.gristTables.queries)
+            );
+
             // Create DC_Config if not exists
-            if (!tableIds.includes(CONFIG.gristTables.config)) {
+            if (!configExists) {
                 await this.createConfigTable();
+            } else {
+                console.log(`✅ ${CONFIG.gristTables.config} table already exists`);
             }
-            
+
             // Create DC_Queries if not exists
-            if (!tableIds.includes(CONFIG.gristTables.queries)) {
+            if (!queriesExists) {
                 await this.createQueriesTable();
+            } else {
+                console.log(`✅ ${CONFIG.gristTables.queries} table already exists`);
             }
-            
+
         } catch (error) {
             console.warn('Could not setup system tables:', error);
         }
