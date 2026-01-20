@@ -99,14 +99,15 @@ const GristBridge = {
 
         try {
             const tables = await this.docApi.listTables();
-            const tableIds = tables.map(t => t.id);
+            // listTables() returns array of strings (table names), not objects
+            const tableIds = Array.isArray(tables) ? tables : [];
 
             // Check if table exists (exact match or with numeric suffix like DC_Config20)
             const configExists = tableIds.some(id =>
-                id === CONFIG.gristTables.config || id.startsWith(CONFIG.gristTables.config)
+                typeof id === 'string' && (id === CONFIG.gristTables.config || id.startsWith(CONFIG.gristTables.config))
             );
             const queriesExists = tableIds.some(id =>
-                id === CONFIG.gristTables.queries || id.startsWith(CONFIG.gristTables.queries)
+                typeof id === 'string' && (id === CONFIG.gristTables.queries || id.startsWith(CONFIG.gristTables.queries))
             );
 
             // Create DC_Config if not exists
