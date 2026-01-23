@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart Agent Pro</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --primary-light: #EEF2FF;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --bg: #F9FAFB;
+            --bg-card: #FFFFFF;
+            --text: #111827;
+            --text-muted: #6B7280;
+            --border: #E5E7EB;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== LAYOUT ===== */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .header-logo { font-size: 1.25rem; }
+        .header-title { font-weight: 600; font-size: 0.95rem; }
+
+        .header-status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .status-indicator.disconnected { background: var(--error); }
+        .status-indicator.loading { background: var(--warning); animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.2s;
+        }
+
+        .header-btn:hover { background: rgba(255,255,255,0.3); }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: 320px;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ===== SUGGESTIONS PANEL ===== */
+        .suggestions-panel {
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, var(--primary-light) 0%, #F0F9FF 100%);
+            display: none;
+        }
+
+        .suggestions-panel.visible { display: block; }
+
+        .suggestions-panel.loading {
+            display: block;
+        }
+
+        .suggestions-header {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--primary);
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .suggestions-header:hover {
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .suggestions-toggle {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+            padding: 4px;
+        }
+
+        .suggestions-panel.collapsed .suggestions-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .suggestions-content {
+            padding: 0 12px 12px 12px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.2s ease;
+            max-height: 500px;
+            opacity: 1;
+        }
+
+        .suggestions-panel.collapsed .suggestions-content {
+            max-height: 0;
+            padding-bottom: 0;
+            opacity: 0;
+        }
+
+        .suggestions-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .suggestion-card {
+            flex: 1 1 calc(50% - 4px);
+            min-width: 120px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .suggestion-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+            transform: translateY(-1px);
+        }
+
+        .suggestion-card.selected {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .suggestion-icon {
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+        }
+
+        .suggestion-title {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .suggestion-subtitle {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .suggestions-loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font-size: 0.8rem;
+        }
+
+        .mini-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ===== CHAT ===== */
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .message {
+            max-width: 90%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .message.user {
+            background: var(--primary);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant {
+            background: var(--bg);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.system {
+            background: var(--primary-light);
+            color: var(--primary);
+            align-self: center;
+            font-size: 0.75rem;
+            padding: 8px 12px;
+        }
+
+        .chat-input-area {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .chat-input:focus { border-color: var(--primary); }
+
+        .chat-send-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+
+        .chat-send-btn:hover { background: var(--primary-hover); }
+        .chat-send-btn:disabled { background: var(--text-muted); cursor: not-allowed; }
+
+        /* ===== CHART AREA ===== */
+        .chart-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: white;
+        }
+
+        .chart-toolbar {
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg);
+        }
+
+        .chart-toolbar.visible { display: flex; }
+
+        .chart-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        .chart-action {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chart-action:hover { background: var(--bg); }
+
+        .chart-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .chart-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .chart-placeholder-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .chart-placeholder-text {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .chart-placeholder-hint {
+            font-size: 0.85rem;
+            max-width: 300px;
+        }
+
+        /* ===== LOADING OVERLAY ===== */
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .loading-overlay.visible { display: flex; }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* ===== SETTINGS MODAL ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.visible { display: flex; }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title { font-weight: 600; }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-body { padding: 16px; }
+
+        .modal-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .form-group { margin-bottom: 16px; }
+
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: white;
+        }
+
+        .btn:hover { background: var(--bg); }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover { background: var(--primary-hover); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <span class="header-logo">📊</span>
+            <span class="header-title">Chart Agent Pro</span>
+            <div class="header-status">
+                <span class="status-indicator" id="status-indicator"></span>
+                <span id="status-text">Connexion...</span>
+            </div>
+            <button class="header-btn" onclick="app.openSettings()">⚙️</button>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <!-- Suggestions Panel (collapsible) -->
+                <div class="suggestions-panel" id="suggestions-panel">
+                    <div class="suggestions-header" onclick="app.toggleSuggestions()">
+                        <span>✨ Suggestions</span>
+                        <button class="suggestions-toggle" id="suggestions-toggle">▼</button>
+                    </div>
+                    <div class="suggestions-content" id="suggestions-content">
+                        <div class="suggestions-grid" id="suggestions-grid">
+                            <!-- Filled dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat -->
+                <div class="chat-section">
+                    <div class="chat-header">💬 Assistant IA</div>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message system">
+                            Décrivez la visualisation souhaitée ou cliquez sur une suggestion.
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-input"
+                               placeholder="Ex: Répartition par statut..."
+                               onkeydown="if(event.key==='Enter' && !event.shiftKey) app.sendMessage()">
+                        <button class="chat-send-btn" id="chat-send-btn" onclick="app.sendMessage()">➤</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chart Area -->
+            <main class="chart-area">
+                <div class="chart-toolbar" id="chart-toolbar">
+                    <span class="chart-title" id="chart-title">Visualisation</span>
+                    <button class="chart-action" onclick="app.expandChart()">🔍 Agrandir</button>
+                    <button class="chart-action" onclick="app.downloadChart()">📥 Télécharger</button>
+                </div>
+
+                <div class="chart-container" id="chart-container">
+                    <div class="chart-placeholder" id="chart-placeholder">
+                        <div class="chart-placeholder-icon">📈</div>
+                        <div class="chart-placeholder-text">Aucune visualisation</div>
+                        <div class="chart-placeholder-hint">
+                            Sélectionnez une suggestion ou décrivez le graphique souhaité dans l'assistant.
+                        </div>
+                    </div>
+                    <iframe class="chart-frame" id="chart-frame" style="display: none;"></iframe>
+                    <div class="loading-overlay" id="chart-loading">
+                        <div class="loading-spinner"></div>
+                        <div class="loading-text">Génération en cours...</div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">⚙️ Configuration</span>
+                <button class="modal-close" onclick="app.closeSettings()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">URL du webhook n8n</label>
+                    <input type="text" class="form-input" id="input-webhook-url"
+                           placeholder="https://n8n.example.com/webhook/chart-agent">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="app.closeSettings()">Annuler</button>
+                <button class="btn btn-primary" onclick="app.saveSettings()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <script>
+    // ============================================================
+    // CHART AGENT PRO - v3
+    // ============================================================
+
+    class ChartAgentApp {
+        constructor() {
+            this.isGristReady = false;
+            this.schema = null;
+            this.allData = {};
+            this.suggestions = [];
+            this.currentChart = null;
+            this.isLoading = false;
+
+            this.config = {
+                webhookUrl: localStorage.getItem('chart_agent_webhook') || ''
+            };
+
+            this.elements = {};
+        }
+
+        // ===== INITIALIZATION =====
+
+        async initialize() {
+            this.cacheElements();
+            this.updateStatus('loading', 'Connexion...');
+
+            try {
+                await grist.ready({
+                    requiredAccess: 'full',
+                    columns: ['*'],
+                    allowSelectBy: true
+                });
+
+                this.isGristReady = true;
+                this.updateStatus('connected', 'Connecté');
+
+                // Load full schema and data
+                await this.loadSchemaAndData();
+
+                // Request suggestions from n8n (async)
+                this.requestSuggestions();
+
+            } catch (error) {
+                console.error('Grist init error:', error);
+                this.updateStatus('disconnected', 'Non connecté');
+                this.addMessage('⚠️ Widget non connecté à Grist. Mode démo.', 'system');
+            }
+        }
+
+        cacheElements() {
+            this.elements = {
+                statusIndicator: document.getElementById('status-indicator'),
+                statusText: document.getElementById('status-text'),
+                suggestionsPanel: document.getElementById('suggestions-panel'),
+                suggestionsContent: document.getElementById('suggestions-content'),
+                suggestionsGrid: document.getElementById('suggestions-grid'),
+                chatMessages: document.getElementById('chat-messages'),
+                chatInput: document.getElementById('chat-input'),
+                chatSendBtn: document.getElementById('chat-send-btn'),
+                chartPlaceholder: document.getElementById('chart-placeholder'),
+                chartFrame: document.getElementById('chart-frame'),
+                chartToolbar: document.getElementById('chart-toolbar'),
+                chartTitle: document.getElementById('chart-title'),
+                chartLoading: document.getElementById('chart-loading'),
+                settingsModal: document.getElementById('settings-modal'),
+                inputWebhookUrl: document.getElementById('input-webhook-url')
+            };
+        }
+
+        updateStatus(status, text) {
+            const indicator = this.elements.statusIndicator;
+            indicator.className = 'status-indicator';
+            if (status === 'disconnected') indicator.classList.add('disconnected');
+            if (status === 'loading') indicator.classList.add('loading');
+            this.elements.statusText.textContent = text;
+        }
+
+        // ===== SCHEMA & DATA LOADING =====
+
+        async loadSchemaAndData() {
+            try {
+                // Get all tables
+                const tableIds = await grist.docApi.listTables();
+                const userTables = tableIds.filter(id => !id.startsWith('_grist_'));
+
+                // Get metadata
+                const [tablesData, columnsData] = await Promise.all([
+                    grist.docApi.fetchTable('_grist_Tables'),
+                    grist.docApi.fetchTable('_grist_Tables_column')
+                ]);
+
+                // Build schema
+                const schema = { tables: {}, relations: [] };
+
+                for (const tableId of userTables) {
+                    const tableIndex = tablesData.tableId.indexOf(tableId);
+                    if (tableIndex === -1) continue;
+
+                    const tableRef = tablesData.id[tableIndex];
+                    const columns = [];
+
+                    for (let i = 0; i < columnsData.id.length; i++) {
+                        if (columnsData.parentId[i] !== tableRef) continue;
+
+                        const colId = columnsData.colId[i];
+                        const colType = columnsData.type[i];
+
+                        if (['manualSort', 'id', 'gristHelper_Display'].includes(colId)) continue;
+                        if (colId.startsWith('gristHelper')) continue;
+
+                        let baseType = colType;
+                        let refTable = null;
+
+                        if (colType.startsWith('Ref:')) {
+                            baseType = 'Ref';
+                            refTable = colType.substring(4);
+                            schema.relations.push({
+                                from: tableId,
+                                fromColumn: colId,
+                                to: refTable,
+                                type: 'Ref'
+                            });
+                        } else if (colType.startsWith('RefList:')) {
+                            baseType = 'RefList';
+                            refTable = colType.substring(8);
+                            schema.relations.push({
+                                from: tableId,
+                                fromColumn: colId,
+                                to: refTable,
+                                type: 'RefList'
+                            });
+                        }
+
+                        let choices = null;
+                        if (colType === 'Choice' || colType === 'ChoiceList') {
+                            try {
+                                const opts = JSON.parse(columnsData.widgetOptions[i] || '{}');
+                                choices = opts.choices || null;
+                            } catch (e) {}
+                        }
+
+                        columns.push({
+                            id: colId,
+                            label: columnsData.label[i] || colId,
+                            type: baseType,
+                            fullType: colType,
+                            refTable,
+                            choices
+                        });
+                    }
+
+                    schema.tables[tableId] = { columns };
+
+                    // Load data for each table
+                    const rawData = await grist.docApi.fetchTable(tableId);
+                    this.allData[tableId] = this.convertToRecords(rawData);
+                }
+
+                this.schema = schema;
+                console.log('📋 Schema loaded:', schema);
+                console.log('📊 Data loaded:', Object.keys(this.allData).map(k => `${k}: ${this.allData[k].length}`));
+
+            } catch (error) {
+                console.error('Schema loading error:', error);
+            }
+        }
+
+        convertToRecords(tableData) {
+            if (!tableData || typeof tableData !== 'object') return [];
+            const columns = Object.keys(tableData).filter(k => k !== 'manualSort');
+            if (columns.length === 0) return [];
+
+            const rowCount = tableData.id?.length || 0;
+            const records = [];
+
+            for (let i = 0; i < rowCount; i++) {
+                const record = {};
+                columns.forEach(col => {
+                    record[col] = tableData[col][i];
+                });
+                records.push(record);
+            }
+            return records;
+        }
+
+        // ===== SUGGESTIONS =====
+
+        async requestSuggestions() {
+            if (!this.config.webhookUrl) {
+                console.log('No webhook configured, using local suggestions');
+                this.generateLocalSuggestions();
+                return;
+            }
+
+            // Show loading state
+            this.elements.suggestionsPanel.classList.add('visible', 'loading');
+            this.elements.suggestionsGrid.innerHTML = `
+                <div class="suggestions-loading">
+                    <div class="mini-spinner"></div>
+                    <span>Analyse du document...</span>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(this.config.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'analyze',
+                        schema: this.schema,
+                        dataSummary: this.buildDataSummary()
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const result = await response.json();
+
+                if (result.suggestions && result.suggestions.length > 0) {
+                    this.suggestions = result.suggestions;
+                    this.renderSuggestions();
+                } else {
+                    this.elements.suggestionsPanel.classList.remove('visible');
+                }
+
+            } catch (error) {
+                console.error('Suggestions error:', error);
+                // Fallback: generate local suggestions
+                this.generateLocalSuggestions();
+            }
+
+            this.elements.suggestionsPanel.classList.remove('loading');
+        }
+
+        buildDataSummary() {
+            const summary = {};
+            for (const [tableId, records] of Object.entries(this.allData)) {
+                const columns = this.schema.tables[tableId]?.columns || [];
+                summary[tableId] = {
+                    count: records.length,
+                    columns: columns.map(c => ({
+                        id: c.id,
+                        type: c.type,
+                        choices: c.choices
+                    })),
+                    sample: records.slice(0, 3)
+                };
+            }
+            return summary;
+        }
+
+        generateLocalSuggestions() {
+            // Fallback: generate suggestions locally based on schema
+            this.suggestions = [];
+
+            for (const [tableId, tableInfo] of Object.entries(this.schema.tables)) {
+                const columns = tableInfo.columns;
+                const records = this.allData[tableId] || [];
+                if (records.length === 0) continue;
+
+                const choiceCols = columns.filter(c => c.type === 'Choice');
+                const numericCols = columns.filter(c => ['Numeric', 'Int'].includes(c.type));
+                const dateCols = columns.filter(c => ['Date', 'DateTime'].includes(c.type));
+
+                // Suggestion: Pie by Choice column
+                for (const col of choiceCols.slice(0, 2)) {
+                    this.suggestions.push({
+                        icon: '🥧',
+                        title: `Répartition par ${col.label}`,
+                        subtitle: tableId,
+                        config: {
+                            type: 'pie',
+                            table: tableId,
+                            mapping: { category: col.id },
+                            aggregation: 'count'
+                        }
+                    });
+                }
+
+                // Suggestion: Bar for numeric by category
+                if (choiceCols.length > 0 && numericCols.length > 0) {
+                    this.suggestions.push({
+                        icon: '📊',
+                        title: `${numericCols[0].label} par ${choiceCols[0].label}`,
+                        subtitle: tableId,
+                        config: {
+                            type: 'bar',
+                            table: tableId,
+                            mapping: { category: choiceCols[0].id, value: numericCols[0].id },
+                            aggregation: 'sum'
+                        }
+                    });
+                }
+
+                // Suggestion: Timeline if date column
+                if (dateCols.length > 0 && numericCols.length > 0) {
+                    this.suggestions.push({
+                        icon: '📈',
+                        title: `Évolution ${numericCols[0].label}`,
+                        subtitle: tableId,
+                        config: {
+                            type: 'line',
+                            table: tableId,
+                            mapping: { x: dateCols[0].id, y: numericCols[0].id }
+                        }
+                    });
+                }
+            }
+
+            // Suggestion: Sankey if relations exist
+            if (this.schema.relations.length > 0) {
+                const rel = this.schema.relations[0];
+                const fromTable = this.schema.tables[rel.from];
+                const choiceCols = fromTable?.columns.filter(c => c.type === 'Choice') || [];
+
+                if (choiceCols.length >= 2) {
+                    this.suggestions.push({
+                        icon: '🔄',
+                        title: `Flux ${choiceCols[0].label} → ${choiceCols[1].label}`,
+                        subtitle: rel.from,
+                        config: {
+                            type: 'sankey',
+                            table: rel.from,
+                            mapping: { source: choiceCols[0].id, target: choiceCols[1].id }
+                        }
+                    });
+                }
+            }
+
+            // Limit to 6 suggestions
+            this.suggestions = this.suggestions.slice(0, 6);
+
+            if (this.suggestions.length > 0) {
+                this.renderSuggestions();
+            }
+        }
+
+        renderSuggestions() {
+            if (this.suggestions.length === 0) {
+                this.elements.suggestionsPanel.classList.remove('visible');
+                return;
+            }
+
+            this.elements.suggestionsPanel.classList.add('visible');
+
+            this.elements.suggestionsGrid.innerHTML = this.suggestions.map((s, idx) => `
+                <div class="suggestion-card" onclick="app.selectSuggestion(${idx})">
+                    <div class="suggestion-icon">${s.icon}</div>
+                    <div class="suggestion-title">${s.title}</div>
+                    <div class="suggestion-subtitle">${s.subtitle}</div>
+                </div>
+            `).join('');
+        }
+
+        async selectSuggestion(index) {
+            const suggestion = this.suggestions[index];
+            if (!suggestion) return;
+
+            // Highlight selected
+            document.querySelectorAll('.suggestion-card').forEach((el, i) => {
+                el.classList.toggle('selected', i === index);
+            });
+
+            // Add to chat
+            this.addMessage(suggestion.title, 'user');
+
+            // Generate chart
+            await this.generateChart(suggestion.config, suggestion.title);
+        }
+
+        // ===== CHAT & GENERATION =====
+
+        addMessage(content, type = 'assistant') {
+            const container = this.elements.chatMessages;
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            msg.textContent = content;
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async sendMessage() {
+            const input = this.elements.chatInput;
+            const prompt = input.value.trim();
+            if (!prompt || this.isLoading) return;
+
+            this.addMessage(prompt, 'user');
+            input.value = '';
+
+            await this.generateChartFromPrompt(prompt);
+        }
+
+        async generateChartFromPrompt(prompt) {
+            if (!this.config.webhookUrl) {
+                this.addMessage('⚠️ Configurez l\'URL du webhook dans les paramètres.', 'system');
+                this.openSettings();
+                return;
+            }
+
+            this.setLoading(true);
+
+            try {
+                const response = await fetch(this.config.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'generate',
+                        prompt: prompt,
+                        schema: this.schema,
+                        data: this.allData
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const result = await response.json();
+
+                if (result.success && result.html) {
+                    this.displayChart(result.html, result.title);
+                    this.addMessage(`✅ ${result.title || 'Visualisation'} générée`, 'system');
+                } else {
+                    throw new Error(result.error || 'Génération échouée');
+                }
+
+            } catch (error) {
+                console.error('Generation error:', error);
+                this.addMessage(`❌ Erreur: ${error.message}`, 'system');
+            } finally {
+                this.setLoading(false);
+            }
+        }
+
+        async generateChart(config, title) {
+            if (!this.config.webhookUrl) {
+                this.addMessage('⚠️ Configurez l\'URL du webhook dans les paramètres.', 'system');
+                this.openSettings();
+                return;
+            }
+
+            this.setLoading(true);
+
+            try {
+                const tableData = this.allData[config.table] || [];
+
+                const response = await fetch(this.config.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'generate',
+                        prompt: title,
+                        config: config,
+                        table: config.table,
+                        data: tableData,
+                        columns: this.schema.tables[config.table]?.columns || [],
+                        schema: this.schema
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const result = await response.json();
+
+                if (result.success && result.html) {
+                    this.displayChart(result.html, result.title || title);
+                    this.addMessage(`✅ ${result.title || title} généré (${tableData.length} enregistrements)`, 'system');
+                } else {
+                    throw new Error(result.error || 'Génération échouée');
+                }
+
+            } catch (error) {
+                console.error('Generation error:', error);
+                this.addMessage(`❌ Erreur: ${error.message}`, 'system');
+            } finally {
+                this.setLoading(false);
+            }
+        }
+
+        displayChart(html, title) {
+            this.elements.chartPlaceholder.style.display = 'none';
+            this.elements.chartFrame.style.display = 'block';
+            this.elements.chartFrame.srcdoc = html;
+            this.elements.chartToolbar.classList.add('visible');
+            this.elements.chartTitle.textContent = title || 'Visualisation';
+
+            this.currentChart = { html, title };
+        }
+
+        setLoading(loading) {
+            this.isLoading = loading;
+            this.elements.chartLoading.classList.toggle('visible', loading);
+            this.elements.chatSendBtn.disabled = loading;
+        }
+
+        // ===== CHART ACTIONS =====
+
+        expandChart() {
+            if (this.currentChart?.html) {
+                const win = window.open('', '_blank');
+                win.document.write(this.currentChart.html);
+                win.document.close();
+            }
+        }
+
+        downloadChart() {
+            if (this.currentChart?.html) {
+                const blob = new Blob([this.currentChart.html], { type: 'text/html' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `${this.currentChart.title || 'chart'}_${Date.now()}.html`;
+                a.click();
+            }
+        }
+
+        // ===== SUGGESTIONS TOGGLE =====
+
+        toggleSuggestions() {
+            this.elements.suggestionsPanel.classList.toggle('collapsed');
+        }
+
+        // ===== SETTINGS =====
+
+        openSettings() {
+            this.elements.inputWebhookUrl.value = this.config.webhookUrl;
+            this.elements.settingsModal.classList.add('visible');
+        }
+
+        closeSettings() {
+            this.elements.settingsModal.classList.remove('visible');
+        }
+
+        saveSettings() {
+            this.config.webhookUrl = this.elements.inputWebhookUrl.value.trim();
+            localStorage.setItem('chart_agent_webhook', this.config.webhookUrl);
+            this.closeSettings();
+            this.addMessage('✅ Configuration enregistrée', 'system');
+
+            // Re-request suggestions with new webhook
+            if (this.config.webhookUrl && this.schema) {
+                this.requestSuggestions();
+            }
+        }
+    }
+
+    // ===== INIT =====
+    const app = new ChartAgentApp();
+    document.addEventListener('DOMContentLoaded', () => app.initialize());
+    </script>
+</body>
+</html>

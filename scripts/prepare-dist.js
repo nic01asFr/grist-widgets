@@ -18,6 +18,7 @@ const staticWidgets = [
   { name: 'reveal-editor', source: 'public' },
   { name: 'panoramax-explorer', source: 'public' },
   { name: 'datacart-explorer', source: 'public' },
+  { name: 'chart-agent-pro', source: 'public' },
   { name: 'Maquette_3d', source: '.' }
 ];
 

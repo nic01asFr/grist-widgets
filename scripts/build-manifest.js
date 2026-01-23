@@ -171,6 +171,18 @@ const widgets = [
       name: 'nic01asFr',
       url: 'https://github.com/nic01asFr'
     }]
+  },
+  {
+    name: 'Chart Agent Pro',
+    description: 'Générateur de visualisations intelligent avec assistant IA. Analyse automatique du schéma Grist, suggestions contextualisées, chat conversationnel pour créer des graphiques (bar, pie, line, sankey, scatter, treemap). Intégration n8n + Albert API pour génération HTML dynamique.',
+    path: 'chart-agent-pro',
+    widgetId: '@nic01asFr/chart-agent-pro',
+    accessLevel: 'full',
+    renderAfterReady: true,
+    authors: [{
+      name: 'nic01asFr',
+      url: 'https://github.com/nic01asFr'
+    }]
   }
 ];
 
