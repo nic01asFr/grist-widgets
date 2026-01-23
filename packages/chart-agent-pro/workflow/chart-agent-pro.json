@@ -1,0 +1,223 @@
+{
+  "name": "Chart Agent Pro v3 - Fixed",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "is-analyze",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "analyze",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "route-action",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-48, 1296]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// PREPARE CONTEXT FOR ANALYZE\n// ============================================\n\nconst input = $input.first().json.body;\nconst schema = input.schema || { tables: {}, relations: [] };\nconst dataSummary = input.dataSummary || {};\n\nlet contextText = '## Document Grist - Analyse des données\\n\\n';\nconst contextByTable = {};\n\nfor (const [tableId, tableSummary] of Object.entries(dataSummary)) {\n  if (!tableSummary || tableSummary.count === 0) continue;\n  \n  const tableSchema = schema.tables?.[tableId] || {};\n  const columns = tableSchema.columns || tableSummary.columns || [];\n  const sampleRecords = tableSummary.sample || [];\n  \n  contextText += `### Table: ${tableId} (${tableSummary.count} enregistrements)\\n\\n`;\n  \n  const analysis = { count: tableSummary.count, columns: [] };\n  \n  for (const col of columns) {\n    const colInfo = { id: col.id, label: col.label || col.id, type: col.type };\n    \n    if (['Choice', 'Text'].includes(col.type)) {\n      const valueCounts = {};\n      sampleRecords.forEach(r => {\n        const val = String(r[col.id] || 'N/A');\n        valueCounts[val] = (valueCounts[val] || 0) + 1;\n      });\n      \n      const sorted = Object.entries(valueCounts).sort((a, b) => b[1] - a[1]);\n      const topValues = sorted.slice(0, 6);\n      \n      if (topValues.length > 0) {\n        colInfo.distribution = valueCounts;\n        colInfo.topValues = topValues.map(([v, c]) => `${v}: ${c}`);\n        colInfo.uniqueCount = sorted.length;\n        contextText += `- **${col.label || col.id}** (${col.type}): ${topValues.map(([v, c]) => `\"${v}\" (${c})`).join(', ')}\\n`;\n      }\n    }\n    \n    if (['Numeric', 'Int'].includes(col.type)) {\n      const values = sampleRecords.map(r => Number(r[col.id])).filter(v => !isNaN(v));\n      if (values.length > 0) {\n        colInfo.min = Math.min(...values);\n        colInfo.max = Math.max(...values);\n        colInfo.sum = Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100;\n        colInfo.avg = Math.round(colInfo.sum / values.length * 100) / 100;\n        contextText += `- **${col.label || col.id}** (${col.type}): min=${colInfo.min}, max=${colInfo.max}, moyenne=${colInfo.avg}\\n`;\n      }\n    }\n    \n    if (['Date', 'DateTime'].includes(col.type)) {\n      const dates = sampleRecords.map(r => r[col.id]).filter(d => d);\n      if (dates.length > 0) {\n        const sorted = [...dates].sort();\n        const formatDate = (ts) => typeof ts === 'number' ? new Date(ts * 1000).toISOString().split('T')[0] : String(ts);\n        colInfo.earliest = formatDate(sorted[0]);\n        colInfo.latest = formatDate(sorted[sorted.length - 1]);\n        contextText += `- **${col.label || col.id}** (${col.type}): de ${colInfo.earliest} à ${colInfo.latest}\\n`;\n      }\n    }\n    \n    if (['Ref', 'RefList'].includes(col.type)) {\n      contextText += `- **${col.label || col.id}** (${col.type}): référence\\n`;\n    }\n    \n    analysis.columns.push(colInfo);\n  }\n  \n  contextByTable[tableId] = analysis;\n  contextText += '\\n';\n}\n\nif (schema.relations && schema.relations.length > 0) {\n  contextText += '### Relations\\n';\n  for (const rel of schema.relations) {\n    contextText += `- ${rel.from}.${rel.fromColumn} → ${rel.to}\\n`;\n  }\n}\n\nreturn { json: { contextText, contextByTable, schema } };"
+      },
+      "id": "prepare-analyze",
+      "name": "Prepare Analyze Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, 1184]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://albert.api.etalab.gouv.fr/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'albert-large',\n  max_tokens: 3000,\n  temperature: 0.4,\n  messages: [\n    {\n      role: 'system',\n      content: `Tu es un expert en visualisation de données. Analyse le contexte fourni et suggère des visualisations pertinentes.\n\nRÈGLES:\n1. Base tes suggestions sur les VRAIES VALEURS présentes\n2. Crée des titres descriptifs avec les données réelles\n3. Propose 4-6 visualisations variées\n4. RETOURNE UNIQUEMENT DU JSON VALIDE\n\nTYPES:\n- pie: répartition (colonnes Choice, 2-8 valeurs)\n- bar: comparaison catégorielle\n- line: évolution temporelle (requiert Date)\n- sankey: flux entre 2 dimensions\n- scatter: corrélation numérique\n\nFORMAT JSON STRICT:\n{\"suggestions\":[{\"icon\":\"emoji\",\"title\":\"Titre\",\"description\":\"Description\",\"config\":{\"type\":\"pie\",\"table\":\"NomTable\",\"mapping\":{\"category\":\"col_id\"},\"aggregation\":\"count\"}}]}`\n    },\n    {\n      role: 'user',\n      content: $json.contextText\n    }\n  ]\n}) }}",
+        "options": {}
+      },
+      "id": "albert-suggestions",
+      "name": "Albert: Suggestions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [368, 1184],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Albert API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// PARSE & VALIDATE INPUT (Generate Branch)\n// Handles both formats:\n// 1. Suggestion click: { table: 'X', data: [...records] }\n// 2. Chat prompt: { data: { TableA: [...], TableB: [...] } }\n// ============================================\n\nconst input = $input.first().json.body;\n\nconsole.log('=== Parse Input Debug ===');\nconsole.log('Has prompt:', !!input.prompt);\nconsole.log('Has table:', !!input.table);\nconsole.log('Has config:', !!input.config);\nconsole.log('Data type:', Array.isArray(input.data) ? 'array' : typeof input.data);\n\nif (!input.prompt) {\n  throw new Error('Missing prompt');\n}\n\nlet tableId, records, columns, allTablesData;\n\n// CASE 1: Direct from suggestion click (data is array of records for specific table)\nif (input.table && Array.isArray(input.data)) {\n  console.log('Format: Suggestion click (array data)');\n  tableId = input.table;\n  records = input.data;\n  columns = input.columns || [];\n  allTablesData = null;\n}\n// CASE 2: From chat prompt (data is object with table names as keys)\nelse if (input.data && typeof input.data === 'object' && !Array.isArray(input.data)) {\n  console.log('Format: Chat prompt (object data)');\n  const allData = input.data;\n  const allTableNames = Object.keys(allData);\n  \n  // CRITICAL: Filter to ONLY tables with data\n  const tableNames = allTableNames.filter(t => Array.isArray(allData[t]) && allData[t].length > 0);\n  \n  console.log('All tables:', allTableNames.join(', '));\n  console.log('Tables with data:', tableNames.join(', '));\n  \n  if (tableNames.length === 0) {\n    throw new Error('All tables are empty. Tables found: ' + allTableNames.join(', '));\n  }\n  \n  const promptLower = input.prompt.toLowerCase();\n  \n  // Try exact match first (only on tables with data)\n  tableId = tableNames.find(t => promptLower.includes(t.toLowerCase()));\n  \n  // Try partial match: \"friche\" matches \"Friches\", \"projet\" matches \"Projets\"\n  if (!tableId) {\n    tableId = tableNames.find(t => {\n      const tLower = t.toLowerCase();\n      const singular = tLower.endsWith('s') ? tLower.slice(0, -1) : tLower;\n      const parts = tLower.split('_').filter(p => p.length > 2);\n      return promptLower.includes(singular) || parts.some(p => promptLower.includes(p));\n    });\n  }\n  \n  if (!tableId) {\n    tableId = tableNames[0];\n    console.log('No table match, using first with data:', tableId);\n  } else {\n    console.log('Matched table:', tableId);\n  }\n  \n  records = allData[tableId];\n  columns = input.schema?.tables?.[tableId]?.columns || [];\n  allTablesData = allData;\n}\n// CASE 3: Config provided without explicit data array (use config.table)\nelse if (input.config?.table && input.data) {\n  console.log('Format: Config with table reference');\n  tableId = input.config.table;\n  \n  if (typeof input.data === 'object' && !Array.isArray(input.data)) {\n    records = input.data[tableId] || [];\n    allTablesData = input.data;\n  } else if (Array.isArray(input.data)) {\n    records = input.data;\n    allTablesData = null;\n  } else {\n    records = [];\n  }\n  \n  columns = input.columns || input.schema?.tables?.[tableId]?.columns || [];\n}\nelse {\n  console.log('Format: Unknown - data:', JSON.stringify(input.data).substring(0, 200));\n  throw new Error('Cannot determine data format');\n}\n\nconsole.log('Selected table:', tableId);\nconsole.log('Records count:', records.length);\nconsole.log('Columns count:', columns.length);\n\nif (records.length === 0) {\n  // Try to provide helpful error message\n  const availableTables = allTablesData ? Object.keys(allTablesData) : [];\n  throw new Error(`No records found for table \"${tableId}\". Available tables: ${availableTables.join(', ') || 'none'}`);\n}\n\n// Analyze column types\nconst numericCols = columns.filter(c => ['Numeric', 'Int'].includes(c.type));\nconst textCols = columns.filter(c => c.type === 'Text');\nconst dateCols = columns.filter(c => ['Date', 'DateTime'].includes(c.type));\nconst categoricalCols = columns.filter(c => ['Choice', 'ChoiceList'].includes(c.type));\nconst refCols = columns.filter(c => ['Ref', 'RefList'].includes(c.type));\n\n// Sample data for LLM\nconst sampleData = records.slice(0, 5);\n\nconst context = {\n  tableId,\n  totalRows: records.length,\n  columnSummary: {\n    total: columns.length,\n    numeric: numericCols.map(c => c.id),\n    text: textCols.map(c => c.id),\n    date: dateCols.map(c => c.id),\n    categorical: categoricalCols.map(c => c.id),\n    references: refCols.map(c => ({ column: c.id, refTable: c.refTable }))\n  },\n  sampleData\n};\n\nreturn {\n  json: {\n    prompt: input.prompt,\n    tableId,\n    records,\n    columns,\n    context,\n    config: input.config || {},\n    allTablesData // Include for cross-table operations\n  }\n};"
+      },
+      "id": "parse-input",
+      "name": "Parse Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, 1392]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chart-agent-pro-v3",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 1296],
+      "webhookId": "chart-agent-pro-v3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// PARSE SUGGESTIONS FROM ALBERT\n// ============================================\n\nconst prepareData = $('Prepare Analyze Context').first().json;\nconst albertResponse = $input.first().json;\n\nlet suggestions = [];\n\ntry {\n  const content = albertResponse.choices?.[0]?.message?.content || '';\n  console.log('Albert response length:', content.length);\n  \n  // Try to extract JSON - handle markdown code blocks\n  let jsonStr = content;\n  const codeBlockMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (codeBlockMatch) {\n    jsonStr = codeBlockMatch[1].trim();\n  }\n  \n  // Find JSON object\n  const jsonMatch = jsonStr.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    suggestions = parsed.suggestions || [];\n    console.log('Parsed', suggestions.length, 'suggestions from Albert');\n  } else {\n    console.log('No JSON found in Albert response');\n  }\n} catch (e) {\n  console.log('Albert parse error:', e.message);\n}\n\n// FALLBACK: Generate suggestions from data analysis if Albert failed\nif (suggestions.length === 0) {\n  console.log('Using fallback suggestions');\n  const contextByTable = prepareData.contextByTable || {};\n  \n  for (const [tableId, analysis] of Object.entries(contextByTable)) {\n    if (!analysis?.columns) continue;\n    \n    const choiceCols = analysis.columns.filter(c => c.type === 'Choice' && c.topValues);\n    const numericCols = analysis.columns.filter(c => ['Numeric', 'Int'].includes(c.type));\n    const dateCols = analysis.columns.filter(c => ['Date', 'DateTime'].includes(c.type));\n    \n    // Pie chart for choice columns\n    for (const col of choiceCols.slice(0, 2)) {\n      suggestions.push({\n        icon: '🥧',\n        title: `Répartition par ${col.label}`,\n        description: tableId,\n        config: { type: 'pie', table: tableId, mapping: { category: col.id }, aggregation: 'count' }\n      });\n    }\n    \n    // Bar for numeric by category\n    if (choiceCols.length > 0 && numericCols.length > 0) {\n      suggestions.push({\n        icon: '📊',\n        title: `${numericCols[0].label} par ${choiceCols[0].label}`,\n        description: tableId,\n        config: { type: 'bar', table: tableId, mapping: { category: choiceCols[0].id, value: numericCols[0].id }, aggregation: 'sum' }\n      });\n    }\n    \n    // Sankey for 2+ choice columns\n    if (choiceCols.length >= 2) {\n      suggestions.push({\n        icon: '🔄',\n        title: `Flux ${choiceCols[0].label} → ${choiceCols[1].label}`,\n        description: tableId,\n        config: { type: 'sankey', table: tableId, mapping: { source: choiceCols[0].id, target: choiceCols[1].id }, aggregation: 'count' }\n      });\n    }\n    \n    // Line for date columns\n    if (dateCols.length > 0) {\n      suggestions.push({\n        icon: '📈',\n        title: `Évolution temporelle`,\n        description: tableId,\n        config: { type: 'line', table: tableId, mapping: { x: dateCols[0].id, y: numericCols[0]?.id }, aggregation: numericCols.length > 0 ? 'sum' : 'count' }\n      });\n    }\n  }\n}\n\nsuggestions = suggestions.slice(0, 6);\n\nreturn {\n  json: {\n    success: true,\n    suggestions,\n    tablesAnalyzed: Object.keys(prepareData.contextByTable || {}).length\n  }\n};"
+      },
+      "id": "parse-suggestions",
+      "name": "Parse Suggestions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 1184]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" },
+              { "name": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
+              { "name": "Access-Control-Allow-Headers", "value": "Content-Type" }
+            ]
+          }
+        }
+      },
+      "id": "respond-analyze",
+      "name": "Respond Analyze",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [768, 1184]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://albert.api.etalab.gouv.fr/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: $json.config.model || 'albert-large',\n  max_tokens: 2000,\n  temperature: 0.3,\n  messages: [\n    {\n      role: 'system',\n      content: `Tu es un expert en visualisation. Analyse la demande et retourne UNIQUEMENT du JSON valide.\n\nTYPES: bar, pie, line, sankey, treemap, scatter\n\nFORMAT JSON STRICT (rien d'autre):\n{\"chartType\":\"bar\",\"title\":\"Titre\",\"mapping\":{\"category\":\"col\",\"value\":\"col\"},\"aggregation\":\"count\"}`\n    },\n    {\n      role: 'user',\n      content: `Demande: ${$json.prompt}\\nTable: ${$json.tableId} (${$json.context.totalRows} lignes)\\nColonnes catégorielles: ${$json.context.columnSummary.categorical.join(', ') || 'aucune'}\\nColonnes numériques: ${$json.context.columnSummary.numeric.join(', ') || 'aucune'}\\nColonnes date: ${$json.context.columnSummary.date.join(', ') || 'aucune'}\\nÉchantillon: ${JSON.stringify($json.context.sampleData?.slice(0,3))}\\nRetourne UNIQUEMENT le JSON.`\n    }\n  ]\n}) }}",
+        "options": {}
+      },
+      "id": "albert-intent",
+      "name": "Albert: Analyze Intent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [368, 1392],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Albert API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// PARSE ANALYSIS & TRANSFORM DATA\n// ============================================\n\nconst input = $('Parse Input').first().json;\nconst analysisResponse = $input.first().json;\n\nconsole.log('=== Transform Data Debug ===');\nconsole.log('Input tableId:', input.tableId);\nconsole.log('Input records count:', input.records?.length);\n\nlet analysis;\ntry {\n  const content = analysisResponse.choices?.[0]?.message?.content || '';\n  console.log('LLM response:', content.substring(0, 200));\n  \n  // Remove markdown if present\n  let jsonStr = content;\n  const codeBlockMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();\n  \n  const jsonMatch = jsonStr.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    analysis = JSON.parse(jsonMatch[0]);\n    console.log('Parsed analysis:', JSON.stringify(analysis));\n    \n    // VALIDATION: For sankey, source must be different from target\n    if (analysis.chartType === 'sankey' && analysis.mapping) {\n      const src = analysis.mapping.source || analysis.mapping.category;\n      const tgt = analysis.mapping.target;\n      if (src === tgt) {\n        console.log('Invalid sankey: source === target, forcing fallback');\n        throw new Error('Sankey source equals target');\n      }\n    }\n  } else {\n    throw new Error('No JSON in response');\n  }\n} catch (e) {\n  console.log('Parse error:', e.message, '- using defaults');\n  \n  // Smart fallback based on available columns and prompt\n  const cats = input.context.columnSummary.categorical || [];\n  const nums = input.context.columnSummary.numeric || [];\n  const promptLower = input.prompt.toLowerCase();\n  \n  // Get all column keys from first record for matching\n  const recordKeys = Object.keys(input.records[0] || {}).filter(k => k !== 'id');\n  console.log('Available record keys:', recordKeys.join(', '));\n  \n  // Helper: find column matching a phrase like \"type friche\" -> \"Type_Friche\"\n  const findColumn = (phrase) => {\n    const words = phrase.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\\s+/);\n    return recordKeys.find(col => {\n      const colLower = col.toLowerCase();\n      return words.every(w => colLower.includes(w));\n    }) || cats.find(c => {\n      const cLower = c.toLowerCase();\n      return words.every(w => cLower.includes(w));\n    });\n  };\n  \n  let chartType = 'bar';\n  let mapping = {};\n  \n  // Detect sankey from prompt\n  if (promptLower.includes('flux') || promptLower.includes('sankey') || promptLower.includes('vers')) {\n    chartType = 'sankey';\n    \n    // Find gristHelper_Display columns (resolved ref labels)\n    const displayCols = recordKeys.filter(k => k.startsWith('gristHelper_Display'));\n    console.log('Display columns:', displayCols.join(', '));\n    \n    // Try to extract source/target from prompt like \"flux X vers Y\"\n    const fluxMatch = promptLower.match(/(?:flux|de)\\s+([a-zéèêàùç_\\s]+?)\\s+(?:vers|->|à|a)\\s+([a-zéèêàùç_\\s]+?)(?:\\s|$|avec|par)/i);\n    if (fluxMatch) {\n      const srcPhrase = fluxMatch[1].trim();\n      const tgtPhrase = fluxMatch[2].trim();\n      console.log('Sankey phrases:', srcPhrase, '->', tgtPhrase);\n      \n      // Try to match phrases to columns\n      let srcCol = findColumn(srcPhrase);\n      let tgtCol = findColumn(tgtPhrase);\n      \n      // If source matches a ref column, use its gristHelper_Display\n      const refs = input.context.columnSummary.references || [];\n      if (srcCol && refs.find(r => r.column === srcCol)) {\n        const displayIdx = refs.findIndex(r => r.column === srcCol);\n        srcCol = displayCols[displayIdx] || 'gristHelper_Display';\n      }\n      if (tgtCol && refs.find(r => r.column === tgtCol)) {\n        const displayIdx = refs.findIndex(r => r.column === tgtCol);\n        tgtCol = displayCols[displayIdx] || 'gristHelper_Display';\n      }\n      \n      // Fallback: use gristHelper_Display for source, statut/priorite for target\n      if (!srcCol) srcCol = displayCols[0] || cats[0];\n      if (!tgtCol || tgtCol === srcCol) {\n        tgtCol = cats.find(c => c !== srcCol && !displayCols.includes(c)) || 'statut';\n      }\n      \n      mapping.source = srcCol;\n      mapping.target = tgtCol;\n    } else {\n      // Default: gristHelper_Display -> statut (or first two different cats)\n      mapping.source = displayCols[0] || cats[0];\n      mapping.target = cats.find(c => c !== mapping.source) || cats[1] || 'statut';\n    }\n    \n    // Final check: ensure source != target\n    if (mapping.source === mapping.target) {\n      mapping.target = cats.find(c => c !== mapping.source) || recordKeys.find(k => k !== mapping.source && k !== 'id');\n    }\n    console.log('Sankey mapping:', JSON.stringify(mapping));\n  }\n  // Detect pie from prompt\n  else if (promptLower.includes('répartition') || promptLower.includes('pie') || promptLower.includes('camembert')) {\n    chartType = 'pie';\n    mapping = { category: cats[0] || Object.keys(input.records[0] || {})[1] };\n  }\n  // Detect line from prompt\n  else if (promptLower.includes('évolution') || promptLower.includes('temps') || promptLower.includes('line')) {\n    chartType = 'line';\n    mapping = { x: input.context.columnSummary.date[0], y: nums[0] };\n  }\n  // Default bar\n  else {\n    mapping = { category: cats[0] || 'id', value: nums[0] };\n  }\n  \n  analysis = {\n    chartType,\n    title: `${input.prompt}`,\n    mapping,\n    aggregation: 'count'\n  };\n  console.log('Fallback analysis:', JSON.stringify(analysis));\n}\n\nconst records = input.records || [];\nif (records.length === 0) {\n  throw new Error('No records to transform');\n}\n\n// Build reference lookup tables for Ref columns\nconst refLookups = new Map();\nconst refColumns = input.context.columnSummary.references || [];\nconst allTables = input.allTablesData || {};\n\nrefColumns.forEach(({ column, refTable }) => {\n  if (refTable && allTables[refTable]) {\n    const lookup = new Map();\n    allTables[refTable].forEach(row => {\n      // Try common label fields: Nom, Name, Label, Libelle, Title, or first text field\n      const label = row.Nom || row.Name || row.Label || row.Libelle || row.Title || row.nom || row.name || Object.values(row).find(v => typeof v === 'string' && v.length > 0 && v.length < 100) || row.id;\n      lookup.set(row.id, String(label));\n    });\n    refLookups.set(column, lookup);\n    console.log(`Ref lookup for ${column} -> ${refTable}: ${lookup.size} entries`);\n  }\n});\n\n// Helper: resolve value, using ref lookup if available\nconst resolveValue = (record, colName) => {\n  const rawValue = record[colName];\n  if (rawValue === null || rawValue === undefined) return 'Non défini';\n  \n  // Check if this column has a ref lookup\n  const lookup = refLookups.get(colName);\n  if (lookup && lookup.has(rawValue)) {\n    return lookup.get(rawValue);\n  }\n  return String(rawValue);\n};\n\nconst chartType = analysis.chartType || 'bar';\nconst mapping = analysis.mapping || {};\nconst aggregation = analysis.aggregation || 'count';\n\nlet chartData;\n\nswitch (chartType) {\n  case 'sankey': {\n    let sourceCol = mapping.source || mapping.category;\n    let targetCol = mapping.target;\n    \n    if (!sourceCol || !targetCol) {\n      throw new Error(`Sankey requires source and target. Got: source=${sourceCol}, target=${targetCol}`);\n    }\n    \n    // Check if we need cross-table data (e.g., type_friche -> type_projet)\n    // This happens when target column doesn't exist in current records\n    const recordKeys = Object.keys(records[0] || {});\n    const promptLower = input.prompt.toLowerCase();\n    let workingRecords = records;\n    \n    // Cross-table: if prompt mentions type_projet and we're in Friches, use Projets\n    if (promptLower.includes('type projet') && input.tableId === 'Friches' && allTables.Projets) {\n      console.log('Cross-table sankey: Friches -> Projets');\n      \n      // Build friche lookup: id -> gristHelper_Display (type friche label)\n      const fricheLookup = new Map();\n      records.forEach(f => {\n        const label = f.gristHelper_Display || resolveValue(f, 'type_friche');\n        fricheLookup.set(f.id, label);\n      });\n      \n      // Use Projets and resolve friche's type\n      workingRecords = allTables.Projets.map(p => ({\n        ...p,\n        _source: fricheLookup.get(p.friche) || 'Non défini',\n        _target: p.type_projet || 'Non défini'\n      }));\n      sourceCol = '_source';\n      targetCol = '_target';\n    }\n    \n    const linksMap = new Map();\n    const nodesSet = new Set();\n    \n    workingRecords.forEach(r => {\n      const source = sourceCol.startsWith('_') ? r[sourceCol] : resolveValue(r, sourceCol);\n      const target = targetCol.startsWith('_') ? r[targetCol] : resolveValue(r, targetCol);\n      if (source === target || source === 'Non défini' || target === 'Non défini') return;\n      \n      nodesSet.add(source);\n      nodesSet.add(target);\n      \n      const key = `${source}|${target}`;\n      linksMap.set(key, (linksMap.get(key) || 0) + 1);\n    });\n    \n    const nodes = Array.from(nodesSet).map(name => ({ name }));\n    const nodeIndex = Object.fromEntries(nodes.map((n, i) => [n.name, i]));\n    \n    const links = Array.from(linksMap.entries()).map(([key, value]) => {\n      const [s, t] = key.split('|');\n      return { source: nodeIndex[s], target: nodeIndex[t], value };\n    });\n    \n    chartData = { nodes, links };\n    break;\n  }\n  \n  case 'pie':\n  case 'bar': {\n    let categoryCol = mapping.category;\n    const valueCol = mapping.value;\n    \n    if (!categoryCol) {\n      const keys = Object.keys(records[0] || {}).filter(k => k !== 'id');\n      categoryCol = keys[0];\n      mapping.category = categoryCol;\n    }\n    \n    const groups = new Map();\n    records.forEach(r => {\n      const cat = resolveValue(r, categoryCol);\n      const val = valueCol ? Number(r[valueCol]) || 0 : 1;\n      if (!groups.has(cat)) groups.set(cat, { sum: 0, count: 0 });\n      const g = groups.get(cat);\n      g.sum += val;\n      g.count += 1;\n    });\n    \n    chartData = Array.from(groups.entries()).map(([cat, g]) => ({\n      category: cat,\n      value: aggregation === 'count' ? g.count : aggregation === 'avg' ? Math.round(g.sum / g.count * 100) / 100 : g.sum\n    }));\n    chartData.sort((a, b) => b.value - a.value);\n    break;\n  }\n  \n  case 'line': {\n    const xCol = mapping.x || mapping.category;\n    const yCol = mapping.y || mapping.value;\n    \n    const groups = new Map();\n    records.forEach(r => {\n      let xVal = r[xCol];\n      if (typeof xVal === 'number' && xVal > 1000000000) {\n        xVal = new Date(xVal * 1000).toISOString().split('T')[0];\n      }\n      const yVal = yCol ? Number(r[yCol]) || 0 : 1;\n      if (!groups.has(xVal)) groups.set(xVal, { sum: 0, count: 0 });\n      const g = groups.get(xVal);\n      g.sum += yVal;\n      g.count += 1;\n    });\n    \n    chartData = Array.from(groups.entries()).map(([x, g]) => ({\n      x, y: aggregation === 'count' ? g.count : g.sum\n    }));\n    chartData.sort((a, b) => String(a.x).localeCompare(String(b.x)));\n    break;\n  }\n  \n  case 'scatter': {\n    chartData = records.slice(0, 100).map(r => ({\n      x: Number(r[mapping.x]) || 0,\n      y: Number(r[mapping.y]) || 0,\n      label: r[mapping.label] || ''\n    }));\n    break;\n  }\n  \n  case 'treemap': {\n    const groups = new Map();\n    records.forEach(r => {\n      const cat = String(r[mapping.category] ?? 'Autre');\n      const val = mapping.value ? Number(r[mapping.value]) || 1 : 1;\n      groups.set(cat, (groups.get(cat) || 0) + val);\n    });\n    chartData = {\n      name: input.tableId,\n      children: Array.from(groups.entries()).map(([name, value]) => ({ name, value }))\n    };\n    break;\n  }\n  \n  default:\n    chartData = records.slice(0, 20);\n}\n\nreturn {\n  json: {\n    chartType,\n    title: analysis.title || input.prompt,\n    data: chartData,\n    mapping,\n    aggregation,\n    explanation: analysis.explanation,\n    tableId: input.tableId,\n    recordCount: records.length\n  }\n};"
+      },
+      "id": "transform-data",
+      "name": "Transform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 1392]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// GENERATE CHART HTML\n// ============================================\n\nconst input = $input.first().json;\nconst { chartType, title, data, recordCount } = input;\n\nconst colors = ['#4F46E5','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#84CC16','#F97316','#6366F1'];\nconst esc = s => String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'})[c]);\n\nlet html;\n\nswitch (chartType) {\n  case 'pie':\n  case 'bar': {\n    const labels = (data || []).map(d => d.category || '');\n    const values = (data || []).map(d => d.value || 0);\n    html = `<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>${esc(title)}</title>\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>\n<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;padding:24px;background:#fff}h1{font-size:1.25rem;color:#111;margin-bottom:24px;text-align:center}.c{max-width:700px;margin:0 auto}.l{margin-top:20px;text-align:center;font-size:0.8rem;color:#6B7280}</style></head>\n<body><h1>${esc(title)}</h1><div class=\"c\"><canvas id=\"c\"></canvas></div><div class=\"l\">${recordCount} enregistrements</div>\n<script>new Chart(document.getElementById('c'),{type:'${chartType==='bar'?'bar':'doughnut'}',data:{labels:${JSON.stringify(labels)},datasets:[{data:${JSON.stringify(values)},backgroundColor:${JSON.stringify(colors.slice(0,labels.length))},borderWidth:${chartType==='pie'?2:0},borderColor:'#fff',borderRadius:${chartType==='bar'?4:0}}]},options:{responsive:true,plugins:{legend:{display:${chartType==='pie'},position:'bottom'}},scales:${chartType==='bar'?'{y:{beginAtZero:true}}':'{}'}}});</script></body></html>`;\n    break;\n  }\n  \n  case 'sankey': {\n    if (!data?.nodes?.length || !data?.links?.length) {\n      throw new Error('Invalid sankey data: no nodes or links');\n    }\n    const sd = data.links.map(l => [data.nodes[l.source]?.name||'?',data.nodes[l.target]?.name||'?',l.value]);\n    html = `<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>${esc(title)}</title>\n<script src=\"https://www.gstatic.com/charts/loader.js\"></script>\n<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;padding:24px;background:#fff}h1{font-size:1.25rem;color:#111;margin-bottom:24px;text-align:center}#c{width:100%;height:500px}.l{margin-top:16px;text-align:center;font-size:0.8rem;color:#6B7280}</style></head>\n<body><h1>${esc(title)}</h1><div id=\"c\"></div><div class=\"l\">${recordCount} enregistrements - ${data.nodes.length} catégories - ${data.links.length} flux</div>\n<script>google.charts.load('current',{packages:['sankey']});google.charts.setOnLoadCallback(()=>{const d=new google.visualization.DataTable();d.addColumn('string','From');d.addColumn('string','To');d.addColumn('number','Value');d.addRows(${JSON.stringify(sd)});new google.visualization.Sankey(document.getElementById('c')).draw(d,{sankey:{node:{colors:${JSON.stringify(colors)},label:{fontSize:12,bold:true}},link:{colorMode:'gradient'}}});});</script></body></html>`;\n    break;\n  }\n  \n  case 'line': {\n    const labels = (data||[]).map(d => typeof d.x==='number'&&d.x>1e9 ? new Date(d.x*1000).toLocaleDateString('fr-FR') : String(d.x||''));\n    const values = (data||[]).map(d => d.y||0);\n    html = `<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>${esc(title)}</title>\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>\n<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;padding:24px;background:#fff}h1{font-size:1.25rem;color:#111;margin-bottom:24px;text-align:center}.c{max-width:800px;margin:0 auto}</style></head>\n<body><h1>${esc(title)}</h1><div class=\"c\"><canvas id=\"c\"></canvas></div>\n<script>new Chart(document.getElementById('c'),{type:'line',data:{labels:${JSON.stringify(labels)},datasets:[{data:${JSON.stringify(values)},borderColor:'#4F46E5',backgroundColor:'rgba(79,70,229,0.1)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});</script></body></html>`;\n    break;\n  }\n  \n  case 'scatter': {\n    const pts = (data||[]).map(d => ({x:d.x||0,y:d.y||0}));\n    html = `<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>${esc(title)}</title>\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>\n<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;padding:24px;background:#fff}h1{font-size:1.25rem;color:#111;margin-bottom:24px;text-align:center}.c{max-width:800px;margin:0 auto}</style></head>\n<body><h1>${esc(title)}</h1><div class=\"c\"><canvas id=\"c\"></canvas></div>\n<script>new Chart(document.getElementById('c'),{type:'scatter',data:{datasets:[{data:${JSON.stringify(pts)},backgroundColor:'#4F46E5',pointRadius:8}]},options:{responsive:true,plugins:{legend:{display:false}}}});</script></body></html>`;\n    break;\n  }\n  \n  case 'treemap': {\n    const td = [['Cat','Parent','Val'],[data?.name||'Root',null,0]];\n    (data?.children||[]).forEach(c => td.push([c.name,data?.name||'Root',c.value]));\n    html = `<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>${esc(title)}</title>\n<script src=\"https://www.gstatic.com/charts/loader.js\"></script>\n<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;padding:24px;background:#fff}h1{font-size:1.25rem;color:#111;margin-bottom:24px;text-align:center}#c{width:100%;height:500px}</style></head>\n<body><h1>${esc(title)}</h1><div id=\"c\"></div>\n<script>google.charts.load('current',{packages:['treemap']});google.charts.setOnLoadCallback(()=>{new google.visualization.TreeMap(document.getElementById('c')).draw(google.visualization.arrayToDataTable(${JSON.stringify(td)}),{minColor:'#E0E7FF',midColor:'#818CF8',maxColor:'#4F46E5',headerHeight:0,fontColor:'#fff'});});</script></body></html>`;\n    break;\n  }\n  \n  default: {\n    const items = Array.isArray(data) ? data.slice(0,10) : [];\n    const labels = items.map((d,i) => d.category||d.name||`Item ${i+1}`);\n    const values = items.map(d => d.value||1);\n    html = `<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>${esc(title)}</title>\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>\n<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;padding:24px;background:#fff}h1{font-size:1.25rem;color:#111;margin-bottom:24px;text-align:center}.c{max-width:700px;margin:0 auto}</style></head>\n<body><h1>${esc(title)}</h1><div class=\"c\"><canvas id=\"c\"></canvas></div>\n<script>new Chart(document.getElementById('c'),{type:'bar',data:{labels:${JSON.stringify(labels)},datasets:[{data:${JSON.stringify(values)},backgroundColor:${JSON.stringify(colors.slice(0,labels.length))}}]},options:{responsive:true,plugins:{legend:{display:false}}}});</script></body></html>`;\n  }\n}\n\nreturn {\n  json: {\n    success: true,\n    html,\n    title,\n    chartType,\n    recordCount\n  }\n};"
+      },
+      "id": "generate-html",
+      "name": "Generate HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [768, 1392]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" },
+              { "name": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
+              { "name": "Access-Control-Allow-Headers", "value": "Content-Type" }
+            ]
+          }
+        }
+      },
+      "id": "respond-generate",
+      "name": "Respond Generate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 1392]
+    }
+  ],
+  "connections": {
+    "Route Action": {
+      "main": [
+        [{ "node": "Prepare Analyze Context", "type": "main", "index": 0 }],
+        [{ "node": "Parse Input", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Analyze Context": {
+      "main": [[{ "node": "Albert: Suggestions", "type": "main", "index": 0 }]]
+    },
+    "Albert: Suggestions": {
+      "main": [[{ "node": "Parse Suggestions", "type": "main", "index": 0 }]]
+    },
+    "Parse Input": {
+      "main": [[{ "node": "Albert: Analyze Intent", "type": "main", "index": 0 }]]
+    },
+    "Webhook": {
+      "main": [[{ "node": "Route Action", "type": "main", "index": 0 }]]
+    },
+    "Parse Suggestions": {
+      "main": [[{ "node": "Respond Analyze", "type": "main", "index": 0 }]]
+    },
+    "Albert: Analyze Intent": {
+      "main": [[{ "node": "Transform Data", "type": "main", "index": 0 }]]
+    },
+    "Transform Data": {
+      "main": [[{ "node": "Generate HTML", "type": "main", "index": 0 }]]
+    },
+    "Generate HTML": {
+      "main": [[{ "node": "Respond Generate", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "chart-agent-pro-workflow-v3-fixed"
+  }
+}

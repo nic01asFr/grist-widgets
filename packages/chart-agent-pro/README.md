@@ -67,10 +67,12 @@ Le widget nécessite un workflow n8n pour fonctionner. Le workflow gère :
 
 #### Installation du workflow
 
-1. Importer le fichier `n8n-workflow.json` dans votre instance n8n
-2. Configurer les credentials pour l'API Albert (ou autre LLM)
+1. Importer le fichier `workflow/chart-agent-pro.json` dans votre instance n8n
+2. Configurer les credentials pour l'API Albert (ou autre LLM compatible OpenAI)
 3. Activer le workflow
 4. Copier l'URL du webhook dans les paramètres du widget
+
+> **Note**: Le workflow se trouve dans le dossier `workflow/` à côté du dossier `public/`
 
 ## Types de graphiques supportés
 
